@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>4D Charta Analyzer V4.7.2</title>
+<title>4D Charta Analyzer V5.0</title>
 
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -1452,7 +1452,7 @@ body.v46-ui .pattern-panel{
 
   <div class="header">
     <h1>4D CHARTA ANALYZER</h1>
-    <div class="version">V4.5 • HISTORY + ADVANCED PATTERN</div>
+    <div class="version">V5.0 • STABLE</div>
     <div class="subtitle">
       Charta Scan + Independent History Scan • Exact + Permutation • Auto Database
     </div>
@@ -4764,482 +4764,143 @@ document.addEventListener("DOMContentLoaded",function(){
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 <style>
-/* V4.7.3.2-CLEAN-FIX */
-#v473bar{
-  position:sticky;top:0;z-index:9000;
-  display:flex;align-items:center;justify-content:space-between;
-  gap:8px;padding:7px 10px;margin-bottom:8px;
-  border:1px solid rgba(255,193,7,.30);border-radius:12px;
-  background:rgba(3,15,28,.94);backdrop-filter:blur(10px);
-  font-size:11px
-}
-#v473bar .db{color:#9fb5c5;white-space:nowrap}
-#v473bar .res{color:#f6c84c;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#v473reset{
-  border:1px solid rgba(255,82,82,.5);
-  background:rgba(255,82,82,.10);color:#ff7777;
-  border-radius:9px;padding:6px 8px;font-weight:800;font-size:10px
-}
+/* V5.0-STABLE-CONSOLIDATED */
+#v5TopBar{position:sticky;top:0;z-index:9000;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 10px;margin:0 0 8px;border:1px solid rgba(255,193,7,.30);border-radius:12px;background:rgba(3,15,28,.94);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);font-size:11px}
+#v5TopBar .db{color:#9fb5c5;white-space:nowrap}
+#v5TopBar .res{color:#f6c84c;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#v5Reset{border:1px solid rgba(255,82,82,.50);background:rgba(255,82,82,.10);color:#ff7777;border-radius:9px;padding:6px 8px;font-weight:800;font-size:10px}
+#v5Install{display:none;position:fixed;right:14px;bottom:82px;z-index:9998;border:1px solid rgba(246,200,76,.55);background:rgba(3,20,35,.96);color:#f6c84c;border-radius:14px;padding:10px 13px;font-weight:800;font-size:12px;box-shadow:0 10px 30px rgba(0,0,0,.28)}
+#v5Install.show{display:block}
+@media(display-mode:standalone){#v5Install{display:none!important}}
+.v5PermBadge{display:inline-block;margin-left:6px;padding:2px 7px;border-radius:999px;font-size:10px;font-weight:900;vertical-align:2px;border:1px solid rgba(255,255,255,.08)}
+.v5x24{background:rgba(78,200,255,.12);color:#66d4ff}.v5x12{background:rgba(246,200,76,.14);color:#ffd85e}.v5x6{background:rgba(66,223,135,.13);color:#6ef0a5}.v5x4{background:rgba(255,119,119,.13);color:#ff8a8a}
+#v5Repeat{margin-top:12px;padding:12px;border:1px solid rgba(246,200,76,.26);border-radius:14px;background:rgba(4,19,31,.56)}
+#v5Repeat .ttl{font-size:12px;font-weight:900;margin-bottom:4px}
+#v5Repeat .note{color:#829daf;font-size:10px;line-height:1.35;margin-bottom:9px}
+#v5Repeat .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+#v5Repeat .item{background:rgba(7,27,42,.86);border:1px solid rgba(255,255,255,.05);border-radius:11px;padding:9px}
+#v5Repeat small{display:block;color:#829daf;font-size:9px;margin-bottom:3px}
+#v5Repeat .num{color:#f6c84c;font-weight:900;font-size:17px}
 </style>
 
+<button id="v5Install" type="button">👑 INSTALL APP</button>
+
 <script>
-/* V4.7.3.2-CLEAN-FIX */
+/* V5.0-STABLE-CONSOLIDATED */
 (function(){
 "use strict";
+const VERSION="V5.0 • STABLE";
+function clean(v){return(v||"").replace(/\s+/g," ").trim()}
+function setVersion(){const v=document.querySelector(".version");if(v)v.textContent=VERSION;document.title="4D Charta Analyzer V5.0"}
 
-function clean(v){return (v||"").replace(/\s+/g," ").trim();}
-
-function ensureBar(){
-  if(document.getElementById("v473bar")) return;
-
+function ensureTopBar(){
+  if(document.getElementById("v5TopBar"))return;
   const bar=document.createElement("div");
-  bar.id="v473bar";
-  bar.innerHTML=
-    '<span class="db">DB: <b id="v473date">loading...</b></span>'+
-    '<span class="res" id="v473res">Ready</span>'+
-    '<button id="v473reset" type="button">RESET</button>';
-
-  const app=document.querySelector(".app");
-  const header=document.querySelector(".header");
-
-  if(app && header) app.insertBefore(bar,header.nextSibling);
-  else if(app) app.insertBefore(bar,app.firstChild);
-  else document.body.insertBefore(bar,document.body.firstChild);
-
-  document.getElementById("v473reset").addEventListener("click",function(){
-    if(!confirm("Kosongkan Charta dan Favourite?")) return;
-
-    document.querySelectorAll(".chart-input,.fav-input").forEach(function(i){
-      i.value="";
-      i.dispatchEvent(new Event("input",{bubbles:true}));
-      i.dispatchEvent(new Event("change",{bubbles:true}));
-    });
-
-    const clear=[...document.querySelectorAll("button")].find(function(b){
-      return clean(b.textContent).toUpperCase()==="CLEAR";
-    });
-    if(clear) try{clear.click()}catch(e){}
-  });
+  bar.id="v5TopBar";
+  bar.innerHTML='<span class="db">DB: <b id="v5Db">loading...</b></span><span class="res" id="v5Result">Ready</span><button id="v5Reset" type="button">RESET</button>';
+  const app=document.querySelector(".app"),header=document.querySelector(".header");
+  if(app&&header)app.insertBefore(bar,header.nextSibling);else if(app)app.insertBefore(bar,app.firstChild);else document.body.insertBefore(bar,document.body.firstChild);
+  document.getElementById("v5Reset").onclick=function(){
+    if(!confirm("Kosongkan Charta dan Favourite?"))return;
+    document.querySelectorAll(".chart-input,.fav-input").forEach(i=>{i.value="";i.dispatchEvent(new Event("input",{bubbles:true}));i.dispatchEvent(new Event("change",{bubbles:true}))});
+    const clear=[...document.querySelectorAll("button")].find(b=>clean(b.textContent).toUpperCase()==="CLEAR");
+    if(clear)try{clear.click()}catch(e){}
+  };
 }
 
-function formatDate(raw){
-  const m=String(raw||"").match(/(20\d{2})[-\/](\d{2})[-\/](\d{2})/);
-  return m ? m[3]+"/"+m[2]+"/"+m[1] : null;
-}
-
-async function updateDb(){
-  const el=document.getElementById("v473date");
-  if(!el) return;
-
-  const files=[
-    "data/magnum.json",
-    "data/toto.json",
-    "data/damacai.json",
-    "data/cashsweep.json"
-  ];
-
-  let latest="";
-
-  for(const file of files){
+function formatDate(raw){const m=String(raw||"").match(/(20\d{2})[-\/](\d{2})[-\/](\d{2})/);return m?m[3]+"/"+m[2]+"/"+m[1]:null}
+async function loadDbDate(){
+  const el=document.getElementById("v5Db");if(!el)return;
+  const files=["magnum","toto","damacai","cashsweep"];let latest="";
+  for(const name of files){
     try{
-      const r=await fetch(file,{cache:"no-store"});
-      if(!r.ok) continue;
+      const r=await fetch("data/"+name+".json",{cache:"no-store"});if(!r.ok)continue;
       const db=await r.json();
-
-      const candidates=[
-        db.lastUpdated,
-        db.historyCoverage && db.historyCoverage.newestDate
-      ].filter(Boolean);
-
-      candidates.forEach(function(raw){
-        const m=String(raw).match(/(20\d{2})[-\/](\d{2})[-\/](\d{2})/);
-        if(!m) return;
-        const iso=m[1]+"-"+m[2]+"-"+m[3];
-        if(!latest || iso>latest) latest=iso;
+      [db.lastUpdated,db.historyCoverage&&db.historyCoverage.newestDate].filter(Boolean).forEach(raw=>{
+        const m=String(raw).match(/(20\d{2})[-\/](\d{2})[-\/](\d{2})/);if(!m)return;
+        const iso=m[1]+"-"+m[2]+"-"+m[3];if(!latest||iso>latest)latest=iso;
       });
     }catch(e){}
   }
-
-  el.textContent=latest ? formatDate(latest) : "unavailable";
+  el.textContent=latest?formatDate(latest):"unavailable";
 }
 
-function getAnalysisCard(){
-  const cards=[...document.querySelectorAll(".analysis-card,.card")];
-  for(const card of cards){
-    const t=clean(card.textContent).toUpperCase();
-    if(t.includes("CHARTA HIT ANALYSIS")) return card;
-  }
-  return null;
+function getAnalysisCard(){return [...document.querySelectorAll(".analysis-card,.card")].find(card=>clean(card.textContent).toUpperCase().includes("CHARTA HIT ANALYSIS"))||null}
+function updateTopResult(){
+  const out=document.getElementById("v5Result");if(!out)return;
+  const card=getAnalysisCard();if(!card){out.textContent="Ready";return}
+  const t=clean(card.textContent),u=t.toUpperCase();
+  if(u.includes("NO MATCH")){out.textContent="★ NO MATCH";return}
+  const type=(u.match(/\b(EXACT|PUSINGAN)\b/)||[])[1];if(!type){out.textContent="Ready";return}
+  let num=null;const best=card.querySelector(".best,.analysis-value.big");
+  if(best){const m=clean(best.textContent).match(/\b\d{4}\b/);if(m)num=m[0]}
+  if(!num){const m=t.match(/BEST MATCH\s*[:\-]?\s*(\d{4})/i);if(m)num=m[1]}
+  out.textContent=num?"★ "+num+" • "+type:"★ "+type;
 }
 
-function updateResult(){
-  const out=document.getElementById("v473res");
-  if(!out) return;
+function fact(n){let r=1;for(let i=2;i<=n;i++)r*=i;return r}
+function permCount(n){const f={};[...String(n)].forEach(d=>f[d]=(f[d]||0)+1);let den=1;Object.values(f).forEach(v=>den*=fact(v));return 24/den}
+function badge(n){const c=permCount(n);return '<span class="v5PermBadge v5x'+c+'">×'+c+'</span>'}
 
-  const card=getAnalysisCard();
-  if(!card){
-    out.textContent="Ready";
-    return;
-  }
-
-  const t=clean(card.textContent);
-  const u=t.toUpperCase();
-
-  if(u.includes("NO MATCH")){
-    out.textContent="★ NO MATCH";
-    return;
-  }
-
-  const type=(u.match(/\b(EXACT|PUSINGAN)\b/)||[])[1];
-  if(!type){
-    out.textContent="Ready";
-    return;
-  }
-
-  let number=null;
-  const best=card.querySelector(".best,.analysis-value.big");
-
-  if(best){
-    const m=clean(best.textContent).match(/\b\d{4}\b/);
-    if(m) number=m[0];
-  }
-
-  if(!number){
-    const m=t.match(/BEST MATCH\s*[:\-]?\s*(\d{4})/i);
-    if(m) number=m[1];
-  }
-
-  out.textContent=number ? "★ "+number+" • "+type : "★ "+type;
-}
-
-function setVersion(){
-  const v=document.querySelector(".version");
-  if(v) v.textContent="V4.7.3.2 • CLEAN FIX";
-  document.title="4D Charta Analyzer V4.7.3.2";
-}
-
-document.addEventListener("DOMContentLoaded",function(){
-  ensureBar();
-  setVersion();
-  updateDb();
-  updateResult();
-
-  let timer=null;
-  const mo=new MutationObserver(function(){
-    clearTimeout(timer);
-    timer=setTimeout(function(){
-      updateResult();
-      setVersion();
-    },120);
+function autoSection(){
+  const all=[...document.querySelectorAll("div,section,article")];let best=null;
+  all.forEach(el=>{
+    const t=clean(el.textContent).toUpperCase();if(!t.includes("AUTO CHART PATTERN"))return;
+    const nums=[...el.querySelectorAll("*")].filter(x=>!x.children.length&&/^\d{4}$/.test(clean(x.textContent)));
+    if(nums.length>=8&&(!best||el.textContent.length<best.textContent.length))best=el;
   });
-  mo.observe(document.body,{childList:true,subtree:true,characterData:true});
-});
-})();
-</script>
-
-
-<style>
-/* V4.7.4-PWA */
-#pwaInstallBtn{
-  display:none;
-  position:fixed;
-  right:14px;
-  bottom:82px;
-  z-index:9998;
-  border:1px solid rgba(246,200,76,.55);
-  background:rgba(3,20,35,.96);
-  color:#f6c84c;
-  border-radius:14px;
-  padding:10px 13px;
-  font-weight:800;
-  font-size:12px;
-  box-shadow:0 10px 30px rgba(0,0,0,.28);
-}
-#pwaInstallBtn.show{display:block}
-@media (display-mode: standalone){
-  #pwaInstallBtn{display:none!important}
-}
-</style>
-
-<button id="pwaInstallBtn" type="button">👑 INSTALL APP</button>
-
-<script>
-/* V4.7.4-PWA */
-(function(){
-  let deferredPrompt=null;
-  const btn=document.getElementById("pwaInstallBtn");
-
-  if("serviceWorker" in navigator){
-    window.addEventListener("load",()=>{
-      navigator.serviceWorker.register("./sw.js").catch(()=>{});
-    });
-  }
-
-  window.addEventListener("beforeinstallprompt",e=>{
-    e.preventDefault();
-    deferredPrompt=e;
-    if(btn) btn.classList.add("show");
-  });
-
-  if(btn){
-    btn.addEventListener("click",async()=>{
-      if(!deferredPrompt) return;
-      deferredPrompt.prompt();
-      try{ await deferredPrompt.userChoice; }catch(e){}
-      deferredPrompt=null;
-      btn.classList.remove("show");
-    });
-  }
-
-  window.addEventListener("appinstalled",()=>{
-    if(btn) btn.classList.remove("show");
-    deferredPrompt=null;
-  });
-
-  document.addEventListener("DOMContentLoaded",()=>{
-    const v=document.querySelector(".version");
-    if(v) v.textContent="V4.7.4 • PWA READY";
-    document.title="4D Charta Analyzer";
-  });
-})();
-</script>
-
-
-<style>
-/* V4.7.5-AUTO-PATTERN-EXPANSION */
-.v475-perm-badge{
-  display:inline-block;
-  margin-left:6px;
-  padding:2px 7px;
-  border-radius:999px;
-  font-size:10px;
-  font-weight:900;
-  vertical-align:2px;
-  border:1px solid rgba(255,255,255,.08);
-}
-.v475-x24{background:rgba(78,200,255,.12);color:#66d4ff}
-.v475-x12{background:rgba(246,200,76,.14);color:#ffd85e}
-.v475-x6{background:rgba(66,223,135,.13);color:#6ef0a5}
-.v475-x4{background:rgba(255,119,119,.13);color:#ff8a8a}
-
-#v475RepeatBox{
-  margin-top:12px;
-  padding:12px;
-  border:1px solid rgba(246,200,76,.26);
-  border-radius:14px;
-  background:rgba(4,19,31,.56);
-}
-#v475RepeatBox .v475-title{
-  color:#eaf4fb;
-  font-size:12px;
-  font-weight:900;
-  margin-bottom:4px;
-}
-#v475RepeatBox .v475-note{
-  color:#829daf;
-  font-size:10px;
-  margin-bottom:10px;
-  line-height:1.35;
-}
-#v475RepeatBox .v475-grid{
-  display:grid;
-  grid-template-columns:repeat(3,1fr);
-  gap:8px;
-}
-#v475RepeatBox .v475-item{
-  background:rgba(7,27,42,.86);
-  border:1px solid rgba(255,255,255,.05);
-  border-radius:11px;
-  padding:9px;
-}
-#v475RepeatBox .v475-item small{
-  display:block;
-  color:#829daf;
-  margin-bottom:3px;
-  font-size:9px;
-}
-#v475RepeatBox .v475-num{
-  color:#f6c84c;
-  font-weight:900;
-  font-size:18px;
-}
-@media(max-width:700px){
-  #v475RepeatBox .v475-grid{grid-template-columns:1fr 1fr 1fr}
-  #v475RepeatBox .v475-num{font-size:16px}
-}
-</style>
-
-<script>
-/* V4.7.5-AUTO-PATTERN-EXPANSION */
-(function(){
-"use strict";
-
-function clean(v){
-  return (v||"").replace(/\s+/g," ").trim();
-}
-
-function fact(n){
-  let r=1;
-  for(let i=2;i<=n;i++) r*=i;
-  return r;
-}
-
-function permCount(num){
-  const f={};
-  [...String(num)].forEach(d=>f[d]=(f[d]||0)+1);
-  let den=1;
-  Object.values(f).forEach(v=>den*=fact(v));
-  return 24/den;
-}
-
-function badgeHtml(n){
-  const c=permCount(n);
-  return '<span class="v475-perm-badge v475-x'+c+'">×'+c+'</span>';
-}
-
-function findAutoPatternSection(){
-  const all=[...document.querySelectorAll("div,section,article")];
-  let best=null;
-
-  for(const el of all){
-    const t=clean(el.textContent).toUpperCase();
-    if(!t.includes("AUTO CHART PATTERN")) continue;
-
-    const nums=[...el.querySelectorAll("*")].filter(x=>{
-      if(x.children.length) return false;
-      return /^\d{4}$/.test(clean(x.textContent));
-    });
-
-    if(nums.length>=8 && (!best || el.textContent.length < best.textContent.length)){
-      best=el;
-    }
-  }
   return best;
 }
 
-function labelDirectPatterns(section){
-  if(!section) return;
-
-  const leaves=[...section.querySelectorAll("*")].filter(el=>{
-    if(el.children.length) return false;
-    return /^\d{4}$/.test(clean(el.textContent));
+function chartDigits(){const a=[...document.querySelectorAll(".chart-input")].map(i=>String(i.value||"").trim()).filter(v=>/^\d$/.test(v));return a.length>=16?a.slice(0,16):[]}
+function updateAutoExpansion(){
+  const sec=autoSection();if(!sec)return;
+  [...sec.querySelectorAll("*")].filter(el=>!el.children.length&&/^\d{4}$/.test(clean(el.textContent))).forEach(el=>{
+    if(el.nextElementSibling&&el.nextElementSibling.classList.contains("v5PermBadge"))return;
+    el.insertAdjacentHTML("afterend",badge(clean(el.textContent)));
   });
-
-  const seen=new Set();
-
-  for(const el of leaves){
-    const n=clean(el.textContent);
-    if(seen.has(el)) continue;
-    seen.add(el);
-
-    let parent=el.parentElement;
-    if(!parent) continue;
-
-    if(parent.querySelector(":scope > .v475-perm-badge")) continue;
-
-    el.insertAdjacentHTML("afterend",badgeHtml(n));
-  }
+  let box=document.getElementById("v5Repeat");if(!box){box=document.createElement("div");box.id="v5Repeat";sec.appendChild(box)}
+  const digits=chartDigits();
+  if(digits.length<16){box.innerHTML='<div class="ttl">REPEAT DIGIT EXPANSION</div><div class="note">Isi penuh Charta 4×4 untuk jana ×12 / ×6 / ×4.</div>';return}
+  const f={};digits.forEach(d=>f[d]=(f[d]||0)+1);
+  const ranked=Object.entries(f).sort((a,b)=>b[1]-a[1]||Number(a[0])-Number(b[0])).map(x=>x[0]);if(ranked.length<3)return;
+  const a=ranked[0],b=ranked[1],c=ranked[2];
+  const rows=[["×12 • AABC",a+a+b+c,"1 pair sama"],["×6 • AABB",a+a+b+b,"2 pair"],["×4 • AAAB",a+a+a+b,"3 digit sama"]];
+  box.innerHTML='<div class="ttl">REPEAT DIGIT EXPANSION</div><div class="note">Berdasarkan digit paling kerap dalam Charta. Unique permutation, bukan probability menang.</div><div class="grid">'+rows.map(x=>'<div class="item"><small>'+x[0]+' • '+x[2]+'</small><span class="num">'+x[1]+'</span>'+badge(x[1])+'</div>').join("")+'</div>';
 }
 
-function getChartDigits(){
-  const inputs=[...document.querySelectorAll("input")].filter(i=>{
-    const v=String(i.value||"").trim();
-    return /^\d$/.test(v) && (i.maxLength===1 || i.getAttribute("maxlength")==="1");
-  });
-
-  if(inputs.length>=16){
-    return inputs.slice(0,16).map(i=>String(i.value).trim());
-  }
-
-  const possible=[...document.querySelectorAll(".chart-input")].map(i=>String(i.value||"").trim()).filter(v=>/^\d$/.test(v));
-  if(possible.length>=16) return possible.slice(0,16);
-
-  return [];
+function setupPWA(){
+  let deferred=null;const btn=document.getElementById("v5Install");
+  if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));
+  window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferred=e;if(btn)btn.classList.add("show")});
+  if(btn)btn.onclick=async()=>{if(!deferred)return;deferred.prompt();try{await deferred.userChoice}catch(e){}deferred=null;btn.classList.remove("show")};
+  window.addEventListener("appinstalled",()=>{if(btn)btn.classList.remove("show");deferred=null});
 }
 
-function buildCandidates(digits){
-  if(digits.length<4) return null;
-
-  const freq={};
-  digits.forEach(d=>freq[d]=(freq[d]||0)+1);
-
-  const ranked=Object.entries(freq)
-    .sort((a,b)=>b[1]-a[1] || Number(a[0])-Number(b[0]))
-    .map(x=>x[0]);
-
-  if(ranked.length<3) return null;
-
-  const a=ranked[0];
-  const b=ranked[1];
-  const c=ranked[2];
-
-  return [
-    {label:"×12 • AABC", number:a+a+b+c, desc:"1 pair sama"},
-    {label:"×6 • AABB", number:a+a+b+b, desc:"2 pair"},
-    {label:"×4 • AAAB", number:a+a+a+b, desc:"3 digit sama"}
-  ];
-}
-
-function renderRepeatBox(section){
-  if(!section) return;
-
-  let box=document.getElementById("v475RepeatBox");
-  if(!box){
-    box=document.createElement("div");
-    box.id="v475RepeatBox";
-    section.appendChild(box);
-  }
-
-  const candidates=buildCandidates(getChartDigits());
-
-  if(!candidates){
-    box.innerHTML=
-      '<div class="v475-title">REPEAT DIGIT EXPANSION</div>'+
-      '<div class="v475-note">Isi penuh Charta 4×4 untuk jana contoh ×12 / ×6 / ×4.</div>';
-    return;
-  }
-
-  box.innerHTML=
-    '<div class="v475-title">REPEAT DIGIT EXPANSION</div>'+
-    '<div class="v475-note">Berdasarkan digit paling kerap dalam Charta. Ini klasifikasi unique permutation, bukan probability menang.</div>'+
-    '<div class="v475-grid">'+
-    candidates.map(x=>
-      '<div class="v475-item">'+
-        '<small>'+x.label+' • '+x.desc+'</small>'+
-        '<span class="v475-num">'+x.number+'</span>'+
-        badgeHtml(x.number)+
-      '</div>'
-    ).join("")+
-    '</div>';
-}
-
-function apply(){
-  const section=findAutoPatternSection();
-  if(!section) return;
-
-  labelDirectPatterns(section);
-  renderRepeatBox(section);
-
-  const v=document.querySelector(".version");
-  if(v) v.textContent="V4.7.5 • AUTO PATTERN EXPANSION";
-  document.title="4D Charta Analyzer V4.7.5";
-}
-
-document.addEventListener("DOMContentLoaded",function(){
-  setTimeout(apply,250);
-
+function apply(){setVersion();ensureTopBar();updateTopResult();updateAutoExpansion()}
+document.addEventListener("DOMContentLoaded",()=>{
+  apply();loadDbDate();setupPWA();
   let timer=null;
-  const mo=new MutationObserver(function(){
-    clearTimeout(timer);
-    timer=setTimeout(apply,180);
-  });
-
-  mo.observe(document.body,{
-    childList:true,
-    subtree:true,
-    characterData:true
-  });
+  const mo=new MutationObserver(()=>{clearTimeout(timer);timer=setTimeout(apply,160)});
+  mo.observe(document.body,{childList:true,subtree:true,characterData:true});
 });
 })();
 </script>
