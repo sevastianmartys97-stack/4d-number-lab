@@ -3,170 +3,214 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
   <title>4D Number Lab</title>
 
   <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
+    *{
+      box-sizing:border-box;
+      margin:0;
+      padding:0;
     }
 
-    body {
-      background: #070b12;
-      color: #ffffff;
-      font-family: Arial, sans-serif;
-      min-height: 100vh;
-      padding: 15px;
+    body{
+      background:#070b12;
+      color:white;
+      font-family:Arial,Helvetica,sans-serif;
+      min-height:100vh;
+      padding:14px;
     }
 
-    .app {
-      width: 100%;
-      max-width: 480px;
-      margin: auto;
+    .app{
+      width:100%;
+      max-width:500px;
+      margin:auto;
     }
 
-    .header {
-      text-align: center;
-      padding: 20px 10px;
+    .header{
+      text-align:center;
+      padding:18px 10px 14px;
     }
 
-    .header h1 {
-      font-size: 24px;
-      color: #f5c542;
-      letter-spacing: 1px;
+    .header h1{
+      color:#f6c744;
+      font-size:24px;
+      letter-spacing:1px;
     }
 
-    .header p {
-      color: #8c98a8;
-      font-size: 12px;
-      margin-top: 6px;
+    .header p{
+      color:#7c899c;
+      font-size:11px;
+      margin-top:6px;
     }
 
-    .card {
-      background: #101722;
-      border: 1px solid #253044;
-      border-radius: 14px;
-      padding: 14px;
-      margin-bottom: 12px;
+    .card{
+      background:#101722;
+      border:1px solid #243044;
+      border-radius:14px;
+      padding:14px;
+      margin-bottom:12px;
     }
 
-    .title {
-      font-size: 11px;
-      color: #8290a3;
-      margin-bottom: 10px;
-      font-weight: bold;
+    .section-title{
+      color:#8c99aa;
+      font-size:11px;
+      font-weight:bold;
+      margin-bottom:10px;
     }
 
-    .operators {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 7px;
+    .grid-2{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:7px;
     }
 
-    .operator {
-      background: #171f2d;
-      border: 1px solid #2b374a;
-      color: #b9c3d1;
-      padding: 11px 5px;
-      border-radius: 8px;
-      font-size: 12px;
-      font-weight: bold;
-      cursor: pointer;
+    .grid-3{
+      display:grid;
+      grid-template-columns:repeat(3,1fr);
+      gap:7px;
     }
 
-    .operator.active {
-      border-color: #f5c542;
-      color: #f5c542;
-      background: #282513;
+    button{
+      cursor:pointer;
     }
 
-    .number-box {
-      text-align: center;
-      padding: 18px 5px;
+    .market-btn,
+    .mode-btn,
+    .count-btn{
+      border:1px solid #2d394d;
+      background:#192131;
+      color:#bec7d4;
+      padding:11px 5px;
+      border-radius:8px;
+      font-size:11px;
+      font-weight:bold;
     }
 
-    .label {
-      font-size: 11px;
-      color: #78869a;
+    .market-btn.active,
+    .mode-btn.active,
+    .count-btn.active{
+      border-color:#f6c744;
+      color:#f6c744;
+      background:#2c2813;
     }
 
-    #mainNumber {
-      font-size: 48px;
-      font-weight: bold;
-      letter-spacing: 10px;
-      margin: 12px 0;
-      color: #ffffff;
+    .generate-box{
+      text-align:center;
     }
 
-    .generate {
-      width: 100%;
-      border: none;
-      background: #f5c542;
-      color: #111111;
-      padding: 14px;
-      border-radius: 9px;
-      font-size: 14px;
-      font-weight: bold;
-      cursor: pointer;
+    .market-label{
+      color:#748299;
+      font-size:11px;
+      margin-bottom:8px;
     }
 
-    .generate:active {
-      transform: scale(.98);
+    .main-number{
+      font-size:48px;
+      font-weight:bold;
+      letter-spacing:10px;
+      margin:10px 0 15px;
     }
 
-    .stats {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
+    .generate-btn{
+      width:100%;
+      border:none;
+      background:#f6c744;
+      color:#111;
+      padding:14px;
+      border-radius:9px;
+      font-size:14px;
+      font-weight:bold;
     }
 
-    .stat {
-      background: #0b111b;
-      padding: 11px;
-      border-radius: 8px;
-      text-align: center;
+    .generate-btn:active{
+      transform:scale(.98);
     }
 
-    .stat span {
-      display: block;
-      color: #748298;
-      font-size: 10px;
-      margin-bottom: 5px;
+    .stats-grid{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:8px;
     }
 
-    .stat strong {
-      font-size: 14px;
+    .stat{
+      background:#0b111b;
+      border-radius:9px;
+      padding:11px;
+      text-align:center;
     }
 
-    .history {
-      margin-top: 7px;
+    .stat span{
+      display:block;
+      font-size:10px;
+      color:#738095;
+      margin-bottom:5px;
     }
 
-    .history-item {
-      display: flex;
-      justify-content: space-between;
-      padding: 9px 4px;
-      border-bottom: 1px solid #202a39;
-      font-size: 13px;
+    .stat strong{
+      font-size:14px;
     }
 
-    .history-item:last-child {
-      border-bottom: none;
+    .hot{
+      color:#4ade80;
     }
 
-    .history-number {
-      color: #f5c542;
-      font-weight: bold;
-      letter-spacing: 2px;
+    .cold{
+      color:#60a5fa;
     }
 
-    .note {
-      color: #637084;
-      font-size: 10px;
-      text-align: center;
-      line-height: 1.5;
-      padding: 8px 15px;
+    .pair{
+      color:#f6c744;
+    }
+
+    .picks{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:7px;
+      margin-top:8px;
+    }
+
+    .pick{
+      background:#0b111b;
+      border-radius:8px;
+      padding:12px;
+      text-align:center;
+      font-weight:bold;
+      letter-spacing:3px;
+      color:#f6c744;
+    }
+
+    .history-item{
+      display:flex;
+      justify-content:space-between;
+      border-bottom:1px solid #202a39;
+      padding:9px 3px;
+      font-size:12px;
+    }
+
+    .history-item:last-child{
+      border-bottom:none;
+    }
+
+    .history-number{
+      color:#f6c744;
+      font-weight:bold;
+      letter-spacing:2px;
+    }
+
+    .empty{
+      color:#687589;
+      text-align:center;
+      font-size:11px;
+      padding:10px;
+    }
+
+    .note{
+      color:#5f6c7e;
+      font-size:9px;
+      line-height:1.5;
+      text-align:center;
+      padding:5px 12px 15px;
     }
   </style>
 </head>
@@ -177,89 +221,178 @@
 
   <div class="header">
     <h1>4D NUMBER LAB</h1>
-    <p>Number Generator & Statistical Analysis</p>
+    <p>Random Generator & Statistical Pattern Analysis</p>
   </div>
 
-  <div class="card">
-    <div class="title">SELECT MARKET</div>
 
-    <div class="operators">
-      <button class="operator active" onclick="selectMarket(this,'Sports Toto')">
+  <div class="card">
+
+    <div class="section-title">
+      SELECT MARKET
+    </div>
+
+    <div class="grid-2">
+
+      <button class="market-btn active"
+        onclick="selectMarket(this,'Sports Toto')">
         SPORTS TOTO
       </button>
 
-      <button class="operator" onclick="selectMarket(this,'Magnum 4D')">
+      <button class="market-btn"
+        onclick="selectMarket(this,'Magnum')">
         MAGNUM
       </button>
 
-      <button class="operator" onclick="selectMarket(this,'Da Ma Cai')">
+      <button class="market-btn"
+        onclick="selectMarket(this,'Da Ma Cai')">
         DA MA CAI
       </button>
 
-      <button class="operator" onclick="selectMarket(this,'Cash Sweep')">
+      <button class="market-btn"
+        onclick="selectMarket(this,'Cash Sweep')">
         CASH SWEEP
       </button>
+
     </div>
+
   </div>
 
-  <div class="card number-box">
 
-    <div class="label" id="marketName">
-      SPORTS TOTO • RANDOM PICK
+  <div class="card">
+
+    <div class="section-title">
+      MODE
     </div>
 
-    <div id="mainNumber">
+    <div class="grid-2">
+
+      <button class="mode-btn active"
+        onclick="selectMode(this,'random')">
+        RANDOM
+      </button>
+
+      <button class="mode-btn"
+        onclick="selectMode(this,'statistical')">
+        STATISTICAL
+      </button>
+
+    </div>
+
+  </div>
+
+
+  <div class="card">
+
+    <div class="section-title">
+      NUMBER OF PICKS
+    </div>
+
+    <div class="grid-3">
+
+      <button class="count-btn active"
+        onclick="selectCount(this,1)">
+        1 PICK
+      </button>
+
+      <button class="count-btn"
+        onclick="selectCount(this,5)">
+        5 PICKS
+      </button>
+
+      <button class="count-btn"
+        onclick="selectCount(this,10)">
+        10 PICKS
+      </button>
+
+    </div>
+
+  </div>
+
+
+  <div class="card generate-box">
+
+    <div class="market-label" id="marketLabel">
+      SPORTS TOTO • RANDOM
+    </div>
+
+    <div class="main-number" id="mainNumber">
       ----
     </div>
 
-    <button class="generate" onclick="generateNumber()">
-      GENERATE NUMBER
+    <button class="generate-btn"
+      onclick="generateNumbers()">
+      GENERATE
     </button>
 
   </div>
 
-  <div class="card">
-
-    <div class="title">NUMBER ANALYSIS</div>
-
-    <div class="stats">
-
-      <div class="stat">
-        <span>SUM DIGITS</span>
-        <strong id="sumDigits">--</strong>
-      </div>
-
-      <div class="stat">
-        <span>ODD / EVEN</span>
-        <strong id="oddEven">--</strong>
-      </div>
-
-      <div class="stat">
-        <span>REPEAT</span>
-        <strong id="repeat">--</strong>
-      </div>
-
-      <div class="stat">
-        <span>RANGE</span>
-        <strong>0000–9999</strong>
-      </div>
-
-    </div>
-  </div>
 
   <div class="card">
 
-    <div class="title">RECENT GENERATED</div>
+    <div class="section-title">
+      STATISTICAL ANALYSIS
+    </div>
 
-    <div id="history" class="history">
-      <div class="note">Belum ada nombor dijana.</div>
+    <div class="stats-grid">
+
+      <div class="stat">
+        <span>HOT DIGITS</span>
+        <strong class="hot" id="hotDigits">--</strong>
+      </div>
+
+      <div class="stat">
+        <span>COLD DIGITS</span>
+        <strong class="cold" id="coldDigits">--</strong>
+      </div>
+
+      <div class="stat">
+        <span>STRONG PAIR</span>
+        <strong class="pair" id="strongPair">--</strong>
+      </div>
+
+      <div class="stat">
+        <span>DATA SIZE</span>
+        <strong id="dataSize">--</strong>
+      </div>
+
     </div>
 
   </div>
+
+
+  <div class="card">
+
+    <div class="section-title">
+      GENERATED PICKS
+    </div>
+
+    <div id="generatedPicks" class="picks">
+      <div class="empty">
+        Belum generate nombor.
+      </div>
+    </div>
+
+  </div>
+
+
+  <div class="card">
+
+    <div class="section-title">
+      RECENT HISTORY
+    </div>
+
+    <div id="history">
+      <div class="empty">
+        Belum ada history.
+      </div>
+    </div>
+
+  </div>
+
 
   <div class="note">
-    Generator ini untuk tujuan eksperimen dan analisis statistik.
-    Ia tidak menjamin keputusan cabutan.
+    Statistical mode menggunakan corak keputusan lepas.
+    Ia tidak menjamin keputusan cabutan sebenar.
   </div>
 
 </div>
@@ -268,81 +401,378 @@
 <script>
 
 let selectedMarket = "Sports Toto";
-let historyNumbers = [];
+let selectedMode = "random";
+let selectedCount = 1;
 
-function selectMarket(button, market) {
+let historyData = [];
+
+
+// DATABASE CONTOH
+// Nanti kita boleh tukar dengan keputusan sebenar.
+
+const marketData = {
+
+  "Sports Toto":[
+    "4287","7319","5624","8831","2047",
+    "6392","4718","9853","1176","3508",
+    "7421","6984","3207","5738","8114",
+    "2469","9082","7355","4623","1897"
+  ],
+
+  "Magnum":[
+    "5731","8824","2406","7193","6618",
+    "4372","9085","1257","3469","7742",
+    "5628","1934","4077","8165","2398",
+    "6543","9871","3280","4459","7016"
+  ],
+
+  "Da Ma Cai":[
+    "3168","7429","5801","9914","2657",
+    "8372","4016","6285","1739","5542",
+    "7683","9204","3471","8158","2336",
+    "6097","4812","7554","1963","8427"
+  ],
+
+  "Cash Sweep":[
+    "6502","1874","9238","4417","7059",
+    "3162","8884","5721","2649","9375",
+    "4018","7136","5294","8820","1473",
+    "6951","3087","7564","2198","8432"
+  ]
+
+};
+
+
+function selectMarket(button,market){
 
   selectedMarket = market;
 
-  document.querySelectorAll(".operator")
-    .forEach(btn => btn.classList.remove("active"));
+  document.querySelectorAll(".market-btn")
+  .forEach(btn=>btn.classList.remove("active"));
 
   button.classList.add("active");
 
-  document.getElementById("marketName").innerText =
-    market.toUpperCase() + " • RANDOM PICK";
+  updateLabel();
+  calculateStatistics();
+
 }
 
 
-function generateNumber() {
+function selectMode(button,mode){
 
-  const number =
-    Math.floor(Math.random() * 10000)
-    .toString()
-    .padStart(4, "0");
+  selectedMode = mode;
 
-  document.getElementById("mainNumber").innerText = number;
+  document.querySelectorAll(".mode-btn")
+  .forEach(btn=>btn.classList.remove("active"));
 
-  analyseNumber(number);
-  addHistory(number);
+  button.classList.add("active");
+
+  updateLabel();
+
 }
 
 
-function analyseNumber(number) {
+function selectCount(button,count){
 
-  const digits = number.split("").map(Number);
+  selectedCount = count;
 
-  const sum = digits.reduce((a,b) => a+b, 0);
+  document.querySelectorAll(".count-btn")
+  .forEach(btn=>btn.classList.remove("active"));
 
-  const odd = digits.filter(n => n % 2 !== 0).length;
-  const even = 4 - odd;
+  button.classList.add("active");
 
-  const unique = new Set(digits);
-
-  document.getElementById("sumDigits").innerText = sum;
-
-  document.getElementById("oddEven").innerText =
-    odd + " / " + even;
-
-  document.getElementById("repeat").innerText =
-    unique.size < 4 ? "YES" : "NO";
 }
 
 
-function addHistory(number) {
+function updateLabel(){
 
-  historyNumbers.unshift({
-    number: number,
-    market: selectedMarket
+  document.getElementById("marketLabel").innerText =
+  selectedMarket.toUpperCase()
+  + " • "
+  + selectedMode.toUpperCase();
+
+}
+
+
+function random4D(){
+
+  return Math.floor(Math.random()*10000)
+  .toString()
+  .padStart(4,"0");
+
+}
+
+
+function getDigitFrequency(){
+
+  const data = marketData[selectedMarket];
+
+  let freq = Array(10).fill(0);
+
+  data.forEach(number=>{
+
+    number.split("").forEach(digit=>{
+
+      freq[Number(digit)]++;
+
+    });
+
   });
 
-  historyNumbers = historyNumbers.slice(0,5);
+  return freq;
 
-  const history = document.getElementById("history");
+}
 
-  history.innerHTML = "";
 
-  historyNumbers.forEach(item => {
+function getHotColdDigits(){
 
-    history.innerHTML += `
-      <div class="history-item">
-        <span>${item.market}</span>
-        <span class="history-number">${item.number}</span>
-      </div>
+  const freq = getDigitFrequency();
+
+  const digits =
+  freq.map((count,digit)=>({
+    digit,
+    count
+  }));
+
+  const sorted =
+  [...digits].sort((a,b)=>b.count-a.count);
+
+  return{
+
+    hot:sorted.slice(0,3)
+    .map(x=>x.digit),
+
+    cold:sorted.slice(-3)
+    .reverse()
+    .map(x=>x.digit)
+
+  };
+
+}
+
+
+function findStrongPair(){
+
+  const data = marketData[selectedMarket];
+
+  let pairs={};
+
+  data.forEach(number=>{
+
+    for(let i=0;i<3;i++){
+
+      let pair =
+      number[i] + number[i+1];
+
+      pairs[pair] =
+      (pairs[pair] || 0) + 1;
+
+    }
+
+  });
+
+  let sorted =
+  Object.entries(pairs)
+  .sort((a,b)=>b[1]-a[1]);
+
+  return sorted[0]
+  ? sorted[0][0]
+  : "--";
+
+}
+
+
+function generateStatistical(){
+
+  const stats = getHotColdDigits();
+
+  const hot = stats.hot;
+
+  let result = "";
+
+  for(let i=0;i<4;i++){
+
+    let useHot =
+    Math.random() < 0.7;
+
+    if(useHot){
+
+      result +=
+      hot[
+        Math.floor(
+          Math.random()*hot.length
+        )
+      ];
+
+    }else{
+
+      result +=
+      Math.floor(Math.random()*10);
+
+    }
+
+  }
+
+  return result;
+
+}
+
+
+function generateNumbers(){
+
+  let numbers=[];
+
+  for(let i=0;i<selectedCount;i++){
+
+    let number;
+
+    if(selectedMode==="statistical"){
+
+      number =
+      generateStatistical();
+
+    }else{
+
+      number =
+      random4D();
+
+    }
+
+    if(!numbers.includes(number)){
+
+      numbers.push(number);
+
+    }else{
+
+      i--;
+
+    }
+
+  }
+
+  document.getElementById("mainNumber")
+  .innerText =
+  numbers[0];
+
+  displayGenerated(numbers);
+
+  addHistory(numbers);
+
+}
+
+
+function displayGenerated(numbers){
+
+  const container =
+  document.getElementById(
+    "generatedPicks"
+  );
+
+  container.innerHTML="";
+
+  numbers.forEach(number=>{
+
+    const div =
+    document.createElement("div");
+
+    div.className="pick";
+
+    div.innerText=number;
+
+    container.appendChild(div);
+
+  });
+
+}
+
+
+function addHistory(numbers){
+
+  numbers.forEach(number=>{
+
+    historyData.unshift({
+
+      market:selectedMarket,
+      mode:selectedMode,
+      number:number
+
+    });
+
+  });
+
+  historyData =
+  historyData.slice(0,12);
+
+  renderHistory();
+
+}
+
+
+function renderHistory(){
+
+  const container =
+  document.getElementById("history");
+
+  container.innerHTML="";
+
+  historyData.forEach(item=>{
+
+    const row =
+    document.createElement("div");
+
+    row.className=
+    "history-item";
+
+    row.innerHTML=`
+
+      <span>
+        ${item.market}
+        •
+        ${item.mode}
+      </span>
+
+      <span class="history-number">
+        ${item.number}
+      </span>
+
     `;
 
+    container.appendChild(row);
+
   });
+
 }
+
+
+function calculateStatistics(){
+
+  const stats =
+  getHotColdDigits();
+
+  document.getElementById(
+    "hotDigits"
+  ).innerText =
+  stats.hot.join(" • ");
+
+  document.getElementById(
+    "coldDigits"
+  ).innerText =
+  stats.cold.join(" • ");
+
+  document.getElementById(
+    "strongPair"
+  ).innerText =
+  findStrongPair();
+
+  document.getElementById(
+    "dataSize"
+  ).innerText =
+  marketData[selectedMarket].length;
+
+}
+
+
+calculateStatistics();
 
 </script>
 
