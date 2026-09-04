@@ -12,10 +12,10 @@ from bs4 import BeautifulSoup
 
 # ============================================================
 # 4D CHARTA ANALYZER
-# FINAL HISTORY UPDATER V7.0
+# HISTORY UPDATER V7.1
 #
-# HISTORY:
-# 01-01-2020 -> TODAY
+# RANGE:
+# 01-01-2021 -> TODAY
 #
 # MARKETS:
 # - Magnum
@@ -23,31 +23,26 @@ from bs4 import BeautifulSoup
 # - Da Ma Cai
 # - Cash Sweep
 #
-# SOURCE:
-# 4dmanager.net historical result pages
-#
-# STRATEGY:
-# - Direct historical date pages
-# - Do NOT depend on fragile page-date position
-# - Parse operators independently
-# - Preserve existing data
-# - Preserve leading zeroes
-# - Merge & deduplicate
-# - FAIL if historical backfill does not really work
+# NOTE:
+# - This is the same V7 logic
+# - Only history start changed to 2021
+# - Keeps existing JSON
+# - Preserves leading zeroes
+# - Fails if historical data still cannot be read
 # ============================================================
 
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = ROOT / "data"
 
-START_DATE = datetime(2020, 1, 1)
+START_DATE = datetime(2021, 1, 1)
 TODAY_DT = datetime.now()
 TODAY = TODAY_DT.strftime("%Y-%m-%d")
 
 BASE_URL = "https://4dmanager.net/result/{date}"
 
 REQUEST_TIMEOUT = 25
-REQUEST_DELAY = 0.15
+REQUEST_DELAY = 0.10
 MAX_RETRIES = 2
 
 
@@ -308,13 +303,7 @@ def html_to_lines(html):
 
 
 # ============================================================
-# PAGE VALIDATION
-#
-# V5 ERROR:
-# only searched first 80 lines.
-#
-# V7:
-# searches entire page for requested date.
+# PAGE DATE VALIDATION
 # ============================================================
 
 def page_contains_date(
@@ -348,7 +337,7 @@ def page_contains_date(
 
 
 # ============================================================
-# FIND MARKET START
+# FIND MARKET
 # ============================================================
 
 def find_market_start(
@@ -368,8 +357,6 @@ def find_market_start(
 
             if marker_low in low:
 
-                # Avoid top navigation line:
-                # Magnum · Toto · DaMaCai ...
                 operator_count = sum(
                     word in low
                     for word in [
@@ -389,7 +376,7 @@ def find_market_start(
 
 
 # ============================================================
-# MARKET BLOCK
+# EXTRACT MARKET BLOCK
 # ============================================================
 
 def extract_market_block(
@@ -468,15 +455,7 @@ def extract_market_block(
 
 
 # ============================================================
-# FOUR-DIGIT EXTRACTION
-#
-# Handles:
-#
-# 928638509898...
-#
-# by splitting:
-#
-# 9286 3850 9898 ...
+# EXTRACT 4D NUMBERS
 # ============================================================
 
 def extract_4d_numbers(text):
@@ -541,7 +520,6 @@ def find_single_prize(
             continue
 
 
-        # Same line
         nums = extract_4d_numbers(
             line
         )
@@ -550,7 +528,6 @@ def find_single_prize(
             return nums[-1]
 
 
-        # Next few lines
         for j in range(
             i + 1,
             min(
@@ -665,8 +642,6 @@ def parse_market(
         return None
 
 
-    # Ensure this market block itself
-    # belongs to requested date.
     if not page_contains_date(
         block,
         requested_date
@@ -821,7 +796,6 @@ def merge_record(
             continue
 
 
-        # Preserve existing draw number
         if (
             not new_record.get(
                 "draw"
@@ -896,7 +870,7 @@ def clean_database(database):
 
         if (
             not date_value
-            or date_value < "2020-01-01"
+            or date_value < "2021-01-01"
             or date_value > TODAY
         ):
             continue
@@ -1038,7 +1012,7 @@ def clean_database(database):
     ] = {
 
         "from":
-            "2020-01-01",
+            "2021-01-01",
 
         "to":
             TODAY
@@ -1123,16 +1097,7 @@ def fetch_page(
 
 
 # ============================================================
-# DATE SELECTION
-#
-# Main MY 4D historical draw days:
-#
-# Tuesday
-# Wednesday
-# Saturday
-# Sunday
-#
-# Includes special draws.
+# DRAW DAYS
 # ============================================================
 
 def should_scan(dt):
@@ -1153,8 +1118,8 @@ def main():
 
     print("=" * 66)
     print("4D CHARTA ANALYZER")
-    print("FINAL HISTORY UPDATER V7")
-    print("2020 -> CURRENT")
+    print("HISTORY UPDATER V7.1")
+    print("2021 -> CURRENT")
     print("=" * 66)
 
 
@@ -1191,8 +1156,6 @@ def main():
     changed_records = 0
 
 
-    # Counts specifically before 2026,
-    # so we know REAL backfill happened.
     historical_records = {
         key: 0
         for key in MARKETS
@@ -1258,8 +1221,6 @@ def main():
         )
 
 
-        # Page must contain requested date
-        # somewhere in entire document.
         if not page_contains_date(
             lines,
             date_value
@@ -1417,19 +1378,12 @@ def main():
         )
 
 
-        # Save only after parsing
         save_json(
             DATA_DIR
             / cfg["file"],
             database
         )
 
-
-        # ================================================
-        # REAL VALIDATION
-        #
-        # We don't want another fake green run.
-        # ================================================
 
         if (
             coverage[
@@ -1452,7 +1406,7 @@ def main():
 
         if (
             not oldest
-            or oldest > "2021-12-31"
+            or oldest > "2022-12-31"
         ):
 
             failures.append(
@@ -1510,13 +1464,12 @@ def main():
 
     print()
     print(
-        "V7 HISTORY BACKFILL SUCCESS ✓"
+        "V7.1 HISTORY BACKFILL SUCCESS ✓"
     )
 
     print(
-        "Database now contains "
-        "real historical results "
-        "from 2020 onward."
+        "Database contains history "
+        "from 2021 onward."
     )
 
     print("=" * 66)
