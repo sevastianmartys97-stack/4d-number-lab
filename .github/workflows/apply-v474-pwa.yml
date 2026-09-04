@@ -1,0 +1,40 @@
+name: Apply V4.7.4 PWA
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply-pwa:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Pillow
+        run: pip install pillow
+
+      - name: Apply PWA
+        run: python scripts/apply_v474_pwa.py
+
+      - name: Save PWA
+        run: |
+          git config user.name "4D App Updater"
+          git config user.email "actions@users.noreply.github.com"
+
+          git add index.html manifest.webmanifest sw.js icons/
+
+          if git diff --cached --quiet; then
+            echo "No changes"
+          else
+            git commit -m "Add PWA install support with Crown icon"
+            git push
+          fi
