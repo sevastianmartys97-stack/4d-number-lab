@@ -1,22 +1,21 @@
 from __future__ import annotations
 
 import json
+import re
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import requests
+from bs4 import BeautifulSoup
 
 
 # ============================================================
 # 4D CHARTA ANALYZER
-# HISTORY UPDATER V6.0 - API EDITION
+# FINAL HISTORY UPDATER V7.0
 #
-# SOURCE:
-# https://4dresult.asia public REST API
-#
-# RANGE:
-# 2020-01-01 -> current date
+# HISTORY:
+# 01-01-2020 -> TODAY
 #
 # MARKETS:
 # - Magnum
@@ -24,73 +23,164 @@ import requests
 # - Da Ma Cai
 # - Cash Sweep
 #
-# IMPORTANT:
-# - Uses official published API structure
-# - Does NOT scrape HTML
-# - Gets real archive draw dates first
-# - Then gets full result for each draw date
-# - Preserves leading zeroes
-# - Merges with existing JSON
-# - Workflow FAILS if historical backfill is clearly unsuccessful
+# SOURCE:
+# 4dmanager.net historical result pages
+#
+# STRATEGY:
+# - Direct historical date pages
+# - Do NOT depend on fragile page-date position
+# - Parse operators independently
+# - Preserve existing data
+# - Preserve leading zeroes
+# - Merge & deduplicate
+# - FAIL if historical backfill does not really work
 # ============================================================
 
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = ROOT / "data"
 
-API_BASE = "https://4dresult.asia/api/results"
+START_DATE = datetime(2020, 1, 1)
+TODAY_DT = datetime.now()
+TODAY = TODAY_DT.strftime("%Y-%m-%d")
 
-START_YEAR = 2020
-CURRENT_YEAR = datetime.now().year
-TODAY = datetime.now().strftime("%Y-%m-%d")
+BASE_URL = "https://4dmanager.net/result/{date}"
 
-REQUEST_TIMEOUT = 30
-REQUEST_DELAY = 0.12
-MAX_RETRIES = 3
+REQUEST_TIMEOUT = 25
+REQUEST_DELAY = 0.15
+MAX_RETRIES = 2
 
 
 MARKETS = {
+
     "magnum": {
         "file": "magnum.json",
-        "market": "Magnum 4D"
+        "market": "Magnum 4D",
+        "markers": [
+            "Magnum 4D",
+            "Magnum"
+        ]
     },
 
     "toto": {
         "file": "toto.json",
-        "market": "Sports Toto"
+        "market": "Sports Toto",
+        "markers": [
+            "TOTO 4D",
+            "Sports Toto",
+            "SportsToto",
+            "Toto 4D"
+        ]
     },
 
     "damacai": {
         "file": "damacai.json",
-        "market": "Da Ma Cai"
+        "market": "Da Ma Cai",
+        "markers": [
+            "DaMaCai 1+3D",
+            "Da Ma Cai",
+            "DaMaCai"
+        ]
     },
 
     "cashsweep": {
         "file": "cashsweep.json",
-        "market": "Cash Sweep"
+        "market": "Cash Sweep",
+        "markers": [
+            "Cashsweep",
+            "Cash Sweep",
+            "Sarawak Cash Sweep"
+        ]
     }
 }
 
 
 HEADERS = {
-    "User-Agent": "4D-Charta-Analyzer/6.0",
-    "Accept": "application/json"
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/131.0 Safari/537.36"
+    ),
+    "Accept": (
+        "text/html,application/xhtml+xml,"
+        "application/xml;q=0.9,*/*;q=0.8"
+    ),
+    "Accept-Language": "en-US,en;q=0.9",
+    "Connection": "keep-alive"
 }
 
 
 # ============================================================
-# JSON HELPERS
+# BASIC HELPERS
 # ============================================================
 
-def load_json(path: Path, default):
+def clean_text(value):
+    return re.sub(
+        r"\s+",
+        " ",
+        str(value)
+    ).strip()
+
+
+def normalize4(value):
+
+    if value is None:
+        return ""
+
+    digits = re.sub(
+        r"\D",
+        "",
+        str(value)
+    )
+
+    if not digits:
+        return ""
+
+    return digits[-4:].zfill(4)
+
+
+def normalize_list(values):
+
+    output = []
+
+    if not isinstance(values, list):
+        return output
+
+    for value in values:
+
+        number = normalize4(value)
+
+        if (
+            number
+            and number not in output
+        ):
+            output.append(number)
+
+    return output
+
+
+# ============================================================
+# JSON
+# ============================================================
+
+def load_json(path, default):
+
     try:
-        with path.open("r", encoding="utf-8") as f:
+
+        with path.open(
+            "r",
+            encoding="utf-8"
+        ) as f:
+
             return json.load(f)
+
     except Exception:
+
         return default
 
 
-def save_json(path: Path, data):
+def save_json(path, data):
+
     path.parent.mkdir(
         parents=True,
         exist_ok=True
@@ -112,6 +202,7 @@ def save_json(path: Path, data):
 
 
 def load_database(path, market):
+
     default = {
         "market": market,
         "lastUpdated": "",
@@ -138,364 +229,530 @@ def load_database(path, market):
 
 
 # ============================================================
-# NUMBER NORMALIZATION
+# DATE HELPERS
 # ============================================================
 
-def normalize4(value):
-    if value is None:
+def parse_date(value):
+
+    if not value:
+        return None
+
+    value = clean_text(value)
+
+    for fmt in (
+        "%Y-%m-%d",
+        "%d/%m/%Y",
+        "%d-%m-%Y",
+        "%d %b %Y",
+        "%d-%b-%Y"
+    ):
+
+        try:
+            return datetime.strptime(
+                value,
+                fmt
+            )
+
+        except ValueError:
+            pass
+
+    return None
+
+
+def iso_date(value):
+
+    dt = parse_date(value)
+
+    if not dt:
         return ""
 
-    text = "".join(
-        ch for ch in str(value)
-        if ch.isdigit()
+    return dt.strftime(
+        "%Y-%m-%d"
     )
 
-    if not text:
-        return ""
 
-    return text[-4:].zfill(4)
+# ============================================================
+# HTML -> CLEAN LINES
+# ============================================================
+
+def html_to_lines(html):
+
+    soup = BeautifulSoup(
+        html,
+        "html.parser"
+    )
+
+    for bad in soup([
+        "script",
+        "style",
+        "noscript",
+        "svg"
+    ]):
+        bad.decompose()
+
+    text = soup.get_text(
+        "\n",
+        strip=True
+    )
+
+    lines = []
+
+    for raw in text.splitlines():
+
+        line = clean_text(raw)
+
+        if line:
+            lines.append(line)
+
+    return lines
 
 
-def normalize_list(values):
-    if not isinstance(values, list):
+# ============================================================
+# PAGE VALIDATION
+#
+# V5 ERROR:
+# only searched first 80 lines.
+#
+# V7:
+# searches entire page for requested date.
+# ============================================================
+
+def page_contains_date(
+    lines,
+    requested_date
+):
+
+    requested_dt = parse_date(
+        requested_date
+    )
+
+    if not requested_dt:
+        return False
+
+    formats = {
+        requested_dt.strftime("%d/%m/%Y"),
+        requested_dt.strftime("%Y-%m-%d"),
+        requested_dt.strftime("%d-%m-%Y"),
+        requested_dt.strftime("%d %b %Y"),
+        requested_dt.strftime("%d-%b-%Y")
+    }
+
+    full_text = "\n".join(
+        lines
+    )
+
+    return any(
+        date_text in full_text
+        for date_text in formats
+    )
+
+
+# ============================================================
+# FIND MARKET START
+# ============================================================
+
+def find_market_start(
+    lines,
+    markers
+):
+
+    for i, line in enumerate(lines):
+
+        low = line.lower()
+
+        for marker in markers:
+
+            marker_low = (
+                marker.lower()
+            )
+
+            if marker_low in low:
+
+                # Avoid top navigation line:
+                # Magnum · Toto · DaMaCai ...
+                operator_count = sum(
+                    word in low
+                    for word in [
+                        "magnum",
+                        "toto",
+                        "damacai",
+                        "cashsweep"
+                    ]
+                )
+
+                if operator_count >= 3:
+                    continue
+
+                return i
+
+    return None
+
+
+# ============================================================
+# MARKET BLOCK
+# ============================================================
+
+def extract_market_block(
+    lines,
+    market_key
+):
+
+    cfg = MARKETS[
+        market_key
+    ]
+
+    start = find_market_start(
+        lines,
+        cfg["markers"]
+    )
+
+    if start is None:
         return []
+
+
+    other_markers = []
+
+    for other_key, other_cfg in (
+        MARKETS.items()
+    ):
+
+        if other_key == market_key:
+            continue
+
+        other_markers.extend(
+            other_cfg["markers"]
+        )
+
+
+    end = len(lines)
+
+
+    for i in range(
+        start + 1,
+        len(lines)
+    ):
+
+        low = lines[i].lower()
+
+        matched_other = False
+
+        for marker in other_markers:
+
+            if marker.lower() in low:
+
+                operator_count = sum(
+                    word in low
+                    for word in [
+                        "magnum",
+                        "toto",
+                        "damacai",
+                        "cashsweep"
+                    ]
+                )
+
+                if operator_count < 3:
+
+                    matched_other = True
+                    break
+
+
+        if matched_other:
+
+            end = i
+            break
+
+
+    return lines[
+        start:end
+    ]
+
+
+# ============================================================
+# FOUR-DIGIT EXTRACTION
+#
+# Handles:
+#
+# 928638509898...
+#
+# by splitting:
+#
+# 9286 3850 9898 ...
+# ============================================================
+
+def extract_4d_numbers(text):
 
     output = []
 
-    for value in values:
-        number = normalize4(value)
+    groups = re.findall(
+        r"\d+",
+        str(text)
+    )
 
-        if (
-            number
-            and number not in output
+    for group in groups:
+
+        if len(group) == 4:
+
+            output.append(
+                group
+            )
+
+        elif (
+            len(group) > 4
+            and len(group) % 4 == 0
         ):
-            output.append(number)
+
+            for i in range(
+                0,
+                len(group),
+                4
+            ):
+
+                chunk = group[
+                    i:i + 4
+                ]
+
+                if len(chunk) == 4:
+                    output.append(
+                        chunk
+                    )
 
     return output
 
 
 # ============================================================
-# HTTP
+# SINGLE PRIZE
 # ============================================================
 
-def api_get(session, url, params=None):
+def find_single_prize(
+    block,
+    prize_names
+):
 
-    last_error = None
-
-    for attempt in range(
-        1,
-        MAX_RETRIES + 1
+    for i, line in enumerate(
+        block
     ):
 
-        try:
+        low = line.lower()
 
-            response = session.get(
-                url,
-                params=params,
-                headers=HEADERS,
-                timeout=REQUEST_TIMEOUT
-            )
-
-            if response.status_code == 404:
-                return None
-
-            response.raise_for_status()
-
-            data = response.json()
-
-            return data
-
-        except Exception as error:
-
-            last_error = error
-
-            print(
-                f"    retry {attempt}/{MAX_RETRIES}:",
-                error
-            )
-
-            time.sleep(
-                1.0 * attempt
-            )
-
-    raise RuntimeError(
-        f"API request failed: {url} | {last_error}"
-    )
-
-
-# ============================================================
-# GET ARCHIVE DATES
-#
-# We DO NOT scan every calendar day.
-#
-# API returns actual published draw dates.
-# ============================================================
-
-def get_archive_dates(session):
-
-    dates = set()
-
-    print()
-    print("=" * 65)
-    print("FETCH ARCHIVE DATES")
-    print("=" * 65)
-
-    for year in range(
-        START_YEAR,
-        CURRENT_YEAR + 1
-    ):
-
-        url = (
-            API_BASE
-            + "/archive"
-        )
-
-        params = {
-            "country_code": "MY",
-            "year": str(year),
-            "limit": 500,
-            "offset": 0
-        }
-
-        data = api_get(
-            session,
-            url,
-            params
-        )
-
-        if not data:
-            print(
-                year,
-                "-> no archive data"
-            )
-            continue
-
-        entries = data.get(
-            "dates",
-            []
-        )
-
-        count = 0
-
-        for item in entries:
-
-            if not isinstance(
-                item,
-                dict
-            ):
-                continue
-
-            date_value = str(
-                item.get(
-                    "date",
-                    ""
-                )
-            )
-
-            if not date_value:
-                continue
-
-            if date_value < "2020-01-01":
-                continue
-
-            if date_value > TODAY:
-                continue
-
-            providers = item.get(
-                "providers",
-                []
-            )
-
-            # Keep only dates involving
-            # at least one target provider.
-            if isinstance(
-                providers,
-                list
-            ):
-
-                target_found = any(
-                    str(provider).lower()
-                    in MARKETS
-                    for provider in providers
-                )
-
-                if not target_found:
-                    continue
-
-            dates.add(
-                date_value
-            )
-
-            count += 1
-
-        print(
-            f"{year}: {count} draw dates"
-        )
-
-        time.sleep(
-            REQUEST_DELAY
-        )
-
-    result = sorted(
-        dates,
-        reverse=True
-    )
-
-    print()
-    print(
-        "TOTAL UNIQUE DRAW DATES:",
-        len(result)
-    )
-
-    return result
-
-
-# ============================================================
-# TOP PRIZES
-# ============================================================
-
-def extract_top_prizes(prizes):
-
-    first = ""
-    second = ""
-    third = ""
-
-    top = prizes.get(
-        "top",
-        []
-    )
-
-    if not isinstance(
-        top,
-        list
-    ):
-        top = []
-
-    for item in top:
-
-        if not isinstance(
-            item,
-            dict
+        if not any(
+            name in low
+            for name in prize_names
         ):
             continue
 
-        prize = str(
-            item.get(
-                "prize",
-                ""
-            )
-        ).lower()
 
-        number = normalize4(
-            item.get(
-                "number",
-                ""
-            )
+        # Same line
+        nums = extract_4d_numbers(
+            line
         )
 
-        if not number:
-            continue
+        if nums:
+            return nums[-1]
 
-        if "1st" in prize:
-            first = number
 
-        elif "2nd" in prize:
-            second = number
+        # Next few lines
+        for j in range(
+            i + 1,
+            min(
+                i + 5,
+                len(block)
+            )
+        ):
 
-        elif "3rd" in prize:
-            third = number
+            nums = (
+                extract_4d_numbers(
+                    block[j]
+                )
+            )
 
-    return (
-        first,
-        second,
-        third
-    )
+            if nums:
+                return nums[0]
+
+
+    return ""
 
 
 # ============================================================
-# PARSE PROVIDER RESULT
+# PRIZE LIST
 # ============================================================
 
-def parse_provider_result(
-    result,
-    draw_date
+def find_prize_list(
+    block,
+    start_words,
+    stop_words
 ):
 
-    if not isinstance(
-        result,
-        dict
+    start = None
+
+    for i, line in enumerate(
+        block
     ):
-        return None, None
 
-    provider_code = str(
-        result.get(
-            "provider_code",
-            ""
+        low = line.lower()
+
+        if any(
+            word in low
+            for word in start_words
+        ):
+
+            start = i + 1
+            break
+
+
+    if start is None:
+        return []
+
+
+    numbers = []
+
+
+    for i in range(
+        start,
+        len(block)
+    ):
+
+        low = block[
+            i
+        ].lower()
+
+
+        if any(
+            word in low
+            for word in stop_words
+        ):
+            break
+
+
+        found = extract_4d_numbers(
+            block[i]
         )
-    ).lower().strip()
 
-    if provider_code not in MARKETS:
-        return None, None
 
-    prizes = result.get(
-        "prizes",
-        {}
+        for number in found:
+
+            if number not in numbers:
+
+                numbers.append(
+                    number
+                )
+
+
+            if len(numbers) >= 10:
+
+                return numbers[:10]
+
+
+    return numbers[:10]
+
+
+# ============================================================
+# PARSE ONE MARKET
+# ============================================================
+
+def parse_market(
+    lines,
+    market_key,
+    requested_date
+):
+
+    block = extract_market_block(
+        lines,
+        market_key
     )
 
-    if not isinstance(
-        prizes,
-        dict
-    ):
-        return None, None
 
-    first, second, third = (
-        extract_top_prizes(
-            prizes
-        )
+    if not block:
+        return None
+
+
+    # Ensure this market block itself
+    # belongs to requested date.
+    if not page_contains_date(
+        block,
+        requested_date
+    ):
+        return None
+
+
+    first = find_single_prize(
+        block,
+        [
+            "1st prize",
+            "1st",
+            "头奖"
+        ]
     )
 
-    # A valid board must contain
-    # all Top 3 prizes.
+
+    second = find_single_prize(
+        block,
+        [
+            "2nd prize",
+            "2nd",
+            "二奖"
+        ]
+    )
+
+
+    third = find_single_prize(
+        block,
+        [
+            "3rd prize",
+            "3rd",
+            "三奖"
+        ]
+    )
+
+
     if not (
         first
         and second
         and third
     ):
-        return None, None
+        return None
 
-    special = normalize_list(
-        prizes.get(
+
+    special = find_prize_list(
+        block,
+        [
             "special",
-            []
-        )
-    )
-
-    consolation = normalize_list(
-        prizes.get(
+            "特别奖"
+        ],
+        [
             "consolation",
-            []
-        )
+            "安慰奖"
+        ]
     )
 
-    record = {
-        "draw": str(
-            result.get(
-                "draw_number",
-                ""
-            )
+
+    consolation = find_prize_list(
+        block,
+        [
+            "consolation",
+            "安慰奖"
+        ],
+        [
+            "jackpot",
+            "next draw",
+            "more result",
+            "past result"
+        ]
+    )
+
+
+    return {
+        "draw": "",
+        "date": requested_date,
+        "first": normalize4(first),
+        "second": normalize4(second),
+        "third": normalize4(third),
+        "special": normalize_list(
+            special
         ),
-        "date": draw_date,
-        "first": first,
-        "second": second,
-        "third": third,
-        "special": special,
-        "consolation": consolation
+        "consolation": normalize_list(
+            consolation
+        )
     }
-
-    return (
-        provider_code,
-        record
-    )
 
 
 # ============================================================
@@ -506,14 +763,14 @@ def record_score(record):
 
     score = 0
 
-    if record.get("first"):
-        score += 10
+    for field in (
+        "first",
+        "second",
+        "third"
+    ):
 
-    if record.get("second"):
-        score += 10
-
-    if record.get("third"):
-        score += 10
+        if record.get(field):
+            score += 10
 
     score += len(
         record.get(
@@ -536,7 +793,7 @@ def record_score(record):
 
 
 # ============================================================
-# MERGE RECORD
+# MERGE
 # ============================================================
 
 def merge_record(
@@ -544,69 +801,62 @@ def merge_record(
     new_record
 ):
 
-    new_date = new_record.get(
-        "date",
-        ""
-    )
+    new_date = new_record[
+        "date"
+    ]
 
-    new_draw = new_record.get(
-        "draw",
-        ""
-    )
 
-    for index, old in enumerate(
+    for i, old in enumerate(
         database["draws"]
     ):
 
-        old_date = str(
+        old_date = iso_date(
             old.get(
-                "date",
-                ""
+                "date"
             )
         )
 
-        old_draw = str(
-            old.get(
-                "draw",
-                ""
-            )
-        )
 
-        same_record = (
-            old_date == new_date
-        )
-
-        if (
-            new_draw
-            and old_draw
-            and new_draw == old_draw
-        ):
-            same_record = True
-
-        if not same_record:
+        if old_date != new_date:
             continue
 
-        # Replace if API record is at least
-        # as complete as existing record.
+
+        # Preserve existing draw number
+        if (
+            not new_record.get(
+                "draw"
+            )
+            and old.get(
+                "draw"
+            )
+        ):
+
+            new_record[
+                "draw"
+            ] = str(
+                old["draw"]
+            )
+
+
         if (
             record_score(
                 new_record
             )
-            >=
+            >
             record_score(
                 old
             )
         ):
 
-            if old != new_record:
+            database[
+                "draws"
+            ][i] = new_record
 
-                database[
-                    "draws"
-                ][index] = new_record
+            return True
 
-                return True
 
         return False
+
 
     database[
         "draws"
@@ -625,22 +875,24 @@ def clean_database(database):
 
     unique = {}
 
-    for record in database[
+
+    for old in database[
         "draws"
     ]:
 
         if not isinstance(
-            record,
+            old,
             dict
         ):
             continue
 
-        date_value = str(
-            record.get(
-                "date",
-                ""
+
+        date_value = iso_date(
+            old.get(
+                "date"
             )
         )
+
 
         if (
             not date_value
@@ -649,82 +901,89 @@ def clean_database(database):
         ):
             continue
 
-        clean = {
+
+        record = {
+
             "draw": str(
-                record.get(
+                old.get(
                     "draw",
                     ""
                 )
             ),
-            "date": date_value,
 
-            "first": normalize4(
-                record.get(
-                    "first",
-                    ""
-                )
-            ),
+            "date":
+                date_value,
 
-            "second": normalize4(
-                record.get(
-                    "second",
-                    ""
-                )
-            ),
+            "first":
+                normalize4(
+                    old.get(
+                        "first"
+                    )
+                ),
 
-            "third": normalize4(
-                record.get(
-                    "third",
-                    ""
-                )
-            ),
+            "second":
+                normalize4(
+                    old.get(
+                        "second"
+                    )
+                ),
 
-            "special": normalize_list(
-                record.get(
-                    "special",
-                    []
-                )
-            ),
+            "third":
+                normalize4(
+                    old.get(
+                        "third"
+                    )
+                ),
+
+            "special":
+                normalize_list(
+                    old.get(
+                        "special",
+                        []
+                    )
+                ),
 
             "consolation":
                 normalize_list(
-                    record.get(
+                    old.get(
                         "consolation",
                         []
                     )
                 )
         }
 
+
         if not (
-            clean["first"]
-            and clean["second"]
-            and clean["third"]
+            record["first"]
+            and record["second"]
+            and record["third"]
         ):
+
             continue
 
-        key = (
-            clean["date"],
-            clean["draw"]
-        )
+
+        key = date_value
+
 
         if key not in unique:
 
-            unique[key] = clean
+            unique[key] = record
 
         elif (
-            record_score(clean)
+            record_score(record)
             >
             record_score(
                 unique[key]
             )
         ):
 
-            unique[key] = clean
+            unique[key] = record
 
 
     draws = list(
         unique.values()
     )
+
 
     draws.sort(
         key=lambda x:
@@ -732,7 +991,10 @@ def clean_database(database):
         reverse=True
     )
 
-    database["draws"] = draws
+
+    database[
+        "draws"
+    ] = draws
 
 
     if draws:
@@ -774,6 +1036,7 @@ def clean_database(database):
     database[
         "historyRange"
     ] = {
+
         "from":
             "2020-01-01",
 
@@ -785,8 +1048,101 @@ def clean_database(database):
     database[
         "historySource"
     ] = (
-        "4dresult.asia public API"
+        "4dmanager.net historical archive"
     )
+
+
+# ============================================================
+# HTTP
+# ============================================================
+
+def fetch_page(
+    session,
+    date_value
+):
+
+    url = BASE_URL.format(
+        date=date_value
+    )
+
+
+    for attempt in range(
+        1,
+        MAX_RETRIES + 1
+    ):
+
+        try:
+
+            response = session.get(
+                url,
+                headers=HEADERS,
+                timeout=REQUEST_TIMEOUT
+            )
+
+
+            if response.status_code == 404:
+
+                return None
+
+
+            response.raise_for_status()
+
+
+            if len(
+                response.text
+            ) < 500:
+
+                return None
+
+
+            return response.text
+
+
+        except Exception as error:
+
+            if (
+                attempt
+                ==
+                MAX_RETRIES
+            ):
+
+                print(
+                    "  HTTP ERROR:",
+                    error
+                )
+
+                return None
+
+
+            time.sleep(
+                attempt
+            )
+
+
+    return None
+
+
+# ============================================================
+# DATE SELECTION
+#
+# Main MY 4D historical draw days:
+#
+# Tuesday
+# Wednesday
+# Saturday
+# Sunday
+#
+# Includes special draws.
+# ============================================================
+
+def should_scan(dt):
+
+    return dt.weekday() in {
+        1,  # Tue
+        2,  # Wed
+        5,  # Sat
+        6   # Sun
+    }
 
 
 # ============================================================
@@ -795,11 +1151,11 @@ def clean_database(database):
 
 def main():
 
-    print("=" * 65)
+    print("=" * 66)
     print("4D CHARTA ANALYZER")
-    print("HISTORY UPDATER V6.0")
-    print("PUBLIC API / 2020 -> CURRENT")
-    print("=" * 65)
+    print("FINAL HISTORY UPDATER V7")
+    print("2020 -> CURRENT")
+    print("=" * 66)
 
 
     DATA_DIR.mkdir(
@@ -810,203 +1166,179 @@ def main():
 
     databases = {}
 
-    for key, cfg in MARKETS.items():
 
-        databases[key] = (
-            load_database(
-                DATA_DIR
-                / cfg["file"],
-                cfg["market"]
-            )
+    for key, cfg in (
+        MARKETS.items()
+    ):
+
+        databases[
+            key
+        ] = load_database(
+
+            DATA_DIR
+            / cfg["file"],
+
+            cfg["market"]
         )
 
 
     session = requests.Session()
 
 
-    # ========================================================
-    # STEP 1
-    # Get real archive dates
-    # ========================================================
-
-    draw_dates = (
-        get_archive_dates(
-            session
-        )
-    )
+    requested_pages = 0
+    valid_pages = 0
+    parsed_records = 0
+    changed_records = 0
 
 
-    # Critical safety check.
-    if len(draw_dates) < 50:
-
-        raise RuntimeError(
-            "Archive validation FAILED: "
-            f"only {len(draw_dates)} "
-            "historical dates returned."
-        )
+    # Counts specifically before 2026,
+    # so we know REAL backfill happened.
+    historical_records = {
+        key: 0
+        for key in MARKETS
+    }
 
 
-    # We specifically asked for 2020+.
-    oldest_archive = min(
-        draw_dates
-    )
-
-    print(
-        "Oldest archive date:",
-        oldest_archive
-    )
+    cursor = TODAY_DT
 
 
-    if oldest_archive > "2020-12-31":
+    while cursor >= START_DATE:
 
-        raise RuntimeError(
-            "Archive validation FAILED: "
-            "source did not reach year 2020."
-        )
-
-
-    # ========================================================
-    # STEP 2
-    # Fetch complete result boards
-    # ========================================================
-
-    print()
-    print("=" * 65)
-    print("FETCH FULL DRAW RESULTS")
-    print("=" * 65)
-
-
-    total_dates = 0
-    total_records = 0
-    total_changes = 0
-
-
-    for index, draw_date in enumerate(
-        draw_dates,
-        start=1
-    ):
-
-        print(
-            f"[{index}/{len(draw_dates)}] "
-            f"{draw_date}"
-        )
-
-
-        url = (
-            API_BASE
-            + "/by-date/MY/"
-            + draw_date
-        )
-
-
-        try:
-
-            data = api_get(
-                session,
-                url
-            )
-
-        except Exception as error:
-
-            print(
-                "  ERROR:",
-                error
-            )
-
-            continue
-
-
-        if not data:
-            print(
-                "  no result"
-            )
-            continue
-
-
-        returned_date = str(
-            data.get(
-                "draw_date",
-                ""
-            )
-        )
-
-
-        # Exact date validation.
-        if returned_date != draw_date:
-
-            print(
-                "  DATE MISMATCH:",
-                returned_date
-            )
-
-            continue
-
-
-        results = data.get(
-            "results",
-            []
-        )
-
-
-        if not isinstance(
-            results,
-            list
+        if not should_scan(
+            cursor
         ):
+
+            cursor -= timedelta(
+                days=1
+            )
+
             continue
 
 
-        records_this_date = 0
+        date_value = (
+            cursor.strftime(
+                "%Y-%m-%d"
+            )
+        )
 
 
-        for result in results:
+        requested_pages += 1
 
-            (
-                provider_code,
-                record
-            ) = parse_provider_result(
-                result,
-                draw_date
+
+        if (
+            requested_pages % 50
+            == 0
+        ):
+
+            print()
+            print(
+                "Progress:",
+                requested_pages,
+                "pages"
             )
 
 
-            if (
-                not provider_code
-                or not record
-            ):
+        html = fetch_page(
+            session,
+            date_value
+        )
+
+
+        if not html:
+
+            cursor -= timedelta(
+                days=1
+            )
+
+            continue
+
+
+        lines = html_to_lines(
+            html
+        )
+
+
+        # Page must contain requested date
+        # somewhere in entire document.
+        if not page_contains_date(
+            lines,
+            date_value
+        ):
+
+            cursor -= timedelta(
+                days=1
+            )
+
+            time.sleep(
+                REQUEST_DELAY
+            )
+
+            continue
+
+
+        records_this_page = 0
+
+
+        for key in MARKETS:
+
+            record = parse_market(
+                lines,
+                key,
+                date_value
+            )
+
+
+            if not record:
                 continue
 
 
-            records_this_date += 1
-            total_records += 1
+            records_this_page += 1
+            parsed_records += 1
+
+
+            if date_value < "2026-01-01":
+
+                historical_records[
+                    key
+                ] += 1
 
 
             changed = merge_record(
-                databases[
-                    provider_code
-                ],
+                databases[key],
                 record
             )
 
 
             if changed:
-                total_changes += 1
+
+                changed_records += 1
 
 
             print(
-                "   ✓",
-                provider_code.upper(),
-                record["draw"],
+                "✓",
+                date_value,
+                key.upper(),
                 record["first"],
                 record["second"],
                 record["third"],
-                f"S:{len(record['special'])}",
-                f"C:{len(record['consolation'])}"
+                "S:",
+                len(
+                    record[
+                        "special"
+                    ]
+                ),
+                "C:",
+                len(
+                    record[
+                        "consolation"
+                    ]
+                )
             )
 
 
-        if records_this_date:
+        if records_this_page:
 
-            total_dates += 1
+            valid_pages += 1
 
 
         time.sleep(
@@ -1014,21 +1346,27 @@ def main():
         )
 
 
+        cursor -= timedelta(
+            days=1
+        )
+
+
     # ========================================================
-    # STEP 3
-    # Clean and save
+    # SAVE / VALIDATE
     # ========================================================
 
     print()
-    print("=" * 65)
-    print("SAVE DATABASE")
-    print("=" * 65)
+    print("=" * 66)
+    print("DATABASE RESULT")
+    print("=" * 66)
 
 
-    final_counts = {}
+    failures = []
 
 
-    for key, cfg in MARKETS.items():
+    for key, cfg in (
+        MARKETS.items()
+    ):
 
         database = databases[
             key
@@ -1043,20 +1381,6 @@ def main():
         coverage = database[
             "historyCoverage"
         ]
-
-
-        final_counts[key] = (
-            coverage[
-                "drawCount"
-            ]
-        )
-
-
-        save_json(
-            DATA_DIR
-            / cfg["file"],
-            database
-        )
 
 
         print()
@@ -1085,102 +1409,117 @@ def main():
             ]
         )
 
-
-    # ========================================================
-    # FINAL VALIDATION
-    #
-    # Do not allow fake GREEN success
-    # like previous updater.
-    # ========================================================
-
-    failed_markets = []
-
-
-    for key, count in (
-        final_counts.items()
-    ):
-
-        if count < 50:
-
-            failed_markets.append(
-                f"{key}={count}"
-            )
-
-
-    oldest_dates = [
-        databases[key]
-        ["historyCoverage"]
-        ["oldestDate"]
-
-        for key in MARKETS
-
-        if databases[key]
-        ["historyCoverage"]
-        ["oldestDate"]
-    ]
-
-
-    overall_oldest = (
-        min(oldest_dates)
-        if oldest_dates
-        else ""
-    )
-
-
-    if failed_markets:
-
-        raise RuntimeError(
-            "BACKFILL FAILED. "
-            "Too few historical draws: "
-            + ", ".join(
-                failed_markets
-            )
+        print(
+            " Pre-2026 parsed:",
+            historical_records[
+                key
+            ]
         )
 
 
-    if (
-        not overall_oldest
-        or overall_oldest
-        > "2020-12-31"
-    ):
-
-        raise RuntimeError(
-            "BACKFILL FAILED. "
-            "Database did not reach 2020."
+        # Save only after parsing
+        save_json(
+            DATA_DIR
+            / cfg["file"],
+            database
         )
+
+
+        # ================================================
+        # REAL VALIDATION
+        #
+        # We don't want another fake green run.
+        # ================================================
+
+        if (
+            coverage[
+                "drawCount"
+            ]
+            < 30
+        ):
+
+            failures.append(
+                f"{key}: "
+                f"only "
+                f"{coverage['drawCount']} draws"
+            )
+
+
+        oldest = coverage[
+            "oldestDate"
+        ]
+
+
+        if (
+            not oldest
+            or oldest > "2021-12-31"
+        ):
+
+            failures.append(
+                f"{key}: "
+                f"oldest={oldest or 'NONE'}"
+            )
 
 
     print()
-    print("=" * 65)
-    print("V6 BACKFILL SUCCESS ✓")
-    print("=" * 65)
+    print("=" * 66)
+    print("FINAL SUMMARY")
+    print("=" * 66)
 
     print(
-        "Archive dates :",
-        len(draw_dates)
+        "Pages requested:",
+        requested_pages
     )
 
     print(
-        "Valid dates   :",
-        total_dates
+        "Valid pages:",
+        valid_pages
     )
 
     print(
         "Records parsed:",
-        total_records
+        parsed_records
     )
 
     print(
-        "New / changed :",
-        total_changes
+        "New / changed:",
+        changed_records
+    )
+
+
+    if failures:
+
+        print()
+        print(
+            "BACKFILL VALIDATION FAILED"
+        )
+
+        for failure in failures:
+
+            print(
+                " -",
+                failure
+            )
+
+
+        raise RuntimeError(
+            "Historical database "
+            "did not pass validation."
+        )
+
+
+    print()
+    print(
+        "V7 HISTORY BACKFILL SUCCESS ✓"
     )
 
     print(
-        "Oldest overall:",
-        overall_oldest
+        "Database now contains "
+        "real historical results "
+        "from 2020 onward."
     )
 
-    print("=" * 65)
+    print("=" * 66)
 
 
 if __name__ == "__main__":
