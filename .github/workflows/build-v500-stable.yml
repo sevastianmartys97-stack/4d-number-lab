@@ -1,0 +1,37 @@
+name: Build V5.0 Stable
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-v5-stable:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Consolidate V5.0
+        run: python scripts/build_v500_stable.py
+
+      - name: Save V5.0
+        run: |
+          git config user.name "4D App Updater"
+          git config user.email "actions@users.noreply.github.com"
+
+          git add index.html sw.js manifest.webmanifest icons/ 2>/dev/null || true
+
+          if git diff --cached --quiet; then
+            echo "No changes"
+          else
+            git commit -m "Consolidate app into V5.0 stable"
+            git push
+          fi
