@@ -322,8 +322,8 @@
     "newestDate": "2026-09-02"
   },
   "historyRange": {
-    "from": "2020-01-01",
-    "to": "2026-09-04"
+    "from": "2026-08-12",
+    "to": "2026-09-02"
   },
-  "historySource": "4dmanager.net + existing records"
+  "historySource": "Existing Cash Sweep database only - historical bulk backfill still pending"
 }
