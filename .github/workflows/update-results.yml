@@ -1,13 +1,18 @@
-name: Build 2021-2026 History
+name: Auto Update 4D Results
 
 on:
+  schedule:
+    - cron: "15 11 * * *"
+    - cron: "15 13 * * *"
+    - cron: "15 15 * * *"
+
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  build-history:
+  update-results:
     runs-on: ubuntu-latest
 
     steps:
@@ -19,21 +24,22 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install requests
-        run: pip install requests
+      - name: Install
+        run: pip install requests beautifulsoup4
 
-      - name: Build History Database
-        run: python scripts/build_history.py
+      - name: Update Latest Results
+        run: python scripts/update_results.py
 
-      - name: Save History Database
+      - name: Save Results
         run: |
-          git config user.name "4D History Builder"
+          git config user.name "4D Auto Updater"
           git config user.email "actions@users.noreply.github.com"
+
           git add data/*.json
 
           if git diff --cached --quiet; then
-            echo "No database changes"
+            echo "No new results"
           else
-            git commit -m "Build 2021-2026 history database"
+            git commit -m "Auto update latest 4D results"
             git push
           fi
