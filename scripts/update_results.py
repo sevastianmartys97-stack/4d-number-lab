@@ -5,7 +5,6 @@ import re
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
-from urllib.parse import urljoin
 
 import requests
 from bs4 import BeautifulSoup
@@ -13,65 +12,48 @@ from bs4 import BeautifulSoup
 
 # =========================================================
 # 4D CHARTA ANALYZER
-# HISTORY UPDATER V4.5
+# HISTORY UPDATER V4.6
 #
-# CARA BARU:
-# - Buka archive
-# - Ikut link "Older"
-# - Simpan semua draw dalam tempoh ~90 hari
-# - Merge dengan data lama
-# - Tidak delete rekod lama
+# - Scan setiap tarikh 90 hari
+# - Simpan hanya tarikh draw sebenar
+# - Exact parser ikut heading market
+# - Merge, dedupe, sort
 # =========================================================
 
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
 
-BASE_URL = "https://4d-my.com"
-START_URL = "https://4d-my.com/4d-past-results/"
+URL = "https://4d-my.com/4d-past-results/?draw={date}"
+
+HISTORY_DAYS = 90
+REQUEST_DELAY = 0.35
 
 
 MARKETS = {
-
-    "toto": {
-        "file": "toto.json",
-        "operator": "Sports Toto",
-        "aliases": [
-            "SportsToto 4D",
-            "Sports Toto 4D",
-            "Sports Toto"
-        ]
-    },
-
     "magnum": {
         "file": "magnum.json",
         "operator": "Magnum",
-        "aliases": [
-            "Magnum 4D",
-            "Magnum4D",
-            "Magnum"
-        ]
+        "heading": "Magnum 4D"
     },
 
     "damacai": {
         "file": "damacai.json",
         "operator": "Da Ma Cai",
-        "aliases": [
-            "Da Ma Cai 1+3D",
-            "Da Ma Cai",
-            "Damacai"
-        ]
+        "heading": "Da Ma Cai 1+3D"
+    },
+
+    "toto": {
+        "file": "toto.json",
+        "operator": "Sports Toto",
+        "heading": "SportsToto 4D"
     },
 
     "cashsweep": {
         "file": "cashsweep.json",
         "operator": "Cash Sweep",
-        "aliases": [
-            "Sarawak Cash Sweep",
-            "Cash Sweep"
-        ]
+        "heading": "Sarawak Cash Sweep"
     }
-
 }
 
 
@@ -80,58 +62,33 @@ HEADERS = {
         "Mozilla/5.0 "
         "(Linux; Android 13) "
         "AppleWebKit/537.36 "
+        "(KHTML, like Gecko) "
         "Chrome/124.0 Safari/537.36"
 }
 
 
-# Archive website says 90 days.
-HISTORY_DAYS = 90
-
-# Safety supaya workflow tidak looping tanpa henti.
-MAX_PAGES = 100
-
-REQUEST_DELAY = 0.35
-
-
 # =========================================================
-# BASIC JSON
+# JSON
 # =========================================================
 
 def load_json(path: Path, default):
-
     try:
-
-        with path.open(
-            "r",
-            encoding="utf-8"
-        ) as f:
-
+        with path.open("r", encoding="utf-8") as f:
             return json.load(f)
-
     except Exception:
-
         return default
 
 
 def save_json(path: Path, data):
+    path.parent.mkdir(parents=True, exist_ok=True)
 
-    path.parent.mkdir(
-        parents=True,
-        exist_ok=True
-    )
-
-    with path.open(
-        "w",
-        encoding="utf-8"
-    ) as f:
-
+    with path.open("w", encoding="utf-8") as f:
         json.dump(
             data,
             f,
             ensure_ascii=False,
             indent=2
         )
-
         f.write("\n")
 
 
@@ -140,7 +97,6 @@ def save_json(path: Path, data):
 # =========================================================
 
 def parse_date(value):
-
     if not value:
         return None
 
@@ -151,14 +107,12 @@ def parse_date(value):
         "%d/%m/%Y",
         "%d-%m-%Y",
         "%d-%b-%Y",
-        "%d %b %Y",
+        "%d %b %Y"
     ]
 
     for fmt in formats:
-
         try:
             return datetime.strptime(value, fmt)
-
         except ValueError:
             pass
 
@@ -166,7 +120,6 @@ def parse_date(value):
 
 
 def normalize_date(value):
-
     dt = parse_date(value)
 
     if not dt:
@@ -176,36 +129,10 @@ def normalize_date(value):
 
 
 # =========================================================
-# NUMBER
-# =========================================================
-
-def normalize_number(value):
-
-    if value is None:
-        return None
-
-    s = str(value).strip()
-
-    if re.fullmatch(r"\d{1,4}", s):
-        return s.zfill(4)
-
-    m = re.search(
-        r"(?<!\d)(\d{4})(?!\d)",
-        s
-    )
-
-    if m:
-        return m.group(1)
-
-    return None
-
-
-# =========================================================
 # DATABASE
 # =========================================================
 
 def load_database(path: Path, operator_name: str):
-
     data = load_json(
         path,
         {
@@ -223,245 +150,239 @@ def load_database(path: Path, operator_name: str):
     if not isinstance(data.get("draws"), list):
         data["draws"] = []
 
-    data.setdefault(
-        "operator",
-        operator_name
-    )
-
-    data.setdefault(
-        "game",
-        "4D"
-    )
-
-    data.setdefault(
-        "source",
-        "Historical 4D Results"
-    )
-
-    data.setdefault(
-        "lastUpdated",
-        ""
-    )
+    data.setdefault("operator", operator_name)
+    data.setdefault("game", "4D")
+    data.setdefault("source", "Historical 4D Results")
+    data.setdefault("lastUpdated", "")
 
     return data
 
 
 # =========================================================
-# FIND MARKET SECTIONS FROM HTML
+# NORMALIZE TEXT
 # =========================================================
 
-def extract_market_sections(soup):
+def clean_text(value):
+    return re.sub(
+        r"\s+",
+        " ",
+        str(value)
+    ).strip()
 
-    sections = {}
 
-    headings = soup.find_all(
-        ["h3", "h2"]
+# =========================================================
+# GET PAGE TEXT AS LINES
+# =========================================================
+
+def get_lines(html):
+    soup = BeautifulSoup(
+        html,
+        "html.parser"
     )
-
-    for heading in headings:
-
-        name = heading.get_text(
-            " ",
-            strip=True
-        )
-
-        if not name:
-            continue
-
-        matched_key = None
-
-        for key, cfg in MARKETS.items():
-
-            for alias in cfg["aliases"]:
-
-                if name.strip().lower() == alias.lower():
-
-                    matched_key = key
-                    break
-
-            if matched_key:
-                break
-
-        if not matched_key:
-            continue
-
-        block_parts = []
-
-        node = heading.next_sibling
-
-        while node:
-
-            # Stop apabila jumpa heading market berikutnya.
-            if getattr(node, "name", None) in ["h2", "h3"]:
-
-                next_title = node.get_text(
-                    " ",
-                    strip=True
-                )
-
-                is_market = False
-
-                for cfg in MARKETS.values():
-
-                    for alias in cfg["aliases"]:
-
-                        if (
-                            next_title.strip().lower()
-                            ==
-                            alias.lower()
-                        ):
-                            is_market = True
-                            break
-
-                    if is_market:
-                        break
-
-                if is_market:
-                    break
-
-            if hasattr(node, "get_text"):
-
-                text = node.get_text(
-                    "\n",
-                    strip=True
-                )
-
-                if text:
-                    block_parts.append(text)
-
-            else:
-
-                text = str(node).strip()
-
-                if text:
-                    block_parts.append(text)
-
-            node = node.next_sibling
-
-        sections[matched_key] = "\n".join(
-            block_parts
-        )
-
-    return sections
-
-
-# =========================================================
-# FALLBACK TEXT SECTION
-# =========================================================
-
-def extract_market_sections_from_text(soup):
 
     text = soup.get_text(
         "\n",
         strip=True
     )
 
-    lines = [
-        re.sub(r"\s+", " ", x).strip()
+    return [
+        clean_text(x)
         for x in text.splitlines()
-        if x.strip()
+        if clean_text(x)
     ]
 
-    sections = {}
 
-    all_aliases = {}
+# =========================================================
+# FIND EXACT MARKET BLOCK
+# =========================================================
 
-    for key, cfg in MARKETS.items():
+def get_market_block(lines, market_heading):
+    headings = [
+        cfg["heading"]
+        for cfg in MARKETS.values()
+    ]
 
-        for alias in cfg["aliases"]:
-
-            all_aliases[
-                alias.lower()
-            ] = key
+    start = None
 
     for i, line in enumerate(lines):
+        if line.lower() == market_heading.lower():
+            start = i
+            break
 
-        key = all_aliases.get(
-            line.lower()
+    if start is None:
+        return []
+
+    end = len(lines)
+
+    for i in range(start + 1, len(lines)):
+        line = lines[i]
+
+        for heading in headings:
+            if line.lower() == heading.lower():
+                end = i
+                return lines[start:end]
+
+        # Also stop at other operator headings
+        if line in [
+            "GD Lotto",
+            "Sabah 4D88",
+            "Sandakan STC 4D",
+            "Singapore Pools 4D"
+        ]:
+            end = i
+            return lines[start:end]
+
+    return lines[start:end]
+
+
+# =========================================================
+# DRAW HEADER
+# =========================================================
+
+def parse_header(block):
+    for line in block:
+        m = re.search(
+            r"#?\s*"
+            r"([0-9]+(?:/[0-9]+)?)"
+            r"\s*"
+            r"\([A-Za-z]{3}\)"
+            r"\s*"
+            r"([0-9]{1,2}-[A-Za-z]{3}-[0-9]{4})",
+            line,
+            re.I
         )
 
-        if not key:
-            continue
+        if m:
+            return {
+                "draw": m.group(1),
+                "date": normalize_date(
+                    m.group(2)
+                )
+            }
 
-        end = len(lines)
+    return None
 
-        for j in range(
-            i + 1,
-            len(lines)
+
+# =========================================================
+# FIND SINGLE PRIZE
+# =========================================================
+
+def find_prize(block, label_words):
+    for i, line in enumerate(block):
+        low = line.lower()
+
+        if any(
+            label.lower() in low
+            for label in label_words
         ):
+            nums = re.findall(
+                r"(?<!\d)(\d{4})(?!\d)",
+                line
+            )
 
-            if lines[j].lower() in all_aliases:
+            if nums:
+                return nums[-1]
 
-                end = j
+            # usually number may be next line
+            for j in range(
+                i + 1,
+                min(i + 4, len(block))
+            ):
+                nums2 = re.findall(
+                    r"(?<!\d)(\d{4})(?!\d)",
+                    block[j]
+                )
+
+                if nums2:
+                    return nums2[0]
+
+    return None
+
+
+# =========================================================
+# FIND SPECIAL / CONSOLATION
+# =========================================================
+
+def find_section(
+    block,
+    start_label,
+    stop_label=None
+):
+    start = None
+
+    for i, line in enumerate(block):
+        if line.lower() == start_label.lower():
+            start = i + 1
+            break
+
+    if start is None:
+        return []
+
+    end = len(block)
+
+    if stop_label:
+        for i in range(start, len(block)):
+            if block[i].lower() == stop_label.lower():
+                end = i
                 break
 
-        sections[key] = "\n".join(
-            lines[i + 1:end]
+    results = []
+
+    for line in block[start:end]:
+        found = re.findall(
+            r"(?<!\d)(\d{4})(?!\d)",
+            line
         )
 
-    return sections
+        for number in found:
+            if number not in results:
+                results.append(number)
+
+            if len(results) == 10:
+                return results
+
+    return results
 
 
 # =========================================================
-# PARSE MARKET BLOCK
+# PARSE ONE MARKET
 # =========================================================
 
-def parse_market_block(block):
+def parse_market(lines, config):
+    block = get_market_block(
+        lines,
+        config["heading"]
+    )
 
     if not block:
         return None
 
-    text = re.sub(
-        r"\r",
-        "",
-        block
-    )
-
-    # Examples:
-    # #416/26(Tue) 01-Sep-2026
-    # #5338(Tue) 01-Sep-2026
-
-    header = re.search(
-        r"#?\s*"
-        r"([0-9]+(?:/[0-9]+)?)"
-        r"\s*"
-        r"\([A-Za-z]{3}\)"
-        r"\s*"
-        r"([0-9]{1,2}-[A-Za-z]{3}-[0-9]{4})",
-        text,
-        re.I
-    )
+    header = parse_header(block)
 
     if not header:
         return None
 
-    draw = header.group(1)
-
-    date = normalize_date(
-        header.group(2)
-    )
-
     first = find_prize(
-        text,
+        block,
         [
             "1st Prize",
-            "1st",
+            "1st"
         ]
     )
 
     second = find_prize(
-        text,
+        block,
         [
             "2nd Prize",
-            "2nd",
+            "2nd"
         ]
     )
 
     third = find_prize(
-        text,
+        block,
         [
             "3rd Prize",
-            "3rd",
+            "3rd"
         ]
     )
 
@@ -472,217 +393,33 @@ def parse_market_block(block):
     ):
         return None
 
-    special = extract_prize_section(
-        text,
+    special = find_section(
+        block,
         "Special",
         "Consolation"
     )
 
-    consolation = extract_prize_section(
-        text,
-        "Consolation",
-        None
+    consolation = find_section(
+        block,
+        "Consolation"
     )
 
     return {
-        "draw": draw,
-        "date": date,
+        "draw": header["draw"],
+        "date": header["date"],
         "first": first,
         "second": second,
         "third": third,
-        "special": special[:10],
-        "consolation": consolation[:10],
+        "special": special,
+        "consolation": consolation
     }
-
-
-# =========================================================
-# FIND PRIZES
-# =========================================================
-
-def find_prize(text, labels):
-
-    lines = [
-        re.sub(r"\s+", " ", x).strip()
-        for x in text.splitlines()
-        if x.strip()
-    ]
-
-    for i, line in enumerate(lines):
-
-        low = line.lower()
-
-        if any(
-            label.lower() in low
-            for label in labels
-        ):
-
-            nums = re.findall(
-                r"(?<!\d)(\d{4})(?!\d)",
-                line
-            )
-
-            if nums:
-                return nums[-1]
-
-            for j in range(
-                i + 1,
-                min(
-                    i + 4,
-                    len(lines)
-                )
-            ):
-
-                n = normalize_number(
-                    lines[j]
-                )
-
-                if n:
-                    return n
-
-    return None
-
-
-# =========================================================
-# SPECIAL / CONSOLATION
-# =========================================================
-
-def extract_prize_section(
-    text,
-    section_name,
-    stop_name
-):
-
-    lines = [
-        re.sub(r"\s+", " ", x).strip()
-        for x in text.splitlines()
-        if x.strip()
-    ]
-
-    start = None
-
-    for i, line in enumerate(lines):
-
-        if (
-            section_name.lower()
-            in line.lower()
-        ):
-
-            start = i + 1
-            break
-
-    if start is None:
-        return []
-
-    end = len(lines)
-
-    if stop_name:
-
-        for i in range(
-            start,
-            len(lines)
-        ):
-
-            if (
-                stop_name.lower()
-                in lines[i].lower()
-            ):
-
-                end = i
-                break
-
-    nums = []
-
-    for line in lines[start:end]:
-
-        found = re.findall(
-            r"(?<!\d)(\d{4})(?!\d)",
-            line
-        )
-
-        for n in found:
-
-            if n not in nums:
-
-                nums.append(n)
-
-            if len(nums) >= 10:
-                return nums
-
-    return nums
 
 
 # =========================================================
 # MERGE
 # =========================================================
 
-def merge_record(database, record):
-
-    draws = database["draws"]
-
-    new_draw = str(
-        record.get(
-            "draw",
-            ""
-        )
-    )
-
-    new_date = str(
-        record.get(
-            "date",
-            ""
-        )
-    )
-
-    for i, old in enumerate(draws):
-
-        old_draw = str(
-            old.get(
-                "draw",
-                ""
-            )
-        )
-
-        old_date = str(
-            old.get(
-                "date",
-                ""
-            )
-        )
-
-        same_draw = (
-            new_draw
-            and old_draw
-            and new_draw == old_draw
-        )
-
-        same_date = (
-            new_date
-            and old_date
-            and new_date == old_date
-        )
-
-        if same_draw or same_date:
-
-            # Ganti hanya jika rekod baru lebih lengkap.
-            old_score = record_score(old)
-            new_score = record_score(record)
-
-            if new_score >= old_score:
-
-                if old != record:
-
-                    draws[i] = record
-                    return True
-
-            return False
-
-    draws.append(record)
-
-    return True
-
-
 def record_score(record):
-
     score = 0
 
     if record.get("first"):
@@ -695,10 +432,7 @@ def record_score(record):
         score += 1
 
     score += len(
-        record.get(
-            "special",
-            []
-        )
+        record.get("special", [])
     )
 
     score += len(
@@ -711,51 +445,87 @@ def record_score(record):
     return score
 
 
-# =========================================================
-# CLEAN DATABASE
-# =========================================================
+def merge_record(database, new_record):
+    draws = database["draws"]
 
-def clean_database(database):
+    new_date = str(
+        new_record.get("date", "")
+    )
 
-    unique = {}
+    new_draw = str(
+        new_record.get("draw", "")
+    )
 
-    for draw in database["draws"]:
+    for i, old in enumerate(draws):
+        old_date = str(
+            old.get("date", "")
+        )
 
-        key = (
-            str(
-                draw.get(
-                    "date",
-                    ""
-                )
-            ),
-            str(
-                draw.get(
-                    "draw",
-                    ""
-                )
+        old_draw = str(
+            old.get("draw", "")
+        )
+
+        same = (
+            (
+                new_draw
+                and old_draw
+                and new_draw == old_draw
+            )
+            or
+            (
+                new_date
+                and old_date
+                and new_date == old_date
             )
         )
 
+        if same:
+            if (
+                record_score(new_record)
+                >=
+                record_score(old)
+            ):
+                if old != new_record:
+                    draws[i] = new_record
+                    return True
+
+            return False
+
+    draws.append(
+        new_record
+    )
+
+    return True
+
+
+# =========================================================
+# CLEAN / SORT
+# =========================================================
+
+def clean_database(database):
+    unique = {}
+
+    for draw in database["draws"]:
+        key = (
+            str(draw.get("date", "")),
+            str(draw.get("draw", ""))
+        )
+
         if key not in unique:
-
             unique[key] = draw
-
         else:
-
             if (
                 record_score(draw)
                 >
                 record_score(unique[key])
             ):
-
                 unique[key] = draw
 
     draws = list(
         unique.values()
     )
 
-    def key_fn(draw):
-
+    def sort_key(draw):
         dt = parse_date(
             draw.get("date")
         )
@@ -763,7 +533,7 @@ def clean_database(database):
         return dt or datetime.min
 
     draws.sort(
-        key=key_fn,
+        key=sort_key,
         reverse=True
     )
 
@@ -772,46 +542,31 @@ def clean_database(database):
     dates = []
 
     for draw in draws:
-
         dt = parse_date(
-            draw.get(
-                "date"
-            )
+            draw.get("date")
         )
 
         if dt:
             dates.append(dt)
 
     if dates:
-
         newest = max(dates)
         oldest = min(dates)
 
-        database[
-            "lastUpdated"
-        ] = newest.strftime(
-            "%Y-%m-%d"
+        database["lastUpdated"] = (
+            newest.strftime("%Y-%m-%d")
         )
 
-        database[
-            "historyCoverage"
-        ] = {
+        database["historyCoverage"] = {
             "drawCount": len(draws),
             "oldestDate":
-                oldest.strftime(
-                    "%Y-%m-%d"
-                ),
+                oldest.strftime("%Y-%m-%d"),
             "newestDate":
-                newest.strftime(
-                    "%Y-%m-%d"
-                )
+                newest.strftime("%Y-%m-%d")
         }
 
     else:
-
-        database[
-            "historyCoverage"
-        ] = {
+        database["historyCoverage"] = {
             "drawCount": len(draws),
             "oldestDate": "",
             "newestDate": ""
@@ -819,73 +574,13 @@ def clean_database(database):
 
 
 # =========================================================
-# FIND PAGE DATE
+# FETCH PAGE
 # =========================================================
 
-def find_page_date(soup):
-
-    text = soup.get_text(
-        " ",
-        strip=True
+def fetch_date(session, date_value):
+    url = URL.format(
+        date=date_value
     )
-
-    matches = re.findall(
-        r"\b"
-        r"(\d{1,2}-[A-Za-z]{3}-\d{4})"
-        r"\b",
-        text
-    )
-
-    if not matches:
-        return None
-
-    dates = []
-
-    for value in matches:
-
-        dt = parse_date(value)
-
-        if dt:
-            dates.append(dt)
-
-    if not dates:
-        return None
-
-    # Semua market dalam page biasanya tarikh sama.
-    return dates[0]
-
-
-# =========================================================
-# FIND OLDER LINK
-# =========================================================
-
-def find_older_url(soup, current_url):
-
-    for a in soup.find_all(
-        "a",
-        href=True
-    ):
-
-        label = a.get_text(
-            " ",
-            strip=True
-        ).lower()
-
-        if label == "older":
-
-            return urljoin(
-                current_url,
-                a["href"]
-            )
-
-    return None
-
-
-# =========================================================
-# FETCH
-# =========================================================
-
-def fetch_page(session, url):
 
     response = session.get(
         url,
@@ -903,219 +598,104 @@ def fetch_page(session, url):
 # =========================================================
 
 def main():
-
-    print(
-        "========================================"
-    )
-
-    print(
-        "4D HISTORY UPDATER V4.5"
-    )
-
-    print(
-        "MODE: FOLLOW ARCHIVE OLDER LINKS"
-    )
-
-    print(
-        "========================================"
-    )
-
+    print("=" * 50)
+    print("4D HISTORY UPDATER V4.6")
+    print("90 DAY DIRECT DATE SCAN")
+    print("=" * 50)
 
     DATA.mkdir(
         parents=True,
         exist_ok=True
     )
 
-
     databases = {}
 
-    for key, cfg in MARKETS.items():
-
+    for key, config in MARKETS.items():
         databases[key] = load_database(
-            DATA / cfg["file"],
-            cfg["operator"]
+            DATA / config["file"],
+            config["operator"]
         )
-
 
     session = requests.Session()
 
-
-    # Mulakan dari latest archive.
-    current_url = START_URL
-
-    visited_urls = set()
-
-    total_pages = 0
-    total_records_seen = 0
+    total_valid_dates = 0
+    total_records = 0
     total_changes = 0
 
+    today = datetime.now()
 
-    newest_archive_date = None
+    for day_index in range(HISTORY_DAYS):
 
-    cutoff_date = (
-        datetime.now()
-        -
-        timedelta(
-            days=HISTORY_DAYS
-        )
-    )
-
-
-    while (
-        current_url
-        and total_pages < MAX_PAGES
-    ):
-
-        if current_url in visited_urls:
-
-            print(
-                "STOP: repeated URL"
-            )
-
-            break
-
-
-        visited_urls.add(
-            current_url
+        target = (
+            today
+            -
+            timedelta(days=day_index)
         )
 
+        date_value = target.strftime(
+            "%Y-%m-%d"
+        )
 
         print()
         print(
-            "PAGE:",
-            current_url
+            f"[{day_index + 1}/{HISTORY_DAYS}] "
+            f"{date_value}"
         )
 
-
         try:
-
-            html = fetch_page(
+            html = fetch_date(
                 session,
-                current_url
+                date_value
             )
 
-        except Exception as error:
+            lines = get_lines(html)
 
+        except Exception as error:
             print(
-                "FETCH ERROR:",
+                "  FETCH ERROR:",
                 error
             )
 
-            break
-
-
-        soup = BeautifulSoup(
-            html,
-            "html.parser"
-        )
-
-
-        page_date = find_page_date(
-            soup
-        )
-
-
-        if page_date:
-
-            print(
-                "DATE:",
-                page_date.strftime(
-                    "%Y-%m-%d"
-                )
+            time.sleep(
+                REQUEST_DELAY
             )
+            continue
 
 
-            if newest_archive_date is None:
-
-                newest_archive_date = page_date
+        records_this_date = 0
 
 
-            if (
-                page_date
-                <
-                cutoff_date
-            ):
+        for key, config in MARKETS.items():
 
-                print(
-                    "Reached 90-day cutoff."
-                )
-
-                break
-
-
-        # First parser
-        sections = extract_market_sections(
-            soup
-        )
-
-
-        # Fallback parser
-        if len(sections) < 2:
-
-            fallback = (
-                extract_market_sections_from_text(
-                    soup
-                )
+            record = parse_market(
+                lines,
+                config
             )
-
-            for k, v in fallback.items():
-
-                sections.setdefault(
-                    k,
-                    v
-                )
-
-
-        found_this_page = 0
-
-
-        for key, cfg in MARKETS.items():
-
-            block = sections.get(
-                key
-            )
-
-
-            if not block:
-                continue
-
-
-            record = parse_market_block(
-                block
-            )
-
 
             if not record:
                 continue
 
 
-            # Safety: if page date exists,
-            # result date should match.
-            record_dt = parse_date(
-                record.get(
-                    "date"
-                )
-            )
-
+            # =================================================
+            # CRITICAL CHECK
+            #
+            # Site may return latest result
+            # for an invalid/non-draw date.
+            #
+            # Only save if result date
+            # EXACTLY equals requested date.
+            # =================================================
 
             if (
-                page_date
-                and record_dt
-                and record_dt.date()
-                != page_date.date()
+                record["date"]
+                !=
+                date_value
             ):
-
-                print(
-                    "SKIP DATE MISMATCH:",
-                    key,
-                    record.get("date")
-                )
-
                 continue
 
 
-            found_this_page += 1
-            total_records_seen += 1
+            records_this_date += 1
+            total_records += 1
 
 
             changed = merge_record(
@@ -1129,50 +709,29 @@ def main():
 
 
             print(
-                " ",
+                "  ✓",
                 key.upper(),
-                record["date"],
                 record["draw"],
                 record["first"],
                 record["second"],
                 record["third"],
                 "S:",
-                len(
-                    record["special"]
-                ),
+                len(record["special"]),
                 "C:",
-                len(
-                    record["consolation"]
-                )
+                len(record["consolation"])
             )
 
 
-        if found_this_page == 0:
+        if records_this_date:
+            total_valid_dates += 1
 
             print(
-                "No target-market draw on this date."
+                "  DRAW DATE ✓"
             )
-
-
-        total_pages += 1
-
-
-        older_url = find_older_url(
-            soup,
-            current_url
-        )
-
-
-        if not older_url:
-
+        else:
             print(
-                "No Older link found."
+                "  no valid target-market result"
             )
-
-            break
-
-
-        current_url = older_url
 
 
         time.sleep(
@@ -1180,25 +739,13 @@ def main():
         )
 
 
-    # =====================================================
-    # SAVE
-    # =====================================================
-
     print()
-    print(
-        "========================================"
-    )
-
-    print(
-        "SAVING DATABASES"
-    )
-
-    print(
-        "========================================"
-    )
+    print("=" * 50)
+    print("SAVING DATABASE")
+    print("=" * 50)
 
 
-    for key, cfg in MARKETS.items():
+    for key, config in MARKETS.items():
 
         database = databases[key]
 
@@ -1207,7 +754,7 @@ def main():
         )
 
         save_json(
-            DATA / cfg["file"],
+            DATA / config["file"],
             database
         )
 
@@ -1217,12 +764,10 @@ def main():
         )
 
         print()
-        print(
-            key.upper()
-        )
+        print(key.upper())
 
         print(
-            "Draw count:",
+            " Draw count:",
             coverage.get(
                 "drawCount",
                 0
@@ -1230,7 +775,7 @@ def main():
         )
 
         print(
-            "Oldest:",
+            " Oldest:",
             coverage.get(
                 "oldestDate",
                 "-"
@@ -1238,7 +783,7 @@ def main():
         )
 
         print(
-            "Newest:",
+            " Newest:",
             coverage.get(
                 "newestDate",
                 "-"
@@ -1247,32 +792,21 @@ def main():
 
 
     print()
+    print("=" * 50)
+    print("V4.6 FINISHED ✓")
     print(
-        "========================================"
+        "Valid draw dates:",
+        total_valid_dates
     )
-
-    print(
-        "UPDATE COMPLETE ✓"
-    )
-
-    print(
-        "Pages visited:",
-        total_pages
-    )
-
     print(
         "Records parsed:",
-        total_records_seen
+        total_records
     )
-
     print(
-        "New/changed records:",
+        "New / changed:",
         total_changes
     )
-
-    print(
-        "========================================"
-    )
+    print("=" * 50)
 
 
 if __name__ == "__main__":
