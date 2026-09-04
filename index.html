@@ -3,9 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>4D Number Lab V3.3</title>
+
+<title>4D Charta Analyzer V4.0</title>
 
 <style>
+
 *{
   box-sizing:border-box;
   margin:0;
@@ -13,485 +15,368 @@
 }
 
 body{
-  background:#06101a;
-  color:#fff;
+  background:#04101a;
+  color:#eef4fb;
   font-family:Arial,Helvetica,sans-serif;
   min-height:100vh;
   padding:12px;
 }
 
 .app{
-  width:100%;
-  max-width:520px;
+  max-width:620px;
   margin:auto;
 }
 
 .header{
   text-align:center;
-  padding:18px 8px 15px;
+  padding:16px 5px 14px;
 }
 
 .header h1{
-  color:#ffc928;
+  color:#ffc92f;
   font-size:25px;
   letter-spacing:1px;
 }
 
 .version{
-  color:#ffc928;
-  font-size:9px;
+  color:#ffc92f;
+  font-size:10px;
   margin-top:4px;
+  font-weight:bold;
 }
 
-.header p{
-  color:#8290a3;
-  font-size:10px;
+.subtitle{
+  color:#778ca4;
+  font-size:9px;
   margin-top:5px;
 }
 
 .card{
-  background:#0d1926;
-  border:1px solid #26394d;
+  background:#0c1a28;
+  border:1px solid #263c51;
   border-radius:14px;
   padding:13px;
   margin-bottom:11px;
 }
 
 .title{
-  color:#91a2b6;
   font-size:10px;
   font-weight:bold;
+  color:#9bb0c6;
   margin-bottom:10px;
 }
 
-.grid2{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:7px;
-}
-
-.grid3{
-  display:grid;
-  grid-template-columns:repeat(3,1fr);
-  gap:7px;
-}
-
-.grid4{
-  display:grid;
-  grid-template-columns:repeat(4,1fr);
-  gap:6px;
-}
-
-button{
-  cursor:pointer;
-  font-family:inherit;
-}
-
-.market,
-.mode,
-.count,
-.window{
-  background:#172335;
-  border:1px solid #314157;
-  color:#c3cbd5;
-  padding:10px 4px;
-  border-radius:8px;
-  font-size:10px;
-  font-weight:bold;
-}
-
-.market.active,
-.mode.active,
-.count.active,
-.window.active{
-  background:#322c10;
-  color:#ffd438;
-  border-color:#e6b91e;
-}
-
-.db-status{
-  margin-top:9px;
-  display:flex;
-  justify-content:space-between;
-  background:#08131e;
-  border-radius:8px;
-  padding:9px 10px;
-  font-size:9px;
-}
-
-.db-label{
-  color:#6f7e92;
-}
-
-.db-live{
-  color:#38e47d;
-  font-weight:bold;
-}
-
-.db-off{
-  color:#ff6868;
-  font-weight:bold;
-}
-
-.loading{
-  color:#ffd438;
-}
-
-.draw-info{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:7px;
-  margin-top:8px;
-}
-
-.info{
-  background:#08131e;
-  padding:9px;
-  border-radius:8px;
-  text-align:center;
-}
-
-.info span{
-  display:block;
-  color:#65758a;
-  font-size:8px;
-  margin-bottom:4px;
-}
-
-.info strong{
-  font-size:11px;
-}
-
-
-/* CHARTA */
-
-.charta-top{
+.charta-head{
   display:flex;
   justify-content:space-between;
   align-items:center;
   margin-bottom:10px;
 }
 
-.charta-top .title{
+.charta-head .title{
   margin:0;
 }
 
 .small-btn{
-  background:#111d2a;
-  border:1px solid #405067;
-  color:#d9e0e7;
+  background:#0e1c2a;
+  border:1px solid #40556c;
+  color:#dbe5ef;
   border-radius:7px;
-  padding:6px 10px;
+  padding:7px 10px;
   font-size:8px;
 }
 
 .charta-grid{
   display:grid;
-  grid-template-columns:30px repeat(4,1fr);
+  grid-template-columns:repeat(4,1fr);
   gap:6px;
-  align-items:center;
-}
-
-.row-label{
-  text-align:center;
-  color:#a8b2c1;
-  font-size:9px;
 }
 
 .chart-input{
   width:100%;
-  height:48px;
+  height:54px;
   border-radius:8px;
-  border:1px solid #bf443d;
-  background:#321a1a;
-  color:#ffd438;
-  font-size:22px;
+  background:#351917;
+  border:1px solid #a83f31;
+  color:#ffc52d;
   text-align:center;
+  font-size:23px;
   font-weight:bold;
   outline:none;
 }
 
 .chart-input:focus{
-  border-color:#ffcf2e;
-  background:#3a2418;
+  border-color:#ffd340;
 }
 
-.apply-btn{
-  width:100%;
-  margin-top:11px;
-  padding:12px;
-  border:1px solid #315071;
-  background:#15304b;
-  color:#ffffff;
-  font-size:11px;
+.favorite-label{
+  margin-top:13px;
+  margin-bottom:7px;
+  color:#a9b8c8;
+  font-size:9px;
   font-weight:bold;
+}
+
+.favorite-input{
+  width:100%;
+  background:#071522;
+  border:1px solid #536578;
+  color:white;
   border-radius:9px;
-}
-
-.charta-status{
-  margin-top:8px;
+  height:55px;
   text-align:center;
-  color:#43df83;
-  font-size:9px;
-}
-
-.charta-note{
-  margin-top:8px;
-  color:#718399;
-  font-size:8px;
-  line-height:1.5;
-  text-align:center;
-}
-
-.pattern-box{
-  margin-top:9px;
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:6px;
-}
-
-.pattern-item{
-  background:#07131e;
-  border-radius:7px;
-  padding:8px;
-  text-align:center;
-}
-
-.pattern-item span{
-  display:block;
-  color:#63758a;
-  font-size:7px;
-}
-
-.pattern-item strong{
-  display:block;
-  color:#ffc928;
-  font-size:10px;
-  margin-top:4px;
-}
-
-
-/* FOCUS */
-
-.focus-list{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:7px;
-}
-
-.focus-item{
-  background:#06121d;
-  border:1px solid #172738;
-  border-radius:8px;
-  padding:10px;
-  display:flex;
-  gap:9px;
-  align-items:center;
-}
-
-.focus-rank{
-  width:25px;
-  height:25px;
-  border-radius:6px;
-  background:#122235;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  font-size:9px;
-  color:#c8d1dc;
-}
-
-.focus-number{
-  color:#ffd12f;
-  font-size:18px;
+  font-size:27px;
+  letter-spacing:7px;
   font-weight:bold;
-  letter-spacing:2px;
+  outline:none;
 }
 
-.focus-score{
-  color:#41dc7b;
-  font-size:7px;
-  margin-top:2px;
-}
-
-.focus-tag{
-  color:#d9ad27;
-  font-size:7px;
-  margin-top:2px;
-}
-
-
-/* GENERATOR */
-
-.generator{
-  text-align:center;
-}
-
-.market-label{
-  color:#718096;
-  font-size:9px;
-}
-
-.main-number{
-  font-size:48px;
-  font-weight:bold;
-  letter-spacing:10px;
-  margin:12px 0 14px;
-}
-
-.generate{
+.analyze{
   width:100%;
-  background:#ffca36;
+  margin-top:10px;
   border:none;
-  color:#111;
-  font-weight:bold;
-  font-size:13px;
-  padding:14px;
   border-radius:9px;
+  padding:14px;
+  background:#ffca32;
+  color:#111;
+  font-size:12px;
+  font-weight:bold;
+  cursor:pointer;
 }
 
-
-/* STATS */
-
-.stats{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:7px;
-}
-
-.stat{
-  background:#07131e;
+.status-bar{
+  margin-bottom:10px;
+  background:#071522;
   border-radius:8px;
+  padding:9px 10px;
+  display:flex;
+  justify-content:space-between;
+  font-size:8px;
+}
+
+.live{
+  color:#41e681;
+  font-weight:bold;
+}
+
+.loading{
+  color:#ffc82e;
+}
+
+.error{
+  color:#ff6767;
+}
+
+.favorite-result{
+  display:none;
+}
+
+.favorite-top{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+  margin-bottom:10px;
+}
+
+.favorite-number{
+  color:#ffc82e;
+  font-size:37px;
+  font-weight:bold;
+  letter-spacing:7px;
+}
+
+.match-badge{
+  border:1px solid #2dbf68;
+  background:#092719;
+  border-radius:9px;
   padding:10px;
   text-align:center;
+  min-width:125px;
 }
 
-.stat span{
+.match-badge strong{
+  color:#59ee93;
   display:block;
-  color:#65778d;
+  font-size:10px;
+}
+
+.match-badge span{
+  display:block;
+  margin-top:4px;
   font-size:8px;
-  margin-bottom:5px;
+  color:#aeeac6;
 }
 
-.stat strong{
-  font-size:12px;
+.match-badge.weak{
+  background:#291910;
+  border-color:#b97932;
 }
 
-.green{
-  color:#38df77;
+.match-badge.weak strong{
+  color:#ffc85e;
 }
 
-.blue{
-  color:#58a9ff;
+.match-badge.none{
+  background:#291213;
+  border-color:#b44747;
 }
 
-.yellow{
-  color:#ffcb2e;
+.match-badge.none strong{
+  color:#ff7979;
 }
 
-.positions{
+.result-list{
+  background:#061522;
+  border-radius:9px;
+  padding:8px 10px;
+}
+
+.result-row{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  border-bottom:1px solid #173047;
+  padding:8px 0;
+  font-size:9px;
+}
+
+.result-row:last-child{
+  border-bottom:none;
+}
+
+.result-row span:first-child{
+  color:#8094aa;
+}
+
+.good{
+  color:#44e685;
+  font-weight:bold;
+}
+
+.mid{
+  color:#ffd04c;
+}
+
+.bad{
+  color:#ff6f6f;
+}
+
+.top-picks{
   display:grid;
-  grid-template-columns:repeat(4,1fr);
-  gap:6px;
-}
-
-.position{
-  background:#07131e;
-  text-align:center;
-  border-radius:8px;
-  padding:10px 3px;
-}
-
-.position span{
-  color:#64768a;
-  font-size:8px;
-  display:block;
-}
-
-.position strong{
-  display:block;
-  color:#ffc928;
-  margin-top:5px;
-  font-size:17px;
-}
-
-
-/* PICKS */
-
-.picks{
-  display:grid;
-  grid-template-columns:1fr 1fr;
+  grid-template-columns:repeat(2,1fr);
   gap:7px;
 }
 
 .pick{
-  background:#07131e;
-  border:1px solid #162738;
-  border-radius:8px;
-  padding:11px 6px;
+  background:#061522;
+  border:1px solid #142d42;
+  border-radius:9px;
+  padding:10px;
   text-align:center;
 }
 
+.rank{
+  color:#758ba2;
+  font-size:8px;
+}
+
 .pick-number{
-  color:#ffc928;
-  font-size:15px;
+  color:#ffc82e;
+  font-size:20px;
   font-weight:bold;
-  letter-spacing:3px;
+  letter-spacing:4px;
+  margin-top:4px;
 }
 
 .pick-score{
-  color:#43df83;
+  color:#53e1d0;
   font-size:8px;
   margin-top:4px;
 }
 
-.pick-reason{
-  color:#65768b;
+.pick-tag{
+  color:#8599ad;
   font-size:7px;
-  margin-top:4px;
-  line-height:1.4;
+  line-height:1.35;
+  margin-top:5px;
 }
 
-
-/* HISTORY */
-
-.history-head{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
+.market-table{
+  overflow-x:auto;
 }
 
-.history-head .title{
-  margin-bottom:0;
+table{
+  width:100%;
+  border-collapse:collapse;
+  min-width:560px;
+  background:#061522;
 }
 
-.history-row{
-  display:flex;
-  justify-content:space-between;
-  padding:8px 2px;
-  border-bottom:1px solid #1d2b3b;
-  font-size:9px;
+th{
+  background:#102437;
+  color:#d2deea;
+  padding:10px 5px;
+  border:1px solid #1b374f;
+  font-size:8px;
 }
 
-.history-number{
-  color:#ffc928;
+td{
+  border:1px solid #153047;
+  padding:9px 6px;
+  font-size:8px;
+  vertical-align:top;
+}
+
+.market-number{
+  color:#ffc82e;
+  font-size:14px;
   font-weight:bold;
   letter-spacing:2px;
 }
 
+.found{
+  color:#43e887;
+  font-weight:bold;
+}
+
+.notfound{
+  color:#ff6868;
+  font-weight:bold;
+}
+
+.detail{
+  margin-top:4px;
+  color:#8399b0;
+  line-height:1.4;
+}
+
 .empty{
   text-align:center;
-  color:#64758a;
+  color:#6d8197;
   font-size:9px;
   padding:12px;
 }
 
-.notice{
-  color:#526174;
+.footer{
+  color:#52677c;
   text-align:center;
+  padding:4px 12px 18px;
   font-size:8px;
   line-height:1.5;
-  padding:5px 15px 15px;
+}
+
+@media(max-width:420px){
+
+  .chart-input{
+    height:47px;
+    font-size:20px;
+  }
+
+  .favorite-number{
+    font-size:30px;
+  }
+
 }
 
 </style>
@@ -501,524 +386,307 @@ button{
 
 <div class="app">
 
-<div class="header">
-  <h1>4D NUMBER LAB</h1>
-  <div class="version">
-    V3.3 • MULTI-DIRECTION CHARTA ENGINE
+  <div class="header">
+
+    <h1>4D CHARTA ANALYZER</h1>
+
+    <div class="version">
+      V4.0 • SIMPLE & FOCUS
+    </div>
+
+    <div class="subtitle">
+      Charta • Favourite Number • Charta Hits • Market History
+    </div>
+
   </div>
-  <p>
-    Horizontal + Vertical + Diagonal + Reverse Pair + Double Focus
-  </p>
-</div>
 
 
-<!-- CHARTA -->
+  <div class="card">
 
-<div class="card">
+    <div class="status-bar">
 
-  <div class="charta-top">
+      <span>DATABASE</span>
+
+      <span
+        id="dbStatus"
+        class="loading">
+        LOADING...
+      </span>
+
+    </div>
+
+
+    <div class="charta-head">
+
+      <div class="title">
+        MANUAL CHARTA 4 × 4
+      </div>
+
+      <button
+        class="small-btn"
+        onclick="clearAll()">
+        CLEAR
+      </button>
+
+    </div>
+
+
+    <div class="charta-grid">
+
+      <input class="chart-input" maxlength="1">
+      <input class="chart-input" maxlength="1">
+      <input class="chart-input" maxlength="1">
+      <input class="chart-input" maxlength="1">
+
+      <input class="chart-input" maxlength="1">
+      <input class="chart-input" maxlength="1">
+      <input class="chart-input" maxlength="1">
+      <input class="chart-input" maxlength="1">
+
+      <input class="chart-input" maxlength="1">
+      <input class="chart-input" maxlength="1">
+      <input class="chart-input" maxlength="1">
+      <input class="chart-input" maxlength="1">
+
+      <input class="chart-input" maxlength="1">
+      <input class="chart-input" maxlength="1">
+      <input class="chart-input" maxlength="1">
+      <input class="chart-input" maxlength="1">
+
+    </div>
+
+
+    <div class="favorite-label">
+      FAVOURITE NUMBER
+    </div>
+
+    <input
+      id="favoriteInput"
+      class="favorite-input"
+      maxlength="4"
+      placeholder="----">
+
+
+    <button
+      class="analyze"
+      onclick="analyzeCharta()">
+      ANALYZE CHARTA
+    </button>
+
+  </div>
+
+
+
+  <div
+    id="favoriteCard"
+    class="card favorite-result">
 
     <div class="title">
-      MANUAL CHARTA
+      FAVOURITE NUMBER ANALYSIS
     </div>
 
-    <button
-      class="small-btn"
-      onclick="clearCharta()">
-      CLEAR
-    </button>
 
-  </div>
+    <div class="favorite-top">
 
+      <div
+        id="favoriteNumber"
+        class="favorite-number">
+        ----
+      </div>
 
-  <div class="charta-grid">
+      <div
+        id="matchBadge"
+        class="match-badge">
 
-    <div class="row-label">R1</div>
+        <strong id="matchText">
+          --
+        </strong>
 
-    <input class="chart-input" maxlength="1">
-    <input class="chart-input" maxlength="1">
-    <input class="chart-input" maxlength="1">
-    <input class="chart-input" maxlength="1">
+        <span id="matchScore">
+          MATCH SCORE: --
+        </span>
 
+      </div>
 
-    <div class="row-label">R2</div>
-
-    <input class="chart-input" maxlength="1">
-    <input class="chart-input" maxlength="1">
-    <input class="chart-input" maxlength="1">
-    <input class="chart-input" maxlength="1">
-
-
-    <div class="row-label">R3</div>
-
-    <input class="chart-input" maxlength="1">
-    <input class="chart-input" maxlength="1">
-    <input class="chart-input" maxlength="1">
-    <input class="chart-input" maxlength="1">
-
-
-    <div class="row-label">R4</div>
-
-    <input class="chart-input" maxlength="1">
-    <input class="chart-input" maxlength="1">
-    <input class="chart-input" maxlength="1">
-    <input class="chart-input" maxlength="1">
-
-  </div>
-
-
-  <button
-    class="apply-btn"
-    onclick="applyCharta()">
-    APPLY CHARTA
-  </button>
-
-
-  <div
-    id="chartaStatus"
-    class="charta-status">
-  </div>
-
-
-  <div class="pattern-box">
-
-    <div class="pattern-item">
-      <span>HORIZONTAL</span>
-      <strong id="horizontalInfo">--</strong>
     </div>
 
-    <div class="pattern-item">
-      <span>VERTICAL</span>
-      <strong id="verticalInfo">--</strong>
-    </div>
 
-    <div class="pattern-item">
-      <span>DIAGONAL</span>
-      <strong id="diagonalInfo">--</strong>
-    </div>
+    <div class="result-list">
 
-    <div class="pattern-item">
-      <span>STRONG CHARTA PAIR</span>
-      <strong id="chartPairInfo">--</strong>
+      <div class="result-row">
+        <span>Charta Match</span>
+        <span id="chartMatch">--</span>
+      </div>
+
+      <div class="result-row">
+        <span>Best Match</span>
+        <span id="matchType">--</span>
+      </div>
+
+      <div class="result-row">
+        <span>Digits in Charta</span>
+        <span id="digitMatch">--</span>
+      </div>
+
+      <div class="result-row">
+        <span>Double / Pair</span>
+        <span id="doubleInfo">--</span>
+      </div>
+
+      <div class="result-row">
+        <span>Historical Appearance</span>
+        <span id="historicalTotal">--</span>
+      </div>
+
+      <div class="result-row">
+        <span>Historical Hit Rate</span>
+        <span id="historicalRate">--</span>
+      </div>
+
     </div>
 
   </div>
 
 
-  <div class="charta-note">
-    Engine membaca carta dari beberapa arah.
-    Charta manual digunakan bersama historical database.
-  </div>
 
-</div>
-
-
-
-<!-- FOCUS PICKS -->
-
-<div class="card">
-
-  <div class="title">
-    CHARTA PICKS • MULTI-DIRECTION DOUBLE FOCUS
-  </div>
-
-  <div
-    id="focusList"
-    class="focus-list">
-
-    <div class="empty">
-      Apply Charta dahulu.
-    </div>
-
-  </div>
-
-</div>
-
-
-
-<!-- MARKET -->
-
-<div class="card">
-
-  <div class="title">
-    SELECT MARKET
-  </div>
-
-  <div class="grid2">
-
-    <button
-      class="market active"
-      onclick="selectMarket(this,'Sports Toto')">
-      SPORTS TOTO
-    </button>
-
-    <button
-      class="market"
-      onclick="selectMarket(this,'Magnum')">
-      MAGNUM
-    </button>
-
-    <button
-      class="market"
-      onclick="selectMarket(this,'Da Ma Cai')">
-      DA MA CAI
-    </button>
-
-    <button
-      class="market"
-      onclick="selectMarket(this,'Cash Sweep')">
-      CASH SWEEP
-    </button>
-
-  </div>
-
-
-  <div class="db-status">
-
-    <span class="db-label">
-      DATABASE STATUS
-    </span>
-
-    <span
-      id="dbStatus"
-      class="loading">
-      LOADING...
-    </span>
-
-  </div>
-
-
-  <div class="draw-info">
-
-    <div class="info">
-      <span>LATEST DRAW</span>
-      <strong id="latestDraw">--</strong>
-    </div>
-
-    <div class="info">
-      <span>LAST UPDATED</span>
-      <strong id="lastUpdated">--</strong>
-    </div>
-
-  </div>
-
-</div>
-
-
-
-<!-- WINDOW -->
-
-<div class="card">
-
-  <div class="title">
-    ANALYSIS WINDOW
-  </div>
-
-  <div class="grid4">
-
-    <button
-      class="window"
-      onclick="selectWindow(this,5)">
-      5
-    </button>
-
-    <button
-      class="window active"
-      onclick="selectWindow(this,10)">
-      10
-    </button>
-
-    <button
-      class="window"
-      onclick="selectWindow(this,20)">
-      20
-    </button>
-
-    <button
-      class="window"
-      onclick="selectWindow(this,'all')">
-      ALL
-    </button>
-
-  </div>
-
-</div>
-
-
-
-<!-- MODE -->
-
-<div class="card">
-
-  <div class="title">
-    MODE
-  </div>
-
-  <div class="grid2">
-
-    <button
-      class="mode"
-      onclick="selectMode(this,'random')">
-      RANDOM
-    </button>
-
-    <button
-      class="mode active"
-      onclick="selectMode(this,'statistical')">
-      STATISTICAL
-    </button>
-
-  </div>
-
-</div>
-
-
-
-<!-- COUNT -->
-
-<div class="card">
-
-  <div class="title">
-    NUMBER OF PICKS
-  </div>
-
-  <div class="grid3">
-
-    <button
-      class="count"
-      onclick="selectCount(this,1)">
-      1 PICK
-    </button>
-
-    <button
-      class="count"
-      onclick="selectCount(this,5)">
-      5 PICKS
-    </button>
-
-    <button
-      class="count active"
-      onclick="selectCount(this,10)">
-      10 PICKS
-    </button>
-
-  </div>
-
-</div>
-
-
-
-<!-- GENERATOR -->
-
-<div class="card generator">
-
-  <div
-    class="market-label"
-    id="marketLabel">
-    SPORTS TOTO • STATISTICAL
-  </div>
-
-  <div
-    class="main-number"
-    id="mainNumber">
-    ----
-  </div>
-
-  <button
-    class="generate"
-    onclick="generateNumbers()">
-    GENERATE
-  </button>
-
-</div>
-
-
-
-<!-- STATISTICS -->
-
-<div class="card">
-
-  <div class="title">
-    STATISTICAL ANALYSIS
-  </div>
-
-  <div class="stats">
-
-    <div class="stat">
-      <span>HOT DIGITS</span>
-      <strong class="green" id="hotDigits">--</strong>
-    </div>
-
-    <div class="stat">
-      <span>COLD DIGITS</span>
-      <strong class="blue" id="coldDigits">--</strong>
-    </div>
-
-    <div class="stat">
-      <span>STRONG PAIR</span>
-      <strong class="yellow" id="strongPair">--</strong>
-    </div>
-
-    <div class="stat">
-      <span>NUMBERS ANALYSED</span>
-      <strong id="dataSize">0</strong>
-    </div>
-
-    <div class="stat">
-      <span>REPEAT DIGIT RATE</span>
-      <strong id="repeatRate">--</strong>
-    </div>
-
-    <div class="stat">
-      <span>AVG DIGIT SUM</span>
-      <strong id="avgSum">--</strong>
-    </div>
-
-  </div>
-
-</div>
-
-
-
-<!-- POSITION -->
-
-<div class="card">
-
-  <div class="title">
-    HOT DIGIT BY POSITION
-  </div>
-
-  <div class="positions">
-
-    <div class="position">
-      <span>D1</span>
-      <strong id="pos1">-</strong>
-    </div>
-
-    <div class="position">
-      <span>D2</span>
-      <strong id="pos2">-</strong>
-    </div>
-
-    <div class="position">
-      <span>D3</span>
-      <strong id="pos3">-</strong>
-    </div>
-
-    <div class="position">
-      <span>D4</span>
-      <strong id="pos4">-</strong>
-    </div>
-
-  </div>
-
-</div>
-
-
-
-<!-- PICKS -->
-
-<div class="card">
-
-  <div class="title">
-    GENERATED PICKS
-  </div>
-
-  <div
-    id="generatedPicks"
-    class="picks">
-
-    <div class="empty">
-      Belum generate nombor.
-    </div>
-
-  </div>
-
-</div>
-
-
-
-<!-- HISTORY -->
-
-<div class="card">
-
-  <div class="history-head">
+  <div class="card">
 
     <div class="title">
-      RECENT HISTORY
+      CHARTA HIT • TOP 5
     </div>
 
-    <button
-      class="small-btn"
-      onclick="clearHistory()">
-      CLEAR
-    </button>
+    <div
+      id="topPicks"
+      class="top-picks">
 
-  </div>
+      <div class="empty">
+        Isi Charta kemudian tekan Analyze.
+      </div>
 
-  <div id="history">
-
-    <div class="empty">
-      Belum ada history.
     </div>
 
   </div>
 
-</div>
 
 
+  <div class="card">
 
-<div class="notice">
-  Multi-Direction Charta Engine membaca corak carta dan historical data.
-  Pattern Score bukan probability atau jaminan keputusan cabutan.
-</div>
+    <div class="title">
+      MARKET HISTORY CHECK
+    </div>
+
+    <div class="market-table">
+
+      <table>
+
+        <thead>
+
+          <tr>
+
+            <th>
+              NUMBER
+            </th>
+
+            <th>
+              SPORTS TOTO
+            </th>
+
+            <th>
+              MAGNUM
+            </th>
+
+            <th>
+              DA MA CAI
+            </th>
+
+            <th>
+              CASH SWEEP
+            </th>
+
+          </tr>
+
+        </thead>
+
+        <tbody id="marketBody">
+
+          <tr>
+
+            <td colspan="5">
+
+              <div class="empty">
+                Belum dianalisis.
+              </div>
+
+            </td>
+
+          </tr>
+
+        </tbody>
+
+      </table>
+
+    </div>
+
+  </div>
+
+
+  <div class="footer">
+
+    Match Score mengukur padanan corak Charta.
+    Historical Hit Rate hanya berdasarkan database keputusan yang disimpan
+    dan bukan kebarangkalian cabutan akan datang.
+
+  </div>
 
 </div>
 
 
 <script>
 
-/* SETTINGS */
+/* ==========================
+DATABASE
+========================== */
 
-let selectedMarket = "Sports Toto";
-let selectedMode = "statistical";
-let selectedCount = 10;
-let selectedWindow = 10;
+const dbFiles = {
 
-let database = null;
-let activeDraws = [];
-let numbersData = [];
+  toto:"data/toto.json",
 
-let chartaApplied = false;
+  magnum:"data/magnum.json",
 
-let chartMatrix = [];
+  damacai:"data/damacai.json",
 
-let chartHorizontal = [];
-let chartVertical = [];
-let chartDiagonal = [];
-let chartReverse = [];
-let chartPairs = {};
-
-let historyData =
-JSON.parse(
-  localStorage.getItem("4dHistoryV33")
-  || "[]"
-);
-
-
-/* DATABASE */
-
-const databaseFiles = {
-
-  "Sports Toto":"data/toto.json",
-  "Magnum":"data/magnum.json",
-  "Da Ma Cai":"data/damacai.json",
-  "Cash Sweep":"data/cashsweep.json"
+  cashsweep:"data/cashsweep.json"
 
 };
 
 
-/* INPUT */
+const dbNames = {
+
+  toto:"Sports Toto",
+
+  magnum:"Magnum",
+
+  damacai:"Da Ma Cai",
+
+  cashsweep:"Cash Sweep"
+
+};
+
+
+let databases = {};
+
+let chartMatrix = [];
+
+let chartLines = [];
+
+let chartPairs = {};
+
+let lastPicks = [];
+
+
+/* ==========================
+INPUT
+========================== */
 
 const chartInputs =
 document.querySelectorAll(
@@ -1045,8 +713,9 @@ chartInputs.forEach(
           chartInputs[index+1]
         ){
 
-          chartInputs[index+1]
-          .focus();
+          chartInputs[
+            index+1
+          ].focus();
 
         }
 
@@ -1057,15 +726,31 @@ chartInputs.forEach(
 );
 
 
-/* LOAD DB */
+const favoriteInput =
+document.getElementById(
+  "favoriteInput"
+);
 
-async function loadDatabase(){
 
-  database = null;
-  activeDraws = [];
-  numbersData = [];
+favoriteInput.addEventListener(
+  "input",
+  function(){
 
-  resetStatistics();
+    this.value =
+    this.value.replace(
+      /[^0-9]/g,
+      ""
+    );
+
+  }
+);
+
+
+/* ==========================
+LOAD DATABASE
+========================== */
+
+async function loadDatabases(){
 
   const status =
   document.getElementById(
@@ -1081,262 +766,80 @@ async function loadDatabase(){
 
   try{
 
-    const file =
-    databaseFiles[
-      selectedMarket
-    ];
+    for(
+      const key
+      of
+      Object.keys(dbFiles)
+    ){
 
-    const response =
-    await fetch(
-      file + "?v=" + Date.now()
-    );
-
-    if(!response.ok){
-
-      throw new Error(
-        "Database not found"
+      const response =
+      await fetch(
+        dbFiles[key]
+        +
+        "?v="
+        +
+        Date.now()
       );
 
+      if(!response.ok){
+
+        throw new Error(
+          key
+        );
+
+      }
+
+      databases[key] =
+      await response.json();
+
     }
 
-    database =
-    await response.json();
-
-    applyWindow();
 
     status.className =
-    "db-live";
+    "live";
 
     status.innerText =
-    "REAL DATA ✓";
-
-    updateDatabaseInfo();
-
-    calculateAllStatistics();
-
-    if(chartaApplied){
-
-      generateFocusPicks();
-
-    }
+    "4 MARKETS CONNECTED ✓";
 
   }
 
   catch(error){
 
     status.className =
-    "db-off";
+    "error";
 
     status.innerText =
-    "NOT CONNECTED";
+    "DATABASE ERROR";
+
+    console.error(error);
 
   }
 
 }
 
 
-/* WINDOW */
+/* ==========================
+CHARTA
+========================== */
 
-function selectWindow(
-  button,
-  value
-){
-
-  selectedWindow =
-  value;
-
-  document.querySelectorAll(
-    ".window"
-  )
-  .forEach(
-    btn =>
-    btn.classList.remove(
-      "active"
-    )
-  );
-
-  button.classList.add(
-    "active"
-  );
-
-  applyWindow();
-
-  calculateAllStatistics();
-
-  if(chartaApplied){
-
-    generateFocusPicks();
-
-  }
-
-}
-
-
-function applyWindow(){
-
-  if(
-    !database
-    ||
-    !Array.isArray(
-      database.draws
-    )
-  ){
-
-    return;
-
-  }
-
-  if(
-    selectedWindow ===
-    "all"
-  ){
-
-    activeDraws =
-    [...database.draws];
-
-  }
-
-  else{
-
-    activeDraws =
-    database.draws.slice(
-      0,
-      selectedWindow
-    );
-
-  }
-
-  flattenDatabase();
-
-}
-
-
-/* FLATTEN */
-
-function flattenDatabase(){
-
-  numbersData = [];
-
-  activeDraws.forEach(
-    (draw,index)=>{
-
-      const weight =
-      Math.max(
-        0.72,
-        1-index*0.028
-      );
-
-      const main = [
-        draw.first,
-        draw.second,
-        draw.third
-      ];
-
-      main.forEach(
-        number=>{
-
-          if(valid4D(number)){
-
-            numbersData.push({
-              number,
-              weight
-            });
-
-          }
-
-        }
-      );
-
-      if(
-        Array.isArray(
-          draw.special
-        )
-      ){
-
-        draw.special.forEach(
-          number=>{
-
-            if(valid4D(number)){
-
-              numbersData.push({
-                number,
-                weight
-              });
-
-            }
-
-          }
-        );
-
-      }
-
-      if(
-        Array.isArray(
-          draw.consolation
-        )
-      ){
-
-        draw.consolation.forEach(
-          number=>{
-
-            if(valid4D(number)){
-
-              numbersData.push({
-                number,
-                weight
-              });
-
-            }
-
-          }
-        );
-
-      }
-
-    }
-  );
-
-}
-
-
-function valid4D(number){
-
-  return(
-    typeof number ===
-    "string"
-    &&
-    /^[0-9]{4}$/.test(
-      number
-    )
-  );
-
-}
-
-
-/* APPLY CHARTA */
-
-function applyCharta(){
+function buildCharta(){
 
   const values =
   [...chartInputs]
   .map(
     input =>
-    input.value.trim()
+    input.value
   );
+
 
   if(
     values.some(
-      value =>
-      !/^[0-9]$/.test(value)
+      x =>
+      !/^[0-9]$/.test(x)
     )
   ){
 
-    document.getElementById(
-      "chartaStatus"
-    ).innerText =
-    "Isi semua 16 kotak dahulu.";
-
-    return;
+    return false;
 
   }
 
@@ -1354,38 +857,8 @@ function applyCharta(){
   ];
 
 
-  buildChartaPatterns();
+  chartLines = [];
 
-  chartaApplied = true;
-
-
-  localStorage.setItem(
-    "4dChartaV33",
-    JSON.stringify(values)
-  );
-
-
-  document.getElementById(
-    "chartaStatus"
-  ).innerText =
-  "MULTI-DIRECTION CHARTA APPLIED ✓";
-
-
-  updatePatternDisplay();
-
-  generateFocusPicks();
-
-}
-
-
-/* BUILD PATTERNS */
-
-function buildChartaPatterns(){
-
-  chartHorizontal = [];
-  chartVertical = [];
-  chartDiagonal = [];
-  chartReverse = [];
   chartPairs = {};
 
 
@@ -1393,9 +866,20 @@ function buildChartaPatterns(){
 
   for(let r=0;r<4;r++){
 
-    chartHorizontal.push(
-      chartMatrix[r].join("")
-    );
+    chartLines.push({
+
+      number:
+      chartMatrix[r]
+      .join(""),
+
+      type:
+      "Horizontal R"
+      +
+      (r+1),
+
+      weight:5
+
+    });
 
   }
 
@@ -1413,127 +897,162 @@ function buildChartaPatterns(){
 
     }
 
-    chartVertical.push(
-      number
-    );
+    chartLines.push({
+
+      number,
+
+      type:
+      "Vertical C"
+      +
+      (c+1),
+
+      weight:4.7
+
+    });
 
   }
 
 
-  /* MAIN DIAGONALS */
+  /* DIAGONAL */
 
-  let diag1 = "";
-  let diag2 = "";
+  let d1 = "";
+  let d2 = "";
 
   for(let i=0;i<4;i++){
 
-    diag1 +=
+    d1 +=
     chartMatrix[i][i];
 
-    diag2 +=
+    d2 +=
     chartMatrix[i][3-i];
 
   }
 
-  chartDiagonal.push(
-    diag1,
-    diag2
-  );
+
+  chartLines.push({
+
+    number:d1,
+
+    type:"Diagonal ↘",
+
+    weight:4.8
+
+  });
 
 
-  /* X / CROSS PATTERNS */
+  chartLines.push({
 
-  const cross1 =
+    number:d2,
+
+    type:"Diagonal ↙",
+
+    weight:4.8
+
+  });
+
+
+  /* CROSS / X */
+
+  const crosses = [
+
     chartMatrix[0][0]
     +
     chartMatrix[1][1]
     +
     chartMatrix[2][1]
     +
-    chartMatrix[3][0];
+    chartMatrix[3][0],
 
-  const cross2 =
     chartMatrix[0][3]
     +
     chartMatrix[1][2]
     +
     chartMatrix[2][2]
     +
-    chartMatrix[3][3];
+    chartMatrix[3][3],
 
-  const cross3 =
     chartMatrix[0][1]
     +
     chartMatrix[1][2]
     +
     chartMatrix[2][1]
     +
-    chartMatrix[3][2];
+    chartMatrix[3][2],
 
-  const cross4 =
     chartMatrix[0][2]
     +
     chartMatrix[1][1]
     +
     chartMatrix[2][2]
     +
-    chartMatrix[3][1];
-
-  chartDiagonal.push(
-    cross1,
-    cross2,
-    cross3,
-    cross4
-  );
-
-
-  /* REVERSE NUMBERS */
-
-  const allLines = [
-
-    ...chartHorizontal,
-    ...chartVertical,
-    ...chartDiagonal
+    chartMatrix[3][1]
 
   ];
 
-  allLines.forEach(
-    line=>{
 
-      const reverse =
-      line
-      .split("")
-      .reverse()
-      .join("");
+  crosses.forEach(
+    (number,index)=>{
 
-      chartReverse.push(
-        reverse
-      );
+      chartLines.push({
+
+        number,
+
+        type:
+        "Cross X"
+        +
+        (index+1),
+
+        weight:4.1
+
+      });
 
     }
   );
 
 
-  /* PAIRS */
+  /* REVERSE */
 
-  const pairLines = [
-
-    ...chartHorizontal,
-    ...chartVertical,
-    ...chartDiagonal
-
-  ];
+  const normalLines =
+  [...chartLines];
 
 
-  pairLines.forEach(
+  normalLines.forEach(
+    item=>{
+
+      chartLines.push({
+
+        number:
+        item.number
+        .split("")
+        .reverse()
+        .join(""),
+
+        type:
+        "Reverse "
+        +
+        item.type,
+
+        weight:
+        item.weight * 0.84
+
+      });
+
+    }
+  );
+
+
+  /* PAIR FREQUENCY */
+
+  chartLines.forEach(
     line=>{
 
       for(let i=0;i<3;i++){
 
         const pair =
-        line[i]
+        line.number[i]
         +
-        line[i+1];
+        line.number[i+1];
+
 
         chartPairs[pair] =
         (
@@ -1542,690 +1061,50 @@ function buildChartaPatterns(){
           0
         )
         +
-        1;
+        line.weight;
 
 
-        const reversePair =
+        const reverse =
         pair[1]
         +
         pair[0];
 
-        chartPairs[reversePair] =
+
+        chartPairs[reverse] =
         (
-          chartPairs[
-            reversePair
-          ]
+          chartPairs[reverse]
           ||
           0
         )
         +
-        0.6;
+        line.weight * 0.5;
 
       }
 
     }
   );
 
-}
 
-
-/* DISPLAY PATTERN */
-
-function updatePatternDisplay(){
-
-  document.getElementById(
-    "horizontalInfo"
-  ).innerText =
-  chartHorizontal
-  .slice(0,2)
-  .join(" • ");
-
-
-  document.getElementById(
-    "verticalInfo"
-  ).innerText =
-  chartVertical
-  .slice(0,2)
-  .join(" • ");
-
-
-  document.getElementById(
-    "diagonalInfo"
-  ).innerText =
-  chartDiagonal
-  .slice(0,2)
-  .join(" • ");
-
-
-  const strongest =
-  Object.entries(
-    chartPairs
-  )
-  .sort(
-    (a,b)=>
-    b[1]-a[1]
-  )[0];
-
-
-  document.getElementById(
-    "chartPairInfo"
-  ).innerText =
-  strongest
-  ?
-  strongest[0]
-  :
-  "--";
+  return true;
 
 }
 
 
-/* RESTORE CHARTA */
+/* ==========================
+DOUBLE
+========================== */
 
-function restoreCharta(){
+function getDoubleType(number){
 
-  const saved =
-  JSON.parse(
-    localStorage.getItem(
-      "4dChartaV33"
-    )
-    ||
-    "null"
-  );
+  const count = {};
 
-  if(
-    !Array.isArray(saved)
-    ||
-    saved.length !== 16
-  ){
-
-    return;
-
-  }
-
-  saved.forEach(
-    (value,index)=>{
-
-      chartInputs[index].value =
-      value;
-
-    }
-  );
-
-  chartMatrix = [
-
-    saved.slice(0,4),
-
-    saved.slice(4,8),
-
-    saved.slice(8,12),
-
-    saved.slice(12,16)
-
-  ];
-
-  buildChartaPatterns();
-
-  chartaApplied = true;
-
-  document.getElementById(
-    "chartaStatus"
-  ).innerText =
-  "SAVED CHARTA ✓";
-
-  updatePatternDisplay();
-
-}
-
-
-/* CLEAR CHARTA */
-
-function clearCharta(){
-
-  chartInputs.forEach(
-    input =>
-    input.value = ""
-  );
-
-  chartaApplied = false;
-
-  chartMatrix = [];
-  chartHorizontal = [];
-  chartVertical = [];
-  chartDiagonal = [];
-  chartReverse = [];
-  chartPairs = {};
-
-  localStorage.removeItem(
-    "4dChartaV33"
-  );
-
-  document.getElementById(
-    "chartaStatus"
-  ).innerText = "";
-
-  document.getElementById(
-    "horizontalInfo"
-  ).innerText = "--";
-
-  document.getElementById(
-    "verticalInfo"
-  ).innerText = "--";
-
-  document.getElementById(
-    "diagonalInfo"
-  ).innerText = "--";
-
-  document.getElementById(
-    "chartPairInfo"
-  ).innerText = "--";
-
-  document.getElementById(
-    "focusList"
-  ).innerHTML =
-  `
-  <div class="empty">
-    Apply Charta dahulu.
-  </div>
-  `;
-
-}
-
-
-/* HISTORICAL FREQUENCY */
-
-function digitFrequency(){
-
-  const freq =
-  Array(10).fill(0);
-
-  numbersData.forEach(
-    item=>{
-
-      item.number
-      .split("")
-      .forEach(
-        digit=>{
-
-          freq[
-            Number(digit)
-          ]
-          +=
-          item.weight;
-
-        }
-      );
-
-    }
-  );
-
-  return freq;
-
-}
-
-
-function positionFrequency(){
-
-  const positions = [
-
-    Array(10).fill(0),
-    Array(10).fill(0),
-    Array(10).fill(0),
-    Array(10).fill(0)
-
-  ];
-
-  numbersData.forEach(
-    item=>{
-
-      for(let i=0;i<4;i++){
-
-        positions[i][
-          Number(
-            item.number[i]
-          )
-        ]
-        +=
-        item.weight;
-
-      }
-
-    }
-  );
-
-  return positions;
-
-}
-
-
-function pairFrequency(){
-
-  const pairs = {};
-
-  numbersData.forEach(
-    item=>{
-
-      for(let i=0;i<3;i++){
-
-        const pair =
-        item.number[i]
-        +
-        item.number[i+1];
-
-        pairs[pair] =
-        (
-          pairs[pair]
-          ||
-          0
-        )
-        +
-        item.weight;
-
-      }
-
-    }
-  );
-
-  return pairs;
-
-}
-
-
-/* STATS */
-
-function getHotCold(){
-
-  const freq =
-  digitFrequency();
-
-  const sorted =
-  freq.map(
-    (count,digit)=>({
-      digit,
-      count
-    })
-  )
-  .sort(
-    (a,b)=>
-    b.count-a.count
-  );
-
-  return{
-
-    hot:
-    sorted
-    .slice(0,3)
-    .map(x=>x.digit),
-
-    cold:
-    sorted
-    .slice(-3)
-    .reverse()
-    .map(x=>x.digit)
-
-  };
-
-}
-
-
-function strongPair(){
-
-  const pairs =
-  pairFrequency();
-
-  const sorted =
-  Object.entries(pairs)
-  .sort(
-    (a,b)=>
-    b[1]-a[1]
-  );
-
-  return(
-    sorted[0]
-    ?
-    sorted[0][0]
-    :
-    "--"
-  );
-
-}
-
-
-function averageDigitSum(){
-
-  if(
-    numbersData.length === 0
-  ){
-
-    return 0;
-
-  }
-
-  let total = 0;
-
-  numbersData.forEach(
-    item=>{
-
-      total +=
-      item.number
-      .split("")
-      .map(Number)
-      .reduce(
-        (a,b)=>a+b,
-        0
-      );
-
-    }
-  );
-
-  return(
-    total /
-    numbersData.length
-  );
-
-}
-
-
-function repeatRate(){
-
-  if(
-    numbersData.length === 0
-  ){
-
-    return 0;
-
-  }
-
-  let repeat = 0;
-
-  numbersData.forEach(
-    item=>{
-
-      if(
-        new Set(
-          item.number.split("")
-        ).size < 4
-      ){
-
-        repeat++;
-
-      }
-
-    }
-  );
-
-  return(
-    repeat /
-    numbersData.length *
-    100
-  );
-
-}
-
-
-function calculateAllStatistics(){
-
-  if(
-    numbersData.length === 0
-  ){
-
-    resetStatistics();
-
-    return;
-
-  }
-
-  const hc =
-  getHotCold();
-
-  document.getElementById(
-    "hotDigits"
-  ).innerText =
-  hc.hot.join(" • ");
-
-  document.getElementById(
-    "coldDigits"
-  ).innerText =
-  hc.cold.join(" • ");
-
-  document.getElementById(
-    "strongPair"
-  ).innerText =
-  strongPair();
-
-  document.getElementById(
-    "dataSize"
-  ).innerText =
-  numbersData.length;
-
-  document.getElementById(
-    "repeatRate"
-  ).innerText =
-  repeatRate().toFixed(1)
-  +
-  "%";
-
-  document.getElementById(
-    "avgSum"
-  ).innerText =
-  averageDigitSum()
-  .toFixed(1);
-
-
-  const positions =
-  positionFrequency();
-
-  for(let i=0;i<4;i++){
-
-    const max =
-    Math.max(
-      ...positions[i]
-    );
-
-    document.getElementById(
-      "pos"+(i+1)
-    ).innerText =
-    positions[i]
-    .indexOf(max);
-
-  }
-
-}
-
-
-function resetStatistics(){
-
-  document.getElementById(
-    "hotDigits"
-  ).innerText = "--";
-
-  document.getElementById(
-    "coldDigits"
-  ).innerText = "--";
-
-  document.getElementById(
-    "strongPair"
-  ).innerText = "--";
-
-  document.getElementById(
-    "dataSize"
-  ).innerText = "0";
-
-  document.getElementById(
-    "repeatRate"
-  ).innerText = "--";
-
-  document.getElementById(
-    "avgSum"
-  ).innerText = "--";
-
-  for(let i=1;i<=4;i++){
-
-    document.getElementById(
-      "pos"+i
-    ).innerText = "-";
-
-  }
-
-}
-
-
-/* DB INFO */
-
-function updateDatabaseInfo(){
-
-  if(!database){
-    return;
-  }
-
-  const latest =
-  database.draws?.[0];
-
-  document.getElementById(
-    "latestDraw"
-  ).innerText =
-  latest?.draw
-  ||
-  "--";
-
-  document.getElementById(
-    "lastUpdated"
-  ).innerText =
-  database.lastUpdated
-  ||
-  "--";
-
-}
-
-
-/* SELECT */
-
-function selectMarket(
-  button,
-  market
-){
-
-  selectedMarket =
-  market;
-
-  document.querySelectorAll(
-    ".market"
-  )
-  .forEach(
-    btn =>
-    btn.classList.remove(
-      "active"
-    )
-  );
-
-  button.classList.add(
-    "active"
-  );
-
-  updateLabel();
-
-  loadDatabase();
-
-  renderHistory();
-
-}
-
-
-function selectMode(
-  button,
-  mode
-){
-
-  selectedMode =
-  mode;
-
-  document.querySelectorAll(
-    ".mode"
-  )
-  .forEach(
-    btn =>
-    btn.classList.remove(
-      "active"
-    )
-  );
-
-  button.classList.add(
-    "active"
-  );
-
-  updateLabel();
-
-}
-
-
-function selectCount(
-  button,
-  count
-){
-
-  selectedCount =
-  count;
-
-  document.querySelectorAll(
-    ".count"
-  )
-  .forEach(
-    btn =>
-    btn.classList.remove(
-      "active"
-    )
-  );
-
-  button.classList.add(
-    "active"
-  );
-
-}
-
-
-function updateLabel(){
-
-  document.getElementById(
-    "marketLabel"
-  ).innerText =
-  selectedMarket.toUpperCase()
-  +
-  " • "
-  +
-  selectedMode.toUpperCase();
-
-}
-
-
-/* RANDOM */
-
-function random4D(){
-
-  return Math.floor(
-    Math.random()*10000
-  )
-  .toString()
-  .padStart(
-    4,
-    "0"
-  );
-
-}
-
-
-/* DOUBLE TYPE */
-
-function doubleType(number){
-
-  const counts = {};
-
-  number
-  .split("")
+  [...number]
   .forEach(
     digit=>{
 
-      counts[digit] =
+      count[digit] =
       (
-        counts[digit]
+        count[digit]
         ||
         0
       )
@@ -2235,11 +1114,14 @@ function doubleType(number){
     }
   );
 
+
   const values =
-  Object.values(counts)
+  Object.values(count)
   .sort(
-    (a,b)=>b-a
+    (a,b)=>
+    b-a
   );
+
 
   if(
     values[0] === 2
@@ -2251,13 +1133,6 @@ function doubleType(number){
 
   }
 
-  if(
-    values[0] === 2
-  ){
-
-    return "ONE DOUBLE";
-
-  }
 
   if(
     values[0] === 3
@@ -2267,259 +1142,117 @@ function doubleType(number){
 
   }
 
+
+  if(
+    values[0] === 2
+  ){
+
+    return "ONE DOUBLE";
+
+  }
+
+
   return "NORMAL";
 
 }
 
 
-function doubleBonus(number){
+/* ==========================
+SCORE
+========================== */
 
-  const type =
-  doubleType(number);
-
-  if(
-    type ===
-    "DOUBLE PAIR"
-  ){
-
-    return 15;
-
-  }
-
-  if(
-    type ===
-    "ONE DOUBLE"
-  ){
-
-    return 9;
-
-  }
-
-  if(
-    type ===
-    "TRIPLE"
-  ){
-
-    return 3;
-
-  }
-
-  return 0;
-
-}
-
-
-/* HISTORICAL SCORE */
-
-function historicalScore(number){
-
-  if(
-    numbersData.length === 0
-  ){
-
-    return 0;
-
-  }
-
-  const overall =
-  digitFrequency();
-
-  const positions =
-  positionFrequency();
-
-  const pairs =
-  pairFrequency();
-
-  const maxOverall =
-  Math.max(
-    ...overall
-  )
-  ||
-  1;
-
-  const pairValues =
-  Object.values(pairs);
-
-  const maxPair =
-  pairValues.length
-  ?
-  Math.max(...pairValues)
-  :
-  1;
+function chartScore(number){
 
   let score = 0;
 
+  let bestType =
+  "Partial Charta";
 
-  for(let i=0;i<4;i++){
-
-    const digit =
-    Number(number[i]);
-
-    const maxPos =
-    Math.max(
-      ...positions[i]
-    )
-    ||
-    1;
-
-    score +=
-    (
-      positions[i][digit]
-      /
-      maxPos
-    )
-    *
-    5;
-
-  }
+  let bestValue = 0;
 
 
-  for(let i=0;i<4;i++){
+  /* EXACT LINES */
 
-    score +=
-    (
-      overall[
-        Number(number[i])
-      ]
-      /
-      maxOverall
-    )
-    *
-    2.3;
+  chartLines.forEach(
+    line=>{
 
-  }
+      if(
+        number ===
+        line.number
+      ){
 
+        const bonus =
+        45 +
+        line.weight * 5;
 
-  for(let i=0;i<3;i++){
+        score += bonus;
 
-    const pair =
-    number[i]
-    +
-    number[i+1];
+        if(
+          bonus >
+          bestValue
+        ){
 
-    score +=
-    (
-      (
-        pairs[pair]
-        ||
-        0
-      )
-      /
-      maxPair
-    )
-    *
-    3.5;
+          bestValue =
+          bonus;
 
-  }
+          bestType =
+          line.type;
 
+        }
 
-  const sum =
-  number
-  .split("")
-  .map(Number)
-  .reduce(
-    (a,b)=>a+b,
-    0
+      }
+
+    }
   );
 
-  score +=
-  Math.max(
-    0,
-    8 -
-    Math.abs(
-      sum -
-      averageDigitSum()
-    )
-  );
 
-  return score;
-
-}
-
-
-/* MULTI-DIRECTION CHARTA SCORE */
-
-function chartaScore(number){
-
-  if(
-    !chartaApplied
-  ){
-
-    return 0;
-
-  }
-
-  let score = 0;
-
-
-  const allLines = [
-
-    ...chartHorizontal,
-    ...chartVertical,
-    ...chartDiagonal,
-    ...chartReverse
-
-  ];
-
-
-  /* EXACT LINE */
-
-  if(
-    allLines.includes(number)
-  ){
-
-    score += 18;
-
-  }
-
-
-  /* DIGIT PRESENCE */
+  /* DIGIT FREQUENCY */
 
   const flat =
   chartMatrix.flat();
 
-  const counts =
+  const freq =
   Array(10).fill(0);
+
 
   flat.forEach(
     digit=>{
 
-      counts[
+      freq[
         Number(digit)
       ]++;
 
     }
   );
 
-  const maxDigit =
-  Math.max(
-    ...counts
-  )
+
+  const maxFreq =
+  Math.max(...freq)
   ||
   1;
 
 
-  number
-  .split("")
-  .forEach(
-    digit=>{
+  for(
+    const digit
+    of
+    number
+  ){
 
-      score +=
-      (
-        counts[
-          Number(digit)
-        ]
-        /
-        maxDigit
-      )
-      *
-      3;
+    score +=
+    (
+      freq[
+        Number(digit)
+      ]
+      /
+      maxFreq
+    )
+    *
+    4;
 
-    }
-  );
+  }
 
 
-  /* PAIR */
+  /* PAIRS */
 
   for(let i=0;i<3;i++){
 
@@ -2529,22 +1262,25 @@ function chartaScore(number){
     number[i+1];
 
     score +=
-    (
-      chartPairs[pair]
-      ||
-      0
-    )
-    *
-    3.2;
+    Math.min(
+      8,
+      (
+        chartPairs[pair]
+        ||
+        0
+      )
+      *
+      0.45
+    );
 
   }
 
 
-  /* POSITION MATCH ACROSS ROWS */
+  /* POSITION */
 
   for(let pos=0;pos<4;pos++){
 
-    let posCount = 0;
+    let count = 0;
 
     for(let row=0;row<4;row++){
 
@@ -2554,157 +1290,200 @@ function chartaScore(number){
         number[pos]
       ){
 
-        posCount++;
+        count++;
 
       }
 
     }
 
     score +=
-    posCount * 2;
+    count * 2.2;
 
   }
 
 
-  return score;
+  /* DOUBLE BONUS */
 
-}
+  const doubleType =
+  getDoubleType(number);
 
-
-/* FINAL SCORE */
-
-function scoreNumber(number){
-
-  let score =
-  historicalScore(number);
-
-  score +=
-  chartaScore(number);
-
-  score +=
-  doubleBonus(number);
-
-  return Math.min(
-    100,
-    score
-  );
-
-}
-
-
-/* REASON */
-
-function getReason(number){
-
-  const reasons = [];
-
-  const type =
-  doubleType(number);
 
   if(
-    type ===
+    doubleType ===
     "DOUBLE PAIR"
   ){
 
-    reasons.push(
-      "Double Pair"
-    );
+    score += 10;
 
   }
 
   else if(
-    type ===
+    doubleType ===
     "ONE DOUBLE"
   ){
 
-    reasons.push(
-      "Double"
-    );
+    score += 6;
 
   }
 
-
-  const allLines = [
-
-    ...chartHorizontal,
-    ...chartVertical,
-    ...chartDiagonal,
-    ...chartReverse
-
-  ];
-
-
-  if(
-    allLines.includes(number)
+  else if(
+    doubleType ===
+    "TRIPLE"
   ){
 
-    reasons.push(
-      "Exact Charta Line"
+    score += 3;
+
+  }
+
+
+  return{
+
+    score:
+    Math.min(
+      100,
+      score
+    ),
+
+    type:
+    bestType
+
+  };
+
+}
+
+
+/* ==========================
+GENERATE CHARTA HITS
+========================== */
+
+function generateTopHits(){
+
+  const map =
+  new Map();
+
+
+  /* INCLUDE ALL EXACT CHARTA LINES */
+
+  chartLines.forEach(
+    line=>{
+
+      map.set(
+        line.number,
+        line.number
+      );
+
+    }
+  );
+
+
+  /* RANDOM CANDIDATE POOL */
+
+  for(
+    let i=0;
+    i<18000;
+    i++
+  ){
+
+    const number =
+    Math.floor(
+      Math.random()*10000
+    )
+    .toString()
+    .padStart(
+      4,
+      "0"
+    );
+
+
+    map.set(
+      number,
+      number
     );
 
   }
 
 
-  let pairStrong = 0;
+  let list =
+  [...map.values()]
+  .map(
+    number=>{
 
-  for(let i=0;i<3;i++){
+      const result =
+      chartScore(number);
 
-    const pair =
-    number[i]
-    +
-    number[i+1];
+      return{
 
-    if(
-      (
-        chartPairs[pair]
-        ||
-        0
+        number,
+
+        score:
+        result.score,
+
+        type:
+        result.type,
+
+        double:
+        getDoubleType(number)
+
+      };
+
+    }
+  )
+  .sort(
+    (a,b)=>
+    b.score-a.score
+  );
+
+
+  /* DIVERSITY */
+
+  const results = [];
+
+
+  for(
+    const item
+    of
+    list
+  ){
+
+    const tooSimilar =
+    results.some(
+      chosen =>
+      similarity(
+        chosen.number,
+        item.number
       )
       >=
-      1.5
+      3
+    );
+
+
+    if(!tooSimilar){
+
+      results.push(item);
+
+    }
+
+
+    if(
+      results.length === 5
     ){
 
-      pairStrong++;
+      break;
 
     }
 
   }
 
 
-  if(pairStrong > 0){
-
-    reasons.push(
-      pairStrong
-      +
-      " Charta Pair"
-    );
-
-  }
-
-
-  if(
-    reasons.length < 3
-  ){
-
-    reasons.push(
-      "Multi-Direction"
-    );
-
-  }
-
-
-  return reasons
-  .slice(0,3)
-  .join(" • ");
+  return results;
 
 }
 
 
-/* SIMILARITY */
-
 function similarity(a,b){
 
   let same = 0;
+
 
   for(let i=0;i<4;i++){
 
@@ -2718,191 +1497,568 @@ function similarity(a,b){
 
   }
 
+
   return same;
 
 }
 
 
-/* STATISTICAL PICKS */
+/* ==========================
+MARKET SEARCH
+========================== */
 
-function statisticalPicks(count){
+function findNumberInDatabase(
+  database,
+  number
+){
 
-  const map =
-  new Map();
+  const appearances = [];
 
-  for(
-    let i=0;
-    i<18000;
-    i++
+
+  if(
+    !database
+    ||
+    !Array.isArray(
+      database.draws
+    )
   ){
 
-    const number =
-    random4D();
+    return{
 
-    if(
-      map.has(number)
-    ){
+      count:0,
 
-      continue;
+      latest:null
 
-    }
-
-    map.set(
-      number,
-      {
-        number,
-        score:
-        scoreNumber(number)
-      }
-    );
+    };
 
   }
 
 
-  const candidates =
-  [...map.values()]
-  .sort(
-    (a,b)=>
-    b.score-a.score
-  );
+  database.draws.forEach(
+    draw=>{
+
+      const positions = [
+
+        {
+          value:draw.first,
+          position:"1st"
+        },
+
+        {
+          value:draw.second,
+          position:"2nd"
+        },
+
+        {
+          value:draw.third,
+          position:"3rd"
+        }
+
+      ];
 
 
-  const doubleCandidates =
-  candidates.filter(
-    item =>
-    doubleType(
-      item.number
-    )
-    !==
-    "NORMAL"
-  );
+      positions.forEach(
+        item=>{
 
+          if(
+            item.value ===
+            number
+          ){
 
-  const results = [];
+            appearances.push({
 
+              draw:
+              draw.draw
+              ||
+              "--",
 
-  function addCandidate(item){
+              date:
+              draw.date
+              ||
+              "",
 
-    const tooSimilar =
-    results.some(
-      selected =>
-      similarity(
-        selected.number,
-        item.number
-      )
-      >=
-      3
-    );
+              position:
+              item.position
 
-    if(
-      !tooSimilar
-    ){
+            });
 
-      item.reason =
-      getReason(
-        item.number
+          }
+
+        }
       );
 
-      results.push(item);
+
+      if(
+        Array.isArray(
+          draw.special
+        )
+        &&
+        draw.special.includes(
+          number
+        )
+      ){
+
+        appearances.push({
+
+          draw:
+          draw.draw
+          ||
+          "--",
+
+          date:
+          draw.date
+          ||
+          "",
+
+          position:
+          "Special"
+
+        });
+
+      }
+
+
+      if(
+        Array.isArray(
+          draw.consolation
+        )
+        &&
+        draw.consolation.includes(
+          number
+        )
+      ){
+
+        appearances.push({
+
+          draw:
+          draw.draw
+          ||
+          "--",
+
+          date:
+          draw.date
+          ||
+          "",
+
+          position:
+          "Consolation"
+
+        });
+
+      }
 
     }
-
-  }
-
-
-  const doubleTarget =
-  Math.ceil(
-    count * 0.7
   );
 
 
-  for(
-    const item
-    of
-    doubleCandidates
-  ){
+  return{
 
-    addCandidate(item);
+    count:
+    appearances.length,
 
-    if(
-      results.length
-      >=
-      doubleTarget
-    ){
+    latest:
+    appearances[0]
+    ||
+    null
 
-      break;
-
-    }
-
-  }
-
-
-  for(
-    const item
-    of
-    candidates
-  ){
-
-    if(
-      results.length >=
-      count
-    ){
-
-      break;
-
-    }
-
-    if(
-      results.some(
-        x =>
-        x.number ===
-        item.number
-      )
-    ){
-
-      continue;
-
-    }
-
-    addCandidate(item);
-
-  }
-
-
-  return results.slice(
-    0,
-    count
-  );
+  };
 
 }
 
 
-/* FOCUS */
+/* ==========================
+HISTORICAL RATE
+========================== */
 
-function generateFocusPicks(){
+function totalDrawCount(){
+
+  let total = 0;
+
+
+  Object.values(
+    databases
+  )
+  .forEach(
+    database=>{
+
+      if(
+        Array.isArray(
+          database?.draws
+        )
+      ){
+
+        total +=
+        database.draws.length;
+
+      }
+
+    }
+  );
+
+
+  return total;
+
+}
+
+
+function allMarketAppearance(number){
+
+  let total = 0;
+
+
+  Object.values(
+    databases
+  )
+  .forEach(
+    database=>{
+
+      total +=
+      findNumberInDatabase(
+        database,
+        number
+      ).count;
+
+    }
+  );
+
+
+  return total;
+
+}
+
+
+/* ==========================
+ANALYZE
+========================== */
+
+function analyzeCharta(){
 
   if(
-    !chartaApplied
-    ||
-    numbersData.length === 0
+    !buildCharta()
   ){
+
+    alert(
+      "Isi semua 16 kotak Charta dahulu."
+    );
 
     return;
 
   }
 
-  const results =
-  statisticalPicks(10);
+
+  const favorite =
+  favoriteInput.value.trim();
+
+
+  if(
+    !/^[0-9]{4}$/.test(
+      favorite
+    )
+  ){
+
+    alert(
+      "Masukkan Favourite Number 4 digit."
+    );
+
+    return;
+
+  }
+
+
+  const result =
+  chartScore(
+    favorite
+  );
+
+
+  const totalAppeared =
+  allMarketAppearance(
+    favorite
+  );
+
+
+  const drawCount =
+  totalDrawCount();
+
+
+  const rate =
+  drawCount > 0
+  ?
+  (
+    totalAppeared
+    /
+    drawCount
+    *
+    100
+  )
+  :
+  0;
+
+
+  renderFavorite(
+    favorite,
+    result,
+    totalAppeared,
+    rate
+  );
+
+
+  lastPicks =
+  generateTopHits();
+
+
+  /* Guarantee favorite included */
+
+  if(
+    !lastPicks.some(
+      x =>
+      x.number ===
+      favorite
+    )
+  ){
+
+    lastPicks.unshift({
+
+      number:
+      favorite,
+
+      score:
+      result.score,
+
+      type:
+      result.type,
+
+      double:
+      getDoubleType(
+        favorite
+      )
+
+    });
+
+    lastPicks =
+    lastPicks.slice(
+      0,
+      5
+    );
+
+  }
+
+
+  lastPicks.sort(
+    (a,b)=>
+    b.score-a.score
+  );
+
+
+  renderTopPicks();
+
+  renderMarketTable();
+
+
+  localStorage.setItem(
+    "4dChartaV40",
+    JSON.stringify(
+      [...chartInputs]
+      .map(
+        input =>
+        input.value
+      )
+    )
+  );
+
+
+  localStorage.setItem(
+    "4dFavouriteV40",
+    favorite
+  );
+
+}
+
+
+/* ==========================
+FAVOURITE DISPLAY
+========================== */
+
+function renderFavorite(
+  number,
+  result,
+  totalAppeared,
+  rate
+){
+
+  const card =
+  document.getElementById(
+    "favoriteCard"
+  );
+
+
+  card.style.display =
+  "block";
+
+
+  document.getElementById(
+    "favoriteNumber"
+  ).innerText =
+  number;
+
+
+  const badge =
+  document.getElementById(
+    "matchBadge"
+  );
+
+
+  const text =
+  document.getElementById(
+    "matchText"
+  );
+
+
+  const scoreText =
+  document.getElementById(
+    "matchScore"
+  );
+
+
+  badge.className =
+  "match-badge";
+
+
+  if(
+    result.score >= 75
+  ){
+
+    text.innerText =
+    "STRONG MATCH ✓";
+
+  }
+
+  else if(
+    result.score >= 50
+  ){
+
+    badge.classList.add(
+      "weak"
+    );
+
+    text.innerText =
+    "MEDIUM MATCH";
+
+  }
+
+  else{
+
+    badge.classList.add(
+      "none"
+    );
+
+    text.innerText =
+    "LOW MATCH";
+
+  }
+
+
+  scoreText.innerText =
+  "MATCH SCORE: "
+  +
+  result.score.toFixed(1)
+  +
+  " / 100";
+
+
+  const exact =
+  chartLines.find(
+    line =>
+    line.number ===
+    number
+  );
+
+
+  document.getElementById(
+    "chartMatch"
+  ).innerHTML =
+  exact
+  ?
+  '<span class="good">FOUND ✓</span>'
+  :
+  '<span class="mid">PARTIAL</span>';
+
+
+  document.getElementById(
+    "matchType"
+  ).innerText =
+  exact
+  ?
+  exact.type
+  :
+  result.type;
+
+
+  const flat =
+  chartMatrix.flat();
+
+
+  const matchedDigits =
+  [...number]
+  .map(
+    digit =>
+    flat.includes(digit)
+    ?
+    digit + " ✓"
+    :
+    digit + " ✕"
+  )
+  .join("  ");
+
+
+  document.getElementById(
+    "digitMatch"
+  ).innerText =
+  matchedDigits;
+
+
+  document.getElementById(
+    "doubleInfo"
+  ).innerText =
+  getDoubleType(
+    number
+  );
+
+
+  document.getElementById(
+    "historicalTotal"
+  ).innerText =
+  totalAppeared
+  +
+  " appearance";
+
+
+  document.getElementById(
+    "historicalRate"
+  ).innerText =
+  rate.toFixed(2)
+  +
+  "%";
+
+}
+
+
+/* ==========================
+TOP PICKS DISPLAY
+========================== */
+
+function renderTopPicks(){
 
   const container =
   document.getElementById(
-    "focusList"
+    "topPicks"
   );
+
 
   container.innerHTML = "";
 
 
-  results.forEach(
+  lastPicks.forEach(
     (item,index)=>{
 
       const div =
@@ -2910,179 +2066,33 @@ function generateFocusPicks(){
         "div"
       );
 
-      div.className =
-      "focus-item";
-
-      div.innerHTML =
-      `
-      <div class="focus-rank">
-        ${index+1}
-      </div>
-
-      <div>
-
-        <div class="focus-number">
-          ${item.number}
-        </div>
-
-        <div class="focus-score">
-          SCORE:
-          ${item.score.toFixed(1)}
-        </div>
-
-        <div class="focus-tag">
-          ${item.reason}
-        </div>
-
-      </div>
-      `;
-
-      container.appendChild(
-        div
-      );
-
-    }
-  );
-
-}
-
-
-/* GENERATE */
-
-function generateNumbers(){
-
-  let results = [];
-
-  if(
-    selectedMode ===
-    "statistical"
-  ){
-
-    if(
-      numbersData.length ===
-      0
-    ){
-
-      alert(
-        "Database belum tersedia."
-      );
-
-      return;
-
-    }
-
-    results =
-    statisticalPicks(
-      selectedCount
-    );
-
-  }
-
-  else{
-
-    const used =
-    new Set();
-
-    while(
-      results.length <
-      selectedCount
-    ){
-
-      const number =
-      random4D();
-
-      if(
-        !used.has(number)
-      ){
-
-        used.add(number);
-
-        results.push({
-          number,
-          score:null,
-          reason:"Random Pick"
-        });
-
-      }
-
-    }
-
-  }
-
-
-  document.getElementById(
-    "mainNumber"
-  ).innerText =
-  results[0].number;
-
-  displayPicks(results);
-
-  saveHistory(results);
-
-}
-
-
-/* DISPLAY PICKS */
-
-function displayPicks(results){
-
-  const container =
-  document.getElementById(
-    "generatedPicks"
-  );
-
-  container.innerHTML = "";
-
-
-  results.forEach(
-    item=>{
-
-      const div =
-      document.createElement(
-        "div"
-      );
 
       div.className =
       "pick";
 
 
-      if(
-        selectedMode ===
-        "statistical"
-      ){
+      div.innerHTML =
+      `
+      <div class="rank">
+        #${index+1}
+      </div>
 
-        div.innerHTML =
-        `
-        <div class="pick-number">
-          ${item.number}
-        </div>
+      <div class="pick-number">
+        ${item.number}
+      </div>
 
-        <div class="pick-score">
-          PATTERN SCORE:
-          ${item.score.toFixed(1)}/100
-        </div>
+      <div class="pick-score">
+        SCORE:
+        ${item.score.toFixed(1)}/100
+      </div>
 
-        <div class="pick-reason">
-          ${item.reason}
-        </div>
-        `;
+      <div class="pick-tag">
+        ${item.type}
+        •
+        ${item.double}
+      </div>
+      `;
 
-      }
-
-      else{
-
-        div.innerHTML =
-        `
-        <div class="pick-number">
-          ${item.number}
-        </div>
-
-        <div class="pick-reason">
-          RANDOM PICK
-        </div>
-        `;
-
-      }
 
       container.appendChild(
         div
@@ -3094,163 +2104,241 @@ function displayPicks(results){
 }
 
 
-/* HISTORY */
+/* ==========================
+MARKET TABLE
+========================== */
 
-function saveHistory(results){
+function renderMarketTable(){
 
-  results.forEach(
-    item=>{
-
-      historyData.unshift({
-        market:
-        selectedMarket,
-
-        number:
-        item.number,
-
-        mode:
-        selectedMode
-      });
-
-    }
+  const body =
+  document.getElementById(
+    "marketBody"
   );
 
 
-  const unique = [];
+  body.innerHTML = "";
 
-  historyData.forEach(
-    item=>{
 
-      const exists =
-      unique.some(
-        x =>
-        x.market ===
-        item.market
-        &&
-        x.number ===
-        item.number
+  lastPicks.forEach(
+    pick=>{
+
+      const tr =
+      document.createElement(
+        "tr"
       );
 
-      if(!exists){
 
-        unique.push(item);
+      let html =
+      `
+      <td>
+        <span class="market-number">
+          ${pick.number}
+        </span>
+      </td>
+      `;
 
-      }
+
+      [
+        "toto",
+        "magnum",
+        "damacai",
+        "cashsweep"
+      ]
+      .forEach(
+        key=>{
+
+          const result =
+          findNumberInDatabase(
+            databases[key],
+            pick.number
+          );
+
+
+          if(
+            result.count > 0
+          ){
+
+            html +=
+            `
+            <td>
+
+              <span class="found">
+                ✓ FOUND
+                (${result.count}×)
+              </span>
+
+              <div class="detail">
+                Latest:
+                ${result.latest.draw}
+                <br>
+                ${result.latest.position}
+              </div>
+
+            </td>
+            `;
+
+          }
+
+          else{
+
+            html +=
+            `
+            <td>
+
+              <span class="notfound">
+                ✕ NOT FOUND
+              </span>
+
+            </td>
+            `;
+
+          }
+
+        }
+      );
+
+
+      tr.innerHTML =
+      html;
+
+
+      body.appendChild(
+        tr
+      );
 
     }
   );
-
-  historyData =
-  unique.slice(0,100);
-
-
-  localStorage.setItem(
-    "4dHistoryV33",
-    JSON.stringify(
-      historyData
-    )
-  );
-
-  renderHistory();
 
 }
 
 
-function renderHistory(){
+/* ==========================
+CLEAR
+========================== */
 
-  const container =
+function clearAll(){
+
+  chartInputs.forEach(
+    input =>
+    input.value = ""
+  );
+
+
+  favoriteInput.value =
+  "";
+
+
   document.getElementById(
-    "history"
+    "favoriteCard"
+  ).style.display =
+  "none";
+
+
+  document.getElementById(
+    "topPicks"
+  ).innerHTML =
+  `
+  <div class="empty">
+    Isi Charta kemudian tekan Analyze.
+  </div>
+  `;
+
+
+  document.getElementById(
+    "marketBody"
+  ).innerHTML =
+  `
+  <tr>
+    <td colspan="5">
+      <div class="empty">
+        Belum dianalisis.
+      </div>
+    </td>
+  </tr>
+  `;
+
+
+  localStorage.removeItem(
+    "4dChartaV40"
   );
 
-  const filtered =
-  historyData.filter(
-    item =>
-    item.market ===
-    selectedMarket
+
+  localStorage.removeItem(
+    "4dFavouriteV40"
   );
 
-  if(
-    filtered.length === 0
-  ){
+}
 
-    container.innerHTML =
-    `
-    <div class="empty">
-      Belum ada history untuk
-      ${selectedMarket}.
-    </div>
-    `;
 
-    return;
+/* ==========================
+RESTORE
+========================== */
+
+function restore(){
+
+  try{
+
+    const saved =
+    JSON.parse(
+      localStorage.getItem(
+        "4dChartaV40"
+      )
+      ||
+      "null"
+    );
+
+
+    if(
+      Array.isArray(saved)
+      &&
+      saved.length === 16
+    ){
+
+      saved.forEach(
+        (value,index)=>{
+
+          chartInputs[
+            index
+          ].value =
+          value;
+
+        }
+      );
+
+    }
+
+
+    const favorite =
+    localStorage.getItem(
+      "4dFavouriteV40"
+    );
+
+
+    if(favorite){
+
+      favoriteInput.value =
+      favorite;
+
+    }
 
   }
 
-  container.innerHTML = "";
+  catch(error){
 
-  filtered
-  .slice(0,20)
-  .forEach(
-    item=>{
+    console.error(error);
 
-      const row =
-      document.createElement(
-        "div"
-      );
-
-      row.className =
-      "history-row";
-
-      row.innerHTML =
-      `
-      <span>
-        ${item.market}
-        •
-        ${item.mode}
-      </span>
-
-      <span class="history-number">
-        ${item.number}
-      </span>
-      `;
-
-      container.appendChild(
-        row
-      );
-
-    }
-  );
+  }
 
 }
 
 
-function clearHistory(){
+/* ==========================
+START
+========================== */
 
-  historyData =
-  historyData.filter(
-    item =>
-    item.market !==
-    selectedMarket
-  );
+restore();
 
-  localStorage.setItem(
-    "4dHistoryV33",
-    JSON.stringify(
-      historyData
-    )
-  );
-
-  renderHistory();
-
-}
-
-
-/* START */
-
-restoreCharta();
-renderHistory();
-updateLabel();
-loadDatabase();
+loadDatabases();
 
 </script>
 
