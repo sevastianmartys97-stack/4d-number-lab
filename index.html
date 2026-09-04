@@ -1,1 +1,350 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>4D Number Lab</title>
 
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: #070b12;
+      color: #ffffff;
+      font-family: Arial, sans-serif;
+      min-height: 100vh;
+      padding: 15px;
+    }
+
+    .app {
+      width: 100%;
+      max-width: 480px;
+      margin: auto;
+    }
+
+    .header {
+      text-align: center;
+      padding: 20px 10px;
+    }
+
+    .header h1 {
+      font-size: 24px;
+      color: #f5c542;
+      letter-spacing: 1px;
+    }
+
+    .header p {
+      color: #8c98a8;
+      font-size: 12px;
+      margin-top: 6px;
+    }
+
+    .card {
+      background: #101722;
+      border: 1px solid #253044;
+      border-radius: 14px;
+      padding: 14px;
+      margin-bottom: 12px;
+    }
+
+    .title {
+      font-size: 11px;
+      color: #8290a3;
+      margin-bottom: 10px;
+      font-weight: bold;
+    }
+
+    .operators {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 7px;
+    }
+
+    .operator {
+      background: #171f2d;
+      border: 1px solid #2b374a;
+      color: #b9c3d1;
+      padding: 11px 5px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .operator.active {
+      border-color: #f5c542;
+      color: #f5c542;
+      background: #282513;
+    }
+
+    .number-box {
+      text-align: center;
+      padding: 18px 5px;
+    }
+
+    .label {
+      font-size: 11px;
+      color: #78869a;
+    }
+
+    #mainNumber {
+      font-size: 48px;
+      font-weight: bold;
+      letter-spacing: 10px;
+      margin: 12px 0;
+      color: #ffffff;
+    }
+
+    .generate {
+      width: 100%;
+      border: none;
+      background: #f5c542;
+      color: #111111;
+      padding: 14px;
+      border-radius: 9px;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .generate:active {
+      transform: scale(.98);
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .stat {
+      background: #0b111b;
+      padding: 11px;
+      border-radius: 8px;
+      text-align: center;
+    }
+
+    .stat span {
+      display: block;
+      color: #748298;
+      font-size: 10px;
+      margin-bottom: 5px;
+    }
+
+    .stat strong {
+      font-size: 14px;
+    }
+
+    .history {
+      margin-top: 7px;
+    }
+
+    .history-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 9px 4px;
+      border-bottom: 1px solid #202a39;
+      font-size: 13px;
+    }
+
+    .history-item:last-child {
+      border-bottom: none;
+    }
+
+    .history-number {
+      color: #f5c542;
+      font-weight: bold;
+      letter-spacing: 2px;
+    }
+
+    .note {
+      color: #637084;
+      font-size: 10px;
+      text-align: center;
+      line-height: 1.5;
+      padding: 8px 15px;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="app">
+
+  <div class="header">
+    <h1>4D NUMBER LAB</h1>
+    <p>Number Generator & Statistical Analysis</p>
+  </div>
+
+  <div class="card">
+    <div class="title">SELECT MARKET</div>
+
+    <div class="operators">
+      <button class="operator active" onclick="selectMarket(this,'Sports Toto')">
+        SPORTS TOTO
+      </button>
+
+      <button class="operator" onclick="selectMarket(this,'Magnum 4D')">
+        MAGNUM
+      </button>
+
+      <button class="operator" onclick="selectMarket(this,'Da Ma Cai')">
+        DA MA CAI
+      </button>
+
+      <button class="operator" onclick="selectMarket(this,'Cash Sweep')">
+        CASH SWEEP
+      </button>
+    </div>
+  </div>
+
+  <div class="card number-box">
+
+    <div class="label" id="marketName">
+      SPORTS TOTO • RANDOM PICK
+    </div>
+
+    <div id="mainNumber">
+      ----
+    </div>
+
+    <button class="generate" onclick="generateNumber()">
+      GENERATE NUMBER
+    </button>
+
+  </div>
+
+  <div class="card">
+
+    <div class="title">NUMBER ANALYSIS</div>
+
+    <div class="stats">
+
+      <div class="stat">
+        <span>SUM DIGITS</span>
+        <strong id="sumDigits">--</strong>
+      </div>
+
+      <div class="stat">
+        <span>ODD / EVEN</span>
+        <strong id="oddEven">--</strong>
+      </div>
+
+      <div class="stat">
+        <span>REPEAT</span>
+        <strong id="repeat">--</strong>
+      </div>
+
+      <div class="stat">
+        <span>RANGE</span>
+        <strong>0000–9999</strong>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="card">
+
+    <div class="title">RECENT GENERATED</div>
+
+    <div id="history" class="history">
+      <div class="note">Belum ada nombor dijana.</div>
+    </div>
+
+  </div>
+
+  <div class="note">
+    Generator ini untuk tujuan eksperimen dan analisis statistik.
+    Ia tidak menjamin keputusan cabutan.
+  </div>
+
+</div>
+
+
+<script>
+
+let selectedMarket = "Sports Toto";
+let historyNumbers = [];
+
+function selectMarket(button, market) {
+
+  selectedMarket = market;
+
+  document.querySelectorAll(".operator")
+    .forEach(btn => btn.classList.remove("active"));
+
+  button.classList.add("active");
+
+  document.getElementById("marketName").innerText =
+    market.toUpperCase() + " • RANDOM PICK";
+}
+
+
+function generateNumber() {
+
+  const number =
+    Math.floor(Math.random() * 10000)
+    .toString()
+    .padStart(4, "0");
+
+  document.getElementById("mainNumber").innerText = number;
+
+  analyseNumber(number);
+  addHistory(number);
+}
+
+
+function analyseNumber(number) {
+
+  const digits = number.split("").map(Number);
+
+  const sum = digits.reduce((a,b) => a+b, 0);
+
+  const odd = digits.filter(n => n % 2 !== 0).length;
+  const even = 4 - odd;
+
+  const unique = new Set(digits);
+
+  document.getElementById("sumDigits").innerText = sum;
+
+  document.getElementById("oddEven").innerText =
+    odd + " / " + even;
+
+  document.getElementById("repeat").innerText =
+    unique.size < 4 ? "YES" : "NO";
+}
+
+
+function addHistory(number) {
+
+  historyNumbers.unshift({
+    number: number,
+    market: selectedMarket
+  });
+
+  historyNumbers = historyNumbers.slice(0,5);
+
+  const history = document.getElementById("history");
+
+  history.innerHTML = "";
+
+  historyNumbers.forEach(item => {
+
+    history.innerHTML += `
+      <div class="history-item">
+        <span>${item.market}</span>
+        <span class="history-number">${item.number}</span>
+      </div>
+    `;
+
+  });
+}
+
+</script>
+
+</body>
+</html>
