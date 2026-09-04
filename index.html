@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>4D Number Lab V3</title>
+<title>4D Number Lab V3.1</title>
 
 <style>
 *{
@@ -76,13 +76,20 @@ body{
   gap:7px;
 }
 
+.grid4{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:6px;
+}
+
 button{
   cursor:pointer;
 }
 
 .market,
 .mode,
-.count{
+.count,
+.window{
   background:#192131;
   border:1px solid #2b374a;
   color:#bdc5d2;
@@ -94,7 +101,8 @@ button{
 
 .market.active,
 .mode.active,
-.count.active{
+.count.active,
+.window.active{
   border-color:#f6c744;
   background:#2c2813;
   color:#f6c744;
@@ -124,6 +132,10 @@ button{
 .db-off{
   color:#f87171;
   font-weight:bold;
+}
+
+.loading{
+  color:#f6c744;
 }
 
 .draw-info{
@@ -255,7 +267,7 @@ button{
   background:#0a111b;
   border:1px solid #151e2b;
   border-radius:8px;
-  padding:11px 5px;
+  padding:11px 6px;
   text-align:center;
 }
 
@@ -267,9 +279,32 @@ button{
 }
 
 .pick-score{
-  color:#5f6c7d;
+  color:#4ade80;
+  font-size:8px;
+  margin-top:4px;
+}
+
+.pick-reason{
+  color:#667489;
   font-size:7px;
   margin-top:4px;
+  line-height:1.4;
+}
+
+.history-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:4px;
+}
+
+.clear-btn{
+  border:1px solid #39465a;
+  background:#151d2a;
+  color:#9ca8b8;
+  border-radius:7px;
+  padding:6px 9px;
+  font-size:8px;
 }
 
 .history-row{
@@ -298,23 +333,12 @@ button{
   padding:10px;
 }
 
-.loading{
-  color:#f6c744;
-}
-
 .notice{
   text-align:center;
   font-size:8px;
   color:#505d70;
   line-height:1.5;
   padding:5px 12px 15px;
-}
-
-.source{
-  color:#536175;
-  font-size:8px;
-  text-align:center;
-  margin-top:8px;
 }
 </style>
 </head>
@@ -325,16 +349,17 @@ button{
 
   <div class="header">
     <h1>4D NUMBER LAB</h1>
-    <div class="version">V3 • DATA ENGINE</div>
-    <p>Historical Pattern & Statistical Analysis</p>
+    <div class="version">V3.1 • DATA ENGINE</div>
+    <p>Historical Pattern & Balanced Statistical Analysis</p>
   </div>
 
 
-  <!-- MARKET -->
   <div class="card">
+
     <div class="title">SELECT MARKET</div>
 
     <div class="grid2">
+
       <button class="market active"
         onclick="selectMarket(this,'Sports Toto')">
         SPORTS TOTO
@@ -354,9 +379,12 @@ button{
         onclick="selectMarket(this,'Cash Sweep')">
         CASH SWEEP
       </button>
+
     </div>
 
+
     <div class="db-status">
+
       <div class="db-left">
         DATABASE STATUS
       </div>
@@ -364,7 +392,9 @@ button{
       <div id="dbStatus" class="loading">
         LOADING...
       </div>
+
     </div>
+
 
     <div class="draw-info">
 
@@ -383,8 +413,41 @@ button{
   </div>
 
 
-  <!-- MODE -->
   <div class="card">
+
+    <div class="title">
+      ANALYSIS WINDOW
+    </div>
+
+    <div class="grid4">
+
+      <button class="window"
+        onclick="selectWindow(this,5)">
+        5
+      </button>
+
+      <button class="window"
+        onclick="selectWindow(this,10)">
+        10
+      </button>
+
+      <button class="window"
+        onclick="selectWindow(this,20)">
+        20
+      </button>
+
+      <button class="window active"
+        onclick="selectWindow(this,'all')">
+        ALL
+      </button>
+
+    </div>
+
+  </div>
+
+
+  <div class="card">
+
     <div class="title">MODE</div>
 
     <div class="grid2">
@@ -400,12 +463,15 @@ button{
       </button>
 
     </div>
+
   </div>
 
 
-  <!-- COUNT -->
   <div class="card">
-    <div class="title">NUMBER OF PICKS</div>
+
+    <div class="title">
+      NUMBER OF PICKS
+    </div>
 
     <div class="grid3">
 
@@ -425,10 +491,10 @@ button{
       </button>
 
     </div>
+
   </div>
 
 
-  <!-- GENERATOR -->
   <div class="card generator">
 
     <div class="market-label" id="marketLabel">
@@ -447,7 +513,6 @@ button{
   </div>
 
 
-  <!-- MAIN STAT -->
   <div class="card">
 
     <div class="title">
@@ -458,44 +523,32 @@ button{
 
       <div class="stat">
         <span>HOT DIGITS</span>
-        <strong class="green" id="hotDigits">
-          --
-        </strong>
+        <strong class="green" id="hotDigits">--</strong>
       </div>
 
       <div class="stat">
         <span>COLD DIGITS</span>
-        <strong class="blue" id="coldDigits">
-          --
-        </strong>
+        <strong class="blue" id="coldDigits">--</strong>
       </div>
 
       <div class="stat">
         <span>STRONG PAIR</span>
-        <strong class="yellow" id="strongPair">
-          --
-        </strong>
+        <strong class="yellow" id="strongPair">--</strong>
       </div>
 
       <div class="stat">
         <span>NUMBERS ANALYSED</span>
-        <strong id="dataSize">
-          0
-        </strong>
+        <strong id="dataSize">0</strong>
       </div>
 
       <div class="stat">
         <span>REPEAT DIGIT RATE</span>
-        <strong id="repeatRate">
-          --
-        </strong>
+        <strong id="repeatRate">--</strong>
       </div>
 
       <div class="stat">
         <span>AVG DIGIT SUM</span>
-        <strong id="avgSum">
-          --
-        </strong>
+        <strong id="avgSum">--</strong>
       </div>
 
     </div>
@@ -503,7 +556,6 @@ button{
   </div>
 
 
-  <!-- POSITION -->
   <div class="card">
 
     <div class="title">
@@ -537,7 +589,6 @@ button{
   </div>
 
 
-  <!-- PICKS -->
   <div class="card">
 
     <div class="title">
@@ -555,11 +606,20 @@ button{
   </div>
 
 
-  <!-- HISTORY -->
   <div class="card">
 
-    <div class="title">
-      RECENT HISTORY
+    <div class="history-head">
+
+      <div class="title"
+        style="margin-bottom:0">
+        RECENT HISTORY
+      </div>
+
+      <button class="clear-btn"
+        onclick="clearHistory()">
+        CLEAR
+      </button>
+
     </div>
 
     <div id="history">
@@ -574,8 +634,9 @@ button{
 
 
   <div class="notice">
-    Statistical mode menganalisis corak data keputusan lepas.
-    Ia tidak menjamin atau meramal keputusan cabutan akan datang.
+    Pattern Score menunjukkan kesesuaian nombor dengan
+    corak historical data yang dipilih.
+    Ia bukan probability menang dan tidak menjamin keputusan cabutan.
   </div>
 
 </div>
@@ -583,27 +644,29 @@ button{
 
 <script>
 
-// ==============================
-// BASIC APP SETTINGS
-// ==============================
+// ==================================
+// SETTINGS
+// ==================================
 
 let selectedMarket = "Sports Toto";
 let selectedMode = "random";
 let selectedCount = 1;
+let selectedWindow = "all";
 
 let database = null;
+let activeDraws = [];
 let numbersData = [];
 
 let historyData =
 JSON.parse(
-  localStorage.getItem("4dHistoryV3")
+  localStorage.getItem("4dHistoryV31")
   || "[]"
 );
 
 
-// ==============================
+// ==================================
 // DATABASE FILES
-// ==============================
+// ==================================
 
 const databaseFiles = {
 
@@ -622,13 +685,14 @@ const databaseFiles = {
 };
 
 
-// ==============================
+// ==================================
 // LOAD DATABASE
-// ==============================
+// ==================================
 
 async function loadDatabase(){
 
   database = null;
+  activeDraws = [];
   numbersData = [];
 
   resetStatistics();
@@ -636,8 +700,8 @@ async function loadDatabase(){
   const status =
   document.getElementById("dbStatus");
 
-  status.className="loading";
-  status.innerText="LOADING...";
+  status.className = "loading";
+  status.innerText = "LOADING...";
 
   try{
 
@@ -650,16 +714,18 @@ async function loadDatabase(){
     );
 
     if(!response.ok){
-      throw new Error("Database not found");
+      throw new Error(
+        "Database not found"
+      );
     }
 
     database =
     await response.json();
 
-    flattenDatabase();
+    applyWindow();
 
-    status.className="db-live";
-    status.innerText="REAL DATA ✓";
+    status.className = "db-live";
+    status.innerText = "REAL DATA ✓";
 
     updateDatabaseInfo();
     calculateAllStatistics();
@@ -668,19 +734,20 @@ async function loadDatabase(){
 
   catch(error){
 
-    database=null;
-    numbersData=[];
+    database = null;
+    activeDraws = [];
+    numbersData = [];
 
-    status.className="db-off";
-    status.innerText="NOT CONNECTED";
+    status.className = "db-off";
+    status.innerText = "NOT CONNECTED";
 
     document.getElementById(
       "latestDraw"
-    ).innerText="--";
+    ).innerText = "--";
 
     document.getElementById(
       "lastUpdated"
-    ).innerText="--";
+    ).innerText = "--";
 
     resetStatistics();
 
@@ -689,64 +756,150 @@ async function loadDatabase(){
 }
 
 
-// ==============================
-// FLATTEN JSON RESULTS
-// ==============================
+// ==================================
+// WINDOW
+// ==================================
 
-function flattenDatabase(){
+function selectWindow(button,value){
 
-  numbersData=[];
+  selectedWindow = value;
+
+  document.querySelectorAll(
+    ".window"
+  ).forEach(btn=>
+    btn.classList.remove("active")
+  );
+
+  button.classList.add("active");
+
+  applyWindow();
+  calculateAllStatistics();
+
+}
+
+
+function applyWindow(){
 
   if(
     !database ||
     !Array.isArray(database.draws)
   ){
+    activeDraws = [];
+    numbersData = [];
     return;
   }
 
-  database.draws.forEach(draw=>{
+  if(selectedWindow === "all"){
 
-    const main=[
-      draw.first,
-      draw.second,
-      draw.third
-    ];
+    activeDraws =
+    [...database.draws];
 
-    main.forEach(number=>{
+  }
 
-      if(valid4D(number)){
-        numbersData.push(number);
+  else{
+
+    activeDraws =
+    database.draws.slice(
+      0,
+      selectedWindow
+    );
+
+  }
+
+  flattenDatabase();
+
+}
+
+
+// ==================================
+// FLATTEN DATA
+// ==================================
+
+function flattenDatabase(){
+
+  numbersData = [];
+
+  activeDraws.forEach(
+    (draw,drawIndex)=>{
+
+      const weight =
+      recencyWeight(drawIndex);
+
+      const main = [
+        draw.first,
+        draw.second,
+        draw.third
+      ];
+
+      main.forEach(number=>{
+
+        if(valid4D(number)){
+
+          numbersData.push({
+            number,
+            weight
+          });
+
+        }
+
+      });
+
+
+      if(Array.isArray(draw.special)){
+
+        draw.special.forEach(
+          number=>{
+
+            if(valid4D(number)){
+
+              numbersData.push({
+                number,
+                weight
+              });
+
+            }
+
+          }
+        );
+
       }
 
-    });
 
+      if(
+        Array.isArray(
+          draw.consolation
+        )
+      ){
 
-    if(Array.isArray(draw.special)){
+        draw.consolation.forEach(
+          number=>{
 
-      draw.special.forEach(number=>{
+            if(valid4D(number)){
 
-        if(valid4D(number)){
-          numbersData.push(number);
-        }
+              numbersData.push({
+                number,
+                weight
+              });
 
-      });
+            }
 
-    }
+          }
+        );
 
-
-    if(Array.isArray(draw.consolation)){
-
-      draw.consolation.forEach(number=>{
-
-        if(valid4D(number)){
-          numbersData.push(number);
-        }
-
-      });
+      }
 
     }
+  );
 
-  });
+}
+
+
+function recencyWeight(index){
+
+  return Math.max(
+    0.75,
+    1 - index * 0.03
+  );
 
 }
 
@@ -754,7 +907,7 @@ function flattenDatabase(){
 function valid4D(number){
 
   return (
-    typeof number==="string"
+    typeof number === "string"
     &&
     /^[0-9]{4}$/.test(number)
   );
@@ -762,9 +915,9 @@ function valid4D(number){
 }
 
 
-// ==============================
-// DATABASE INFO
-// ==============================
+// ==================================
+// INFO
+// ==================================
 
 function updateDatabaseInfo(){
 
@@ -772,7 +925,7 @@ function updateDatabaseInfo(){
     return;
   }
 
-  let latest =
+  const latest =
   database.draws?.[0];
 
   document.getElementById(
@@ -788,13 +941,13 @@ function updateDatabaseInfo(){
 }
 
 
-// ==============================
-// MARKET
-// ==============================
+// ==================================
+// SELECTION
+// ==================================
 
 function selectMarket(button,market){
 
-  selectedMarket=market;
+  selectedMarket = market;
 
   document.querySelectorAll(
     ".market"
@@ -810,13 +963,9 @@ function selectMarket(button,market){
 }
 
 
-// ==============================
-// MODE
-// ==============================
-
 function selectMode(button,mode){
 
-  selectedMode=mode;
+  selectedMode = mode;
 
   document.querySelectorAll(
     ".mode"
@@ -831,13 +980,9 @@ function selectMode(button,mode){
 }
 
 
-// ==============================
-// COUNT
-// ==============================
-
 function selectCount(button,count){
 
-  selectedCount=count;
+  selectedCount = count;
 
   document.querySelectorAll(
     ".count"
@@ -849,10 +994,6 @@ function selectCount(button,count){
 
 }
 
-
-// ==============================
-// LABEL
-// ==============================
 
 function updateLabel(){
 
@@ -869,35 +1010,23 @@ function updateLabel(){
 }
 
 
-// ==============================
-// RANDOM NUMBER
-// ==============================
-
-function random4D(){
-
-  return Math.floor(
-    Math.random()*10000
-  )
-  .toString()
-  .padStart(4,"0");
-
-}
-
-
-// ==============================
-// DIGIT FREQUENCY
-// ==============================
+// ==================================
+// FREQUENCY
+// ==================================
 
 function digitFrequency(){
 
-  let freq =
+  const freq =
   Array(10).fill(0);
 
-  numbersData.forEach(number=>{
+  numbersData.forEach(item=>{
 
-    number.split("").forEach(d=>{
+    item.number
+    .split("")
+    .forEach(d=>{
 
-      freq[Number(d)]++;
+      freq[Number(d)] +=
+      item.weight;
 
     });
 
@@ -908,26 +1037,22 @@ function digitFrequency(){
 }
 
 
-// ==============================
-// POSITION FREQUENCY
-// ==============================
-
 function positionFrequency(){
 
-  let positions = [
+  const positions = [
     Array(10).fill(0),
     Array(10).fill(0),
     Array(10).fill(0),
     Array(10).fill(0)
   ];
 
-  numbersData.forEach(number=>{
+  numbersData.forEach(item=>{
 
     for(let i=0;i<4;i++){
 
       positions[i][
-        Number(number[i])
-      ]++;
+        Number(item.number[i])
+      ] += item.weight;
 
     }
 
@@ -938,9 +1063,36 @@ function positionFrequency(){
 }
 
 
-// ==============================
-// HOT / COLD
-// ==============================
+function pairFrequency(){
+
+  const pairs = {};
+
+  numbersData.forEach(item=>{
+
+    for(let i=0;i<3;i++){
+
+      const pair =
+      item.number[i]
+      +
+      item.number[i+1];
+
+      pairs[pair] =
+      (pairs[pair] || 0)
+      +
+      item.weight;
+
+    }
+
+  });
+
+  return pairs;
+
+}
+
+
+// ==================================
+// BASIC STATS
+// ==================================
 
 function getHotCold(){
 
@@ -948,26 +1100,26 @@ function getHotCold(){
   digitFrequency();
 
   const result =
-  freq.map((count,digit)=>({
-    digit,
-    count
-  }));
+  freq.map(
+    (count,digit)=>({
+      digit,
+      count
+    })
+  );
 
   const sorted =
   [...result].sort(
     (a,b)=>b.count-a.count
   );
 
-  return{
+  return {
 
     hot:
-    sorted
-    .slice(0,3)
+    sorted.slice(0,3)
     .map(x=>x.digit),
 
     cold:
-    sorted
-    .slice(-3)
+    sorted.slice(-3)
     .reverse()
     .map(x=>x.digit)
 
@@ -976,27 +1128,10 @@ function getHotCold(){
 }
 
 
-// ==============================
-// STRONG PAIR
-// ==============================
-
 function strongPair(){
 
-  let pairs={};
-
-  numbersData.forEach(number=>{
-
-    for(let i=0;i<3;i++){
-
-      const pair =
-      number[i] + number[i+1];
-
-      pairs[pair] =
-      (pairs[pair] || 0) + 1;
-
-    }
-
-  });
+  const pairs =
+  pairFrequency();
 
   const sorted =
   Object.entries(pairs)
@@ -1009,24 +1144,21 @@ function strongPair(){
 }
 
 
-// ==============================
-// REPEAT RATE
-// ==============================
-
 function repeatRate(){
 
-  if(numbersData.length===0){
+  if(numbersData.length === 0){
     return 0;
   }
 
-  let repeat=0;
+  let repeat = 0;
 
-  numbersData.forEach(number=>{
+  numbersData.forEach(item=>{
 
-    const unique =
-    new Set(number.split(""));
-
-    if(unique.size<4){
+    if(
+      new Set(
+        item.number.split("")
+      ).size < 4
+    ){
       repeat++;
     }
 
@@ -1041,22 +1173,18 @@ function repeatRate(){
 }
 
 
-// ==============================
-// AVERAGE DIGIT SUM
-// ==============================
-
 function averageDigitSum(){
 
-  if(numbersData.length===0){
+  if(numbersData.length === 0){
     return 0;
   }
 
-  let total=0;
+  let total = 0;
 
-  numbersData.forEach(number=>{
+  numbersData.forEach(item=>{
 
     total +=
-    number
+    item.number
     .split("")
     .map(Number)
     .reduce(
@@ -1072,10 +1200,6 @@ function averageDigitSum(){
 }
 
 
-// ==============================
-// POSITION HOT DIGIT
-// ==============================
-
 function getPositionHot(){
 
   const positions =
@@ -1083,7 +1207,7 @@ function getPositionHot(){
 
   return positions.map(freq=>{
 
-    let max =
+    const max =
     Math.max(...freq);
 
     return freq.indexOf(max);
@@ -1093,13 +1217,13 @@ function getPositionHot(){
 }
 
 
-// ==============================
-// CALCULATE STATISTICS
-// ==============================
+// ==================================
+// DISPLAY STATS
+// ==================================
 
 function calculateAllStatistics(){
 
-  if(numbersData.length===0){
+  if(numbersData.length === 0){
 
     resetStatistics();
     return;
@@ -1146,100 +1270,84 @@ function calculateAllStatistics(){
 
   document.getElementById(
     "pos1"
-  ).innerText=positions[0];
+  ).innerText =
+  positions[0];
 
   document.getElementById(
     "pos2"
-  ).innerText=positions[1];
+  ).innerText =
+  positions[1];
 
   document.getElementById(
     "pos3"
-  ).innerText=positions[2];
+  ).innerText =
+  positions[2];
 
   document.getElementById(
     "pos4"
-  ).innerText=positions[3];
+  ).innerText =
+  positions[3];
 
 }
 
-
-// ==============================
-// RESET STATISTICS
-// ==============================
 
 function resetStatistics(){
 
   document.getElementById(
     "hotDigits"
-  ).innerText="--";
+  ).innerText = "--";
 
   document.getElementById(
     "coldDigits"
-  ).innerText="--";
+  ).innerText = "--";
 
   document.getElementById(
     "strongPair"
-  ).innerText="--";
+  ).innerText = "--";
 
   document.getElementById(
     "dataSize"
-  ).innerText="0";
+  ).innerText = "0";
 
   document.getElementById(
     "repeatRate"
-  ).innerText="--";
+  ).innerText = "--";
 
   document.getElementById(
     "avgSum"
-  ).innerText="--";
+  ).innerText = "--";
 
   for(let i=1;i<=4;i++){
 
     document.getElementById(
       "pos"+i
-    ).innerText="-";
+    ).innerText = "-";
 
   }
 
 }
 
 
-// ==============================
-// PAIR FREQUENCY
-// ==============================
+// ==================================
+// RANDOM
+// ==================================
 
-function pairFrequency(){
+function random4D(){
 
-  let pairs={};
-
-  numbersData.forEach(number=>{
-
-    for(let i=0;i<3;i++){
-
-      let pair =
-      number[i]+number[i+1];
-
-      pairs[pair] =
-      (pairs[pair] || 0)+1;
-
-    }
-
-  });
-
-  return pairs;
+  return Math.floor(
+    Math.random()*10000
+  )
+  .toString()
+  .padStart(4,"0");
 
 }
 
 
-// ==============================
-// SCORE NUMBER
-// ==============================
+// ==================================
+// BALANCED SCORE
+// ==================================
 
 function scoreNumber(number){
-
-  if(numbersData.length===0){
-    return 0;
-  }
 
   const overall =
   digitFrequency();
@@ -1250,62 +1358,77 @@ function scoreNumber(number){
   const pairs =
   pairFrequency();
 
+  const avgSum =
+  averageDigitSum();
+
   const maxOverall =
   Math.max(...overall) || 1;
 
-  let score=0;
+  const maxPair =
+  Math.max(
+    ...Object.values(pairs),
+    1
+  );
+
+  let raw = 0;
 
 
-  // POSITION WEIGHT
+  // POSITION = max 36
   for(let i=0;i<4;i++){
 
     const digit =
     Number(number[i]);
 
     const maxPos =
-    Math.max(...positions[i])
-    || 1;
+    Math.max(
+      ...positions[i]
+    ) || 1;
 
-    score +=
+    raw +=
     (
-      positions[i][digit] /
+      positions[i][digit]
+      /
       maxPos
-    ) * 35;
+    ) * 9;
 
   }
 
 
-  // OVERALL DIGIT WEIGHT
+  // OVERALL = max 16
   for(let i=0;i<4;i++){
 
     const digit =
     Number(number[i]);
 
-    score +=
+    raw +=
     (
-      overall[digit] /
+      overall[digit]
+      /
       maxOverall
-    ) * 12;
+    ) * 4;
 
   }
 
 
-  // ADJACENT PAIR WEIGHT
+  // PAIRS = max 18
   for(let i=0;i<3;i++){
 
     const pair =
-    number[i]+number[i+1];
+    number[i]
+    +
+    number[i+1];
 
-    const pairCount =
-    pairs[pair] || 0;
-
-    score +=
-    pairCount * 4;
+    raw +=
+    (
+      (pairs[pair] || 0)
+      /
+      maxPair
+    ) * 6;
 
   }
 
 
-  // DIGIT SUM BALANCE
+  // SUM BALANCE = max 15
   const sum =
   number
   .split("")
@@ -1315,33 +1438,221 @@ function scoreNumber(number){
     0
   );
 
-  const avg =
-  averageDigitSum();
-
   const distance =
-  Math.abs(sum-avg);
+  Math.abs(
+    sum - avgSum
+  );
 
-  score +=
-  Math.max(
+  raw += Math.max(
     0,
-    20-distance
+    15 - distance
   );
 
 
-  return score;
+  // REPEAT BALANCE = max 10
+  const unique =
+  new Set(
+    number.split("")
+  ).size;
+
+  if(unique === 4){
+    raw += 10;
+  }
+  else if(unique === 3){
+    raw += 7;
+  }
+  else if(unique === 2){
+    raw += 3;
+  }
+
+
+  // RANGE BONUS = max 5
+  const digits =
+  number
+  .split("")
+  .map(Number);
+
+  const range =
+  Math.max(...digits)
+  -
+  Math.min(...digits);
+
+  raw +=
+  Math.min(
+    5,
+    range * 0.7
+  );
+
+
+  return Math.min(
+    100,
+    raw
+  );
 
 }
 
 
-// ==============================
-// STATISTICAL GENERATOR
-// ==============================
+// ==================================
+// REASONS
+// ==================================
+
+function getReasons(number){
+
+  const reasons = [];
+
+  const positions =
+  positionFrequency();
+
+  const pairs =
+  pairFrequency();
+
+  const avgSum =
+  averageDigitSum();
+
+
+  let strongPositions = 0;
+
+  for(let i=0;i<4;i++){
+
+    const max =
+    Math.max(
+      ...positions[i]
+    );
+
+    const digit =
+    Number(number[i]);
+
+    if(
+      positions[i][digit]
+      >= max * 0.9
+    ){
+      strongPositions++;
+    }
+
+  }
+
+
+  if(strongPositions >= 2){
+
+    reasons.push(
+      strongPositions
+      + " Position Strong"
+    );
+
+  }
+
+
+  let strongPairs = 0;
+
+  const maxPair =
+  Math.max(
+    ...Object.values(pairs),
+    1
+  );
+
+  for(let i=0;i<3;i++){
+
+    const pair =
+    number[i]
+    +
+    number[i+1];
+
+    if(
+      (pairs[pair] || 0)
+      >= maxPair * 0.75
+    ){
+      strongPairs++;
+    }
+
+  }
+
+
+  if(strongPairs > 0){
+
+    reasons.push(
+      strongPairs
+      + " Pair Strong"
+    );
+
+  }
+
+
+  const sum =
+  number
+  .split("")
+  .map(Number)
+  .reduce(
+    (a,b)=>a+b,
+    0
+  );
+
+  if(
+    Math.abs(
+      sum - avgSum
+    ) <= 3
+  ){
+
+    reasons.push(
+      "Sum Balanced"
+    );
+
+  }
+
+
+  const unique =
+  new Set(
+    number.split("")
+  ).size;
+
+  if(unique >= 3){
+
+    reasons.push(
+      "Digit Balanced"
+    );
+
+  }
+
+
+  return reasons
+  .slice(0,3)
+  .join(" • ");
+
+}
+
+
+// ==================================
+// DIVERSITY FILTER
+// ==================================
+
+function similarity(a,b){
+
+  let same = 0;
+
+  for(let i=0;i<4;i++){
+
+    if(a[i] === b[i]){
+      same++;
+    }
+
+  }
+
+  return same;
+
+}
+
+
+// ==================================
+// STATISTICAL PICKS
+// ==================================
 
 function statisticalPicks(count){
 
-  let candidates=[];
+  const candidateMap =
+  new Map();
 
-  const candidateAmount=5000;
+  const candidateAmount =
+  12000;
+
 
   for(
     let i=0;
@@ -1352,35 +1663,61 @@ function statisticalPicks(count){
     const number =
     random4D();
 
-    candidates.push({
+    if(
+      candidateMap.has(number)
+    ){
+      continue;
+    }
 
-      number:number,
-      score:scoreNumber(number)
-
-    });
+    candidateMap.set(
+      number,
+      {
+        number,
+        score:
+        scoreNumber(number)
+      }
+    );
 
   }
 
 
-  candidates.sort(
+  const candidates =
+  [...candidateMap.values()]
+  .sort(
     (a,b)=>b.score-a.score
   );
 
 
-  let results=[];
-  let used=new Set();
+  const results = [];
 
 
   for(const item of candidates){
 
-    if(!used.has(item.number)){
+    const tooSimilar =
+    results.some(
+      selected=>
+      similarity(
+        selected.number,
+        item.number
+      ) >= 3
+    );
 
-      used.add(item.number);
+
+    if(!tooSimilar){
+
+      item.reason =
+      getReasons(
+        item.number
+      );
+
       results.push(item);
 
     }
 
-    if(results.length>=count){
+
+    if(
+      results.length >= count
+    ){
       break;
     }
 
@@ -1392,27 +1729,30 @@ function statisticalPicks(count){
 }
 
 
-// ==============================
+// ==================================
 // GENERATE
-// ==============================
+// ==================================
 
 function generateNumbers(){
 
-  let results=[];
+  let results = [];
 
 
   if(
-    selectedMode==="statistical"
+    selectedMode ===
+    "statistical"
   ){
 
-    if(numbersData.length===0){
+    if(
+      numbersData.length === 0
+    ){
 
       alert(
         "Database untuk "
         +
         selectedMarket
         +
-        " belum disambungkan."
+        " belum tersedia."
       );
 
       return;
@@ -1428,22 +1768,28 @@ function generateNumbers(){
 
   else{
 
-    let used=new Set();
+    const used =
+    new Set();
 
     while(
-      results.length <
+      results.length
+      <
       selectedCount
     ){
 
-      let number=random4D();
+      const number =
+      random4D();
 
-      if(!used.has(number)){
+      if(
+        !used.has(number)
+      ){
 
         used.add(number);
 
         results.push({
-          number:number,
-          score:null
+          number,
+          score:null,
+          reason:"Random Pick"
         });
 
       }
@@ -1465,9 +1811,9 @@ function generateNumbers(){
 }
 
 
-// ==============================
+// ==================================
 // DISPLAY PICKS
-// ==============================
+// ==================================
 
 function displayPicks(results){
 
@@ -1476,7 +1822,7 @@ function displayPicks(results){
     "generatedPicks"
   );
 
-  container.innerHTML="";
+  container.innerHTML = "";
 
 
   results.forEach(item=>{
@@ -1486,34 +1832,47 @@ function displayPicks(results){
       "div"
     );
 
-    box.className="pick";
+    box.className = "pick";
 
 
-    let scoreText="";
+    let detail = "";
+
 
     if(
-      selectedMode===
+      selectedMode ===
       "statistical"
     ){
 
-      scoreText=
-      `
-      <div class="pick-score">
-        PATTERN SCORE:
-        ${item.score.toFixed(1)}
-      </div>
+      detail = `
+        <div class="pick-score">
+          PATTERN SCORE:
+          ${item.score.toFixed(1)}/100
+        </div>
+
+        <div class="pick-reason">
+          ${item.reason || "Balanced Pattern"}
+        </div>
+      `;
+
+    }
+
+    else{
+
+      detail = `
+        <div class="pick-reason">
+          RANDOM PICK
+        </div>
       `;
 
     }
 
 
-    box.innerHTML=
-    `
-    <div class="pick-number">
-      ${item.number}
-    </div>
+    box.innerHTML = `
+      <div class="pick-number">
+        ${item.number}
+      </div>
 
-    ${scoreText}
+      ${detail}
     `;
 
 
@@ -1524,9 +1883,9 @@ function displayPicks(results){
 }
 
 
-// ==============================
+// ==================================
 // HISTORY
-// ==============================
+// ==================================
 
 function saveHistory(results){
 
@@ -1534,9 +1893,14 @@ function saveHistory(results){
 
     historyData.unshift({
 
-      market:selectedMarket,
-      mode:selectedMode,
-      number:item.number
+      market:
+      selectedMarket,
+
+      mode:
+      selectedMode,
+
+      number:
+      item.number
 
     });
 
@@ -1551,8 +1915,10 @@ function saveHistory(results){
 
 
   localStorage.setItem(
-    "4dHistoryV3",
-    JSON.stringify(historyData)
+    "4dHistoryV31",
+    JSON.stringify(
+      historyData
+    )
   );
 
 
@@ -1569,13 +1935,14 @@ function renderHistory(){
   );
 
 
-  if(historyData.length===0){
+  if(
+    historyData.length === 0
+  ){
 
-    container.innerHTML=
-    `
-    <div class="empty">
-      Belum ada history.
-    </div>
+    container.innerHTML = `
+      <div class="empty">
+        Belum ada history.
+      </div>
     `;
 
     return;
@@ -1583,7 +1950,7 @@ function renderHistory(){
   }
 
 
-  container.innerHTML="";
+  container.innerHTML = "";
 
 
   historyData.forEach(item=>{
@@ -1593,21 +1960,20 @@ function renderHistory(){
       "div"
     );
 
-    row.className=
+    row.className =
     "history-row";
 
 
-    row.innerHTML=
-    `
-    <span>
-      ${item.market}
-      •
-      ${item.mode}
-    </span>
+    row.innerHTML = `
+      <span>
+        ${item.market}
+        •
+        ${item.mode}
+      </span>
 
-    <span class="history-number">
-      ${item.number}
-    </span>
+      <span class="history-number">
+        ${item.number}
+      </span>
     `;
 
 
@@ -1618,9 +1984,22 @@ function renderHistory(){
 }
 
 
-// ==============================
-// START APP
-// ==============================
+function clearHistory(){
+
+  historyData = [];
+
+  localStorage.removeItem(
+    "4dHistoryV31"
+  );
+
+  renderHistory();
+
+}
+
+
+// ==================================
+// START
+// ==================================
 
 renderHistory();
 updateLabel();
