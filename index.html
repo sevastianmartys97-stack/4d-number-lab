@@ -2,8 +2,8 @@
 <html lang="ms">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>4D Charta Analyzer V4.6</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>4D Charta Analyzer V4.6.1</title>
 
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -506,7 +506,7 @@ td{
   margin-top:10px;
 }
 
-@media(max-width:680px){
+@media(max-width:1100px){
 
   body{padding:7px}
 
@@ -800,7 +800,7 @@ body.v46-ui .pattern-panel{
   display:none!important;
 }
 
-@media(max-width:680px){
+@media(max-width:1100px){
 
   html,body{
     overflow-x:hidden;
@@ -1171,6 +1171,53 @@ body.v46-ui .pattern-panel{
     font-weight:bold;
     color:#cce4f4;
     margin:2px 0 8px;
+  }
+}
+
+
+/* V4.6.1-MOBILE-FORCE-FIX */
+@media(max-width:1100px){
+  html{
+    width:100%;
+    max-width:100%;
+    overflow-x:hidden;
+  }
+
+  body.v46-ui{
+    width:100%;
+    max-width:100%;
+    min-width:0!important;
+    margin:0!important;
+    box-sizing:border-box;
+  }
+
+  body.v46-ui .app{
+    width:100%!important;
+    max-width:100%!important;
+    min-width:0!important;
+    margin:0 auto!important;
+    padding:0!important;
+  }
+
+  body.v46-ui .container,
+  body.v46-ui .card,
+  body.v46-ui .bottom-grid,
+  body.v46-ui .history-card,
+  body.v46-ui .analysis-card,
+  body.v46-ui .permutation-card{
+    width:100%!important;
+    max-width:100%!important;
+    min-width:0!important;
+    box-sizing:border-box;
+  }
+
+  body.v46-ui .bottom-grid{
+    display:block!important;
+  }
+
+  body.v46-ui .analysis-card,
+  body.v46-ui .history-card{
+    width:100%!important;
   }
 }
 
@@ -3979,7 +4026,7 @@ loadDatabases();
     /* On mobile, make CHARTA HIT/PATTERN appear immediately after favourites.
        Move existing nodes only — do not recreate or alter their logic. */
     function arrangeMobile(){
-      if(!app || window.innerWidth>680){
+      if(!app || window.innerWidth>1100){
         return;
       }
 
@@ -4020,7 +4067,7 @@ loadDatabases();
       document.body.appendChild(nav);
 
       const showTab=function(tab){
-        if(window.innerWidth>680){
+        if(window.innerWidth>1100){
           [inputCard,favCard,analysis,permCard,history,footer].forEach(el=>{
             if(el) el.classList.remove("v46-hidden-mobile");
           });
@@ -4072,7 +4119,7 @@ loadDatabases();
 
     window.addEventListener("resize",function(){
       arrangeMobile();
-      if(window.innerWidth>680){
+      if(window.innerWidth>1100){
         document.querySelectorAll(".v46-hidden-mobile").forEach(el=>{
           el.classList.remove("v46-hidden-mobile");
         });
@@ -4082,6 +4129,15 @@ loadDatabases();
     console.log("4D Charta Analyzer V4.6 Premium Glass Mobile UI loaded ✓");
   });
 })();
+</script>
+
+
+<script>
+/* V4.6.1-MOBILE-FORCE-FIX */
+document.addEventListener("DOMContentLoaded",function(){
+  const v=document.querySelector(".version");
+  if(v) v.textContent="V4.6.1 • PREMIUM GLASS MOBILE FIX";
+});
 </script>
 
 </body>
