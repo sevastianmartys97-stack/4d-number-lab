@@ -1,6 +1,9 @@
 {
-  "backfillCompleted": false,
-  "lastRun": "2026-09-04 15:15:28",
-  "lastParsedDates": 0,
-  "lastUpdates": 0
+  "lastRun": "2026-09-04T17:40:31",
+  "lookbackDays": 7,
+  "pagesChecked": 7,
+  "validPages": 4,
+  "recordsParsed": 16,
+  "recordsChanged": 0,
+  "mode": "lightweight-recent-results-only"
 }
