@@ -5,6 +5,7 @@ import re
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
+from urllib.parse import urljoin
 
 import requests
 from bs4 import BeautifulSoup
@@ -12,37 +13,30 @@ from bs4 import BeautifulSoup
 
 # =========================================================
 # 4D CHARTA ANALYZER
-# HISTORY AUTO UPDATER V4.4
+# HISTORY UPDATER V4.5
 #
-# FIRST RUN:
-# - Scan sehingga 90 hari ke belakang
-#
-# NEXT RUN:
-# - Scan 14 hari terakhir sahaja
-#
-# MARKET:
-# - Sports Toto
-# - Magnum
-# - Da Ma Cai
-# - Sarawak Cash Sweep
+# CARA BARU:
+# - Buka archive
+# - Ikut link "Older"
+# - Simpan semua draw dalam tempoh ~90 hari
+# - Merge dengan data lama
+# - Tidak delete rekod lama
 # =========================================================
 
 
 ROOT = Path(__file__).resolve().parents[1]
-
 DATA = ROOT / "data"
 
-META_FILE = DATA / "update_meta.json"
-
-
-URL = "https://4d-my.com/4d-past-results/?draw={date}"
+BASE_URL = "https://4d-my.com"
+START_URL = "https://4d-my.com/4d-past-results/"
 
 
 MARKETS = {
 
     "toto": {
         "file": "toto.json",
-        "names": [
+        "operator": "Sports Toto",
+        "aliases": [
             "SportsToto 4D",
             "Sports Toto 4D",
             "Sports Toto"
@@ -51,7 +45,8 @@ MARKETS = {
 
     "magnum": {
         "file": "magnum.json",
-        "names": [
+        "operator": "Magnum",
+        "aliases": [
             "Magnum 4D",
             "Magnum4D",
             "Magnum"
@@ -60,7 +55,8 @@ MARKETS = {
 
     "damacai": {
         "file": "damacai.json",
-        "names": [
+        "operator": "Da Ma Cai",
+        "aliases": [
             "Da Ma Cai 1+3D",
             "Da Ma Cai",
             "Damacai"
@@ -69,7 +65,8 @@ MARKETS = {
 
     "cashsweep": {
         "file": "cashsweep.json",
-        "names": [
+        "operator": "Cash Sweep",
+        "aliases": [
             "Sarawak Cash Sweep",
             "Cash Sweep"
         ]
@@ -79,29 +76,25 @@ MARKETS = {
 
 
 HEADERS = {
-
     "User-Agent":
-    "Mozilla/5.0 "
-    "(Linux; Android 13) "
-    "AppleWebKit/537.36 "
-    "Chrome/124.0 Safari/537.36"
-
+        "Mozilla/5.0 "
+        "(Linux; Android 13) "
+        "AppleWebKit/537.36 "
+        "Chrome/124.0 Safari/537.36"
 }
 
 
-# =========================================================
-# SETTINGS
-# =========================================================
+# Archive website says 90 days.
+HISTORY_DAYS = 90
 
-BACKFILL_DAYS = 90
+# Safety supaya workflow tidak looping tanpa henti.
+MAX_PAGES = 100
 
-NORMAL_DAYS = 14
-
-REQUEST_DELAY = 0.25
+REQUEST_DELAY = 0.35
 
 
 # =========================================================
-# JSON
+# BASIC JSON
 # =========================================================
 
 def load_json(path: Path, default):
@@ -149,41 +142,25 @@ def save_json(path: Path, data):
 def parse_date(value):
 
     if not value:
-
         return None
-
 
     value = str(value).strip()
 
-
     formats = [
-
         "%Y-%m-%d",
-
         "%d/%m/%Y",
-
         "%d-%m-%Y",
-
         "%d-%b-%Y",
-
-        "%d %b %Y"
-
+        "%d %b %Y",
     ]
-
 
     for fmt in formats:
 
         try:
-
-            return datetime.strptime(
-                value,
-                fmt
-            )
+            return datetime.strptime(value, fmt)
 
         except ValueError:
-
             pass
-
 
     return None
 
@@ -193,47 +170,32 @@ def normalize_date(value):
     dt = parse_date(value)
 
     if not dt:
-
         return str(value)
 
-
-    return dt.strftime(
-        "%Y-%m-%d"
-    )
+    return dt.strftime("%Y-%m-%d")
 
 
 # =========================================================
-# NORMALIZE NUMBER
+# NUMBER
 # =========================================================
 
 def normalize_number(value):
 
     if value is None:
-
         return None
 
+    s = str(value).strip()
 
-    value = str(value).strip()
+    if re.fullmatch(r"\d{1,4}", s):
+        return s.zfill(4)
 
-
-    if re.fullmatch(
-        r"\d{1,4}",
-        value
-    ):
-
-        return value.zfill(4)
-
-
-    match = re.search(
+    m = re.search(
         r"(?<!\d)(\d{4})(?!\d)",
-        value
+        s
     )
 
-
-    if match:
-
-        return match.group(1)
-
+    if m:
+        return m.group(1)
 
     return None
 
@@ -242,257 +204,340 @@ def normalize_number(value):
 # DATABASE
 # =========================================================
 
-def load_database(
-    path: Path,
-    market_name: str
-):
+def load_database(path: Path, operator_name: str):
 
     data = load_json(
-
         path,
-
         {
-            "market": market_name,
+            "operator": operator_name,
+            "game": "4D",
             "lastUpdated": "",
+            "source": "Historical 4D Results",
             "draws": []
         }
-
     )
 
-
-    if not isinstance(
-        data,
-        dict
-    ):
-
+    if not isinstance(data, dict):
         data = {}
 
-
-    if not isinstance(
-        data.get("draws"),
-        list
-    ):
-
+    if not isinstance(data.get("draws"), list):
         data["draws"] = []
 
-
     data.setdefault(
-        "market",
-        market_name
+        "operator",
+        operator_name
     )
 
+    data.setdefault(
+        "game",
+        "4D"
+    )
+
+    data.setdefault(
+        "source",
+        "Historical 4D Results"
+    )
 
     data.setdefault(
         "lastUpdated",
         ""
     )
 
-
     return data
 
 
 # =========================================================
-# HTML → LINES
+# FIND MARKET SECTIONS FROM HTML
 # =========================================================
 
-def get_page_lines(html):
+def extract_market_sections(soup):
 
-    soup = BeautifulSoup(
-        html,
-        "html.parser"
+    sections = {}
+
+    headings = soup.find_all(
+        ["h3", "h2"]
     )
 
+    for heading in headings:
+
+        name = heading.get_text(
+            " ",
+            strip=True
+        )
+
+        if not name:
+            continue
+
+        matched_key = None
+
+        for key, cfg in MARKETS.items():
+
+            for alias in cfg["aliases"]:
+
+                if name.strip().lower() == alias.lower():
+
+                    matched_key = key
+                    break
+
+            if matched_key:
+                break
+
+        if not matched_key:
+            continue
+
+        block_parts = []
+
+        node = heading.next_sibling
+
+        while node:
+
+            # Stop apabila jumpa heading market berikutnya.
+            if getattr(node, "name", None) in ["h2", "h3"]:
+
+                next_title = node.get_text(
+                    " ",
+                    strip=True
+                )
+
+                is_market = False
+
+                for cfg in MARKETS.values():
+
+                    for alias in cfg["aliases"]:
+
+                        if (
+                            next_title.strip().lower()
+                            ==
+                            alias.lower()
+                        ):
+                            is_market = True
+                            break
+
+                    if is_market:
+                        break
+
+                if is_market:
+                    break
+
+            if hasattr(node, "get_text"):
+
+                text = node.get_text(
+                    "\n",
+                    strip=True
+                )
+
+                if text:
+                    block_parts.append(text)
+
+            else:
+
+                text = str(node).strip()
+
+                if text:
+                    block_parts.append(text)
+
+            node = node.next_sibling
+
+        sections[matched_key] = "\n".join(
+            block_parts
+        )
+
+    return sections
+
+
+# =========================================================
+# FALLBACK TEXT SECTION
+# =========================================================
+
+def extract_market_sections_from_text(soup):
 
     text = soup.get_text(
         "\n",
         strip=True
     )
 
-
-    lines = []
-
-
-    for line in text.splitlines():
-
-        line = re.sub(
-            r"\s+",
-            " ",
-            line
-        ).strip()
-
-
-        if line:
-
-            lines.append(line)
-
-
-    return lines
-
-
-# =========================================================
-# FIND MARKET BLOCK
-# =========================================================
-
-def find_market_block(
-    lines,
-    aliases
-):
-
-    aliases_lower = [
-        x.lower()
-        for x in aliases
+    lines = [
+        re.sub(r"\s+", " ", x).strip()
+        for x in text.splitlines()
+        if x.strip()
     ]
 
+    sections = {}
 
-    all_market_names = []
+    all_aliases = {}
 
+    for key, cfg in MARKETS.items():
 
-    for config in MARKETS.values():
+        for alias in cfg["aliases"]:
 
-        for name in config["names"]:
-
-            all_market_names.append(
-                name.lower()
-            )
-
-
-    start = None
-
+            all_aliases[
+                alias.lower()
+            ] = key
 
     for i, line in enumerate(lines):
 
-        value = line.lower().strip()
-
-
-        if value in aliases_lower:
-
-            start = i
-
-            break
-
-
-    if start is None:
-
-        return None
-
-
-    end = len(lines)
-
-
-    for i in range(
-        start + 1,
-        len(lines)
-    ):
-
-        value = lines[i].lower().strip()
-
-
-        if value in all_market_names:
-
-            end = i
-
-            break
-
-
-    return lines[
-        start:end
-    ]
-
-
-# =========================================================
-# FIND DRAW HEADER
-# =========================================================
-
-def parse_draw_header(block):
-
-    for line in block:
-
-        # Example:
-        # #416/26(Tue) 01-Sep-2026
-        # #5338(Tue) 01-Sep-2026
-
-        match = re.search(
-
-            r"#?\s*"
-            r"([0-9]+(?:/[0-9]+)?)"
-            r"\s*"
-            r"\([A-Za-z]{3}\)"
-            r"\s*"
-            r"([0-9]{1,2}-[A-Za-z]{3}-[0-9]{4})",
-
-            line,
-
-            re.I
-
+        key = all_aliases.get(
+            line.lower()
         )
 
+        if not key:
+            continue
 
-        if match:
+        end = len(lines)
 
-            draw = match.group(1)
+        for j in range(
+            i + 1,
+            len(lines)
+        ):
 
-            date = normalize_date(
-                match.group(2)
-            )
+            if lines[j].lower() in all_aliases:
 
+                end = j
+                break
 
-            return draw, date
+        sections[key] = "\n".join(
+            lines[i + 1:end]
+        )
 
-
-    return None, None
+    return sections
 
 
 # =========================================================
-# PRIZE FINDER
+# PARSE MARKET BLOCK
 # =========================================================
 
-def find_prize(
-    block,
-    labels
-):
+def parse_market_block(block):
 
-    for i, line in enumerate(block):
+    if not block:
+        return None
+
+    text = re.sub(
+        r"\r",
+        "",
+        block
+    )
+
+    # Examples:
+    # #416/26(Tue) 01-Sep-2026
+    # #5338(Tue) 01-Sep-2026
+
+    header = re.search(
+        r"#?\s*"
+        r"([0-9]+(?:/[0-9]+)?)"
+        r"\s*"
+        r"\([A-Za-z]{3}\)"
+        r"\s*"
+        r"([0-9]{1,2}-[A-Za-z]{3}-[0-9]{4})",
+        text,
+        re.I
+    )
+
+    if not header:
+        return None
+
+    draw = header.group(1)
+
+    date = normalize_date(
+        header.group(2)
+    )
+
+    first = find_prize(
+        text,
+        [
+            "1st Prize",
+            "1st",
+        ]
+    )
+
+    second = find_prize(
+        text,
+        [
+            "2nd Prize",
+            "2nd",
+        ]
+    )
+
+    third = find_prize(
+        text,
+        [
+            "3rd Prize",
+            "3rd",
+        ]
+    )
+
+    if not (
+        first
+        and second
+        and third
+    ):
+        return None
+
+    special = extract_prize_section(
+        text,
+        "Special",
+        "Consolation"
+    )
+
+    consolation = extract_prize_section(
+        text,
+        "Consolation",
+        None
+    )
+
+    return {
+        "draw": draw,
+        "date": date,
+        "first": first,
+        "second": second,
+        "third": third,
+        "special": special[:10],
+        "consolation": consolation[:10],
+    }
+
+
+# =========================================================
+# FIND PRIZES
+# =========================================================
+
+def find_prize(text, labels):
+
+    lines = [
+        re.sub(r"\s+", " ", x).strip()
+        for x in text.splitlines()
+        if x.strip()
+    ]
+
+    for i, line in enumerate(lines):
 
         low = line.lower()
 
+        if any(
+            label.lower() in low
+            for label in labels
+        ):
 
-        for label in labels:
+            nums = re.findall(
+                r"(?<!\d)(\d{4})(?!\d)",
+                line
+            )
 
-            label_low = label.lower()
+            if nums:
+                return nums[-1]
 
+            for j in range(
+                i + 1,
+                min(
+                    i + 4,
+                    len(lines)
+                )
+            ):
 
-            if label_low in low:
-
-                # Number on same line
-                nums = re.findall(
-                    r"(?<!\d)(\d{4})(?!\d)",
-                    line
+                n = normalize_number(
+                    lines[j]
                 )
 
-
-                if nums:
-
-                    return nums[-1]
-
-
-                # Number on next line
-                for j in range(
-                    i + 1,
-                    min(
-                        i + 3,
-                        len(block)
-                    )
-                ):
-
-                    value = normalize_number(
-                        block[j]
-                    )
-
-
-                    if value:
-
-                        return value
-
+                if n:
+                    return n
 
     return None
 
@@ -501,236 +546,94 @@ def find_prize(
 # SPECIAL / CONSOLATION
 # =========================================================
 
-def find_section_numbers(
-    block,
-    section,
-    stop_section=None
+def extract_prize_section(
+    text,
+    section_name,
+    stop_name
 ):
+
+    lines = [
+        re.sub(r"\s+", " ", x).strip()
+        for x in text.splitlines()
+        if x.strip()
+    ]
 
     start = None
 
+    for i, line in enumerate(lines):
 
-    for i, line in enumerate(block):
-
-        if line.lower().strip() == section.lower():
+        if (
+            section_name.lower()
+            in line.lower()
+        ):
 
             start = i + 1
-
             break
 
-
     if start is None:
-
         return []
 
+    end = len(lines)
 
-    end = len(block)
-
-
-    if stop_section:
+    if stop_name:
 
         for i in range(
             start,
-            len(block)
+            len(lines)
         ):
 
             if (
-                block[i]
-                .lower()
-                .strip()
-                ==
-                stop_section.lower()
+                stop_name.lower()
+                in lines[i].lower()
             ):
 
                 end = i
-
                 break
 
+    nums = []
 
-    results = []
+    for line in lines[start:end]:
 
-
-    for line in block[
-        start:end
-    ]:
-
-        nums = re.findall(
-
-            r"(?<!\d)"
-            r"(\d{4})"
-            r"(?!\d)",
-
+        found = re.findall(
+            r"(?<!\d)(\d{4})(?!\d)",
             line
-
         )
 
+        for n in found:
 
-        for number in nums:
+            if n not in nums:
 
-            if number not in results:
+                nums.append(n)
 
-                results.append(
-                    number
-                )
+            if len(nums) >= 10:
+                return nums
 
-
-            if len(results) >= 10:
-
-                return results
-
-
-    return results
-
-
-# =========================================================
-# PARSE ONE MARKET
-# =========================================================
-
-def parse_market(block):
-
-    if not block:
-
-        return None
-
-
-    draw, date = parse_draw_header(
-        block
-    )
-
-
-    if not draw or not date:
-
-        return None
-
-
-    first = find_prize(
-
-        block,
-
-        [
-            "1st Prize",
-            "1st",
-            "First Prize"
-        ]
-
-    )
-
-
-    second = find_prize(
-
-        block,
-
-        [
-            "2nd Prize",
-            "2nd",
-            "Second Prize"
-        ]
-
-    )
-
-
-    third = find_prize(
-
-        block,
-
-        [
-            "3rd Prize",
-            "3rd",
-            "Third Prize"
-        ]
-
-    )
-
-
-    if not (
-        first
-        and second
-        and third
-    ):
-
-        return None
-
-
-    special = find_section_numbers(
-
-        block,
-
-        "Special",
-
-        "Consolation"
-
-    )
-
-
-    consolation = find_section_numbers(
-
-        block,
-
-        "Consolation"
-
-    )
-
-
-    return {
-
-        "date": date,
-
-        "draw": draw,
-
-        "first": first,
-
-        "second": second,
-
-        "third": third,
-
-        "special": special,
-
-        "consolation": consolation
-
-    }
+    return nums
 
 
 # =========================================================
 # MERGE
 # =========================================================
 
-def merge_record(
-    database,
-    new_record
-):
+def merge_record(database, record):
 
-    draws = database[
-        "draws"
-    ]
-
-
-    new_date = str(
-        new_record.get(
-            "date",
-            ""
-        )
-    )
-
+    draws = database["draws"]
 
     new_draw = str(
-        new_record.get(
+        record.get(
             "draw",
             ""
         )
     )
 
-
-    for index, old in enumerate(
-        draws
-    ):
-
-        old_date = str(
-            old.get(
-                "date",
-                ""
-            )
+    new_date = str(
+        record.get(
+            "date",
+            ""
         )
+    )
 
+    for i, old in enumerate(draws):
 
         old_draw = str(
             old.get(
@@ -739,76 +642,136 @@ def merge_record(
             )
         )
 
+        old_date = str(
+            old.get(
+                "date",
+                ""
+            )
+        )
 
-        if (
-            old_date == new_date
-            and
-            old_draw == new_draw
-        ):
+        same_draw = (
+            new_draw
+            and old_draw
+            and new_draw == old_draw
+        )
 
-            if old != new_record:
+        same_date = (
+            new_date
+            and old_date
+            and new_date == old_date
+        )
 
-                draws[index] = (
-                    new_record
-                )
+        if same_draw or same_date:
 
-                return True
+            # Ganti hanya jika rekod baru lebih lengkap.
+            old_score = record_score(old)
+            new_score = record_score(record)
 
+            if new_score >= old_score:
+
+                if old != record:
+
+                    draws[i] = record
+                    return True
 
             return False
 
-
-    draws.append(
-        new_record
-    )
-
+    draws.append(record)
 
     return True
 
 
+def record_score(record):
+
+    score = 0
+
+    if record.get("first"):
+        score += 1
+
+    if record.get("second"):
+        score += 1
+
+    if record.get("third"):
+        score += 1
+
+    score += len(
+        record.get(
+            "special",
+            []
+        )
+    )
+
+    score += len(
+        record.get(
+            "consolation",
+            []
+        )
+    )
+
+    return score
+
+
 # =========================================================
-# SORT + DEDUP DATABASE
+# CLEAN DATABASE
 # =========================================================
 
-def clean_database(
-    database
-):
+def clean_database(database):
 
     unique = {}
 
-
-    for draw in database[
-        "draws"
-    ]:
+    for draw in database["draws"]:
 
         key = (
-
             str(
                 draw.get(
                     "date",
                     ""
                 )
             ),
-
             str(
                 draw.get(
                     "draw",
                     ""
                 )
             )
-
         )
 
+        if key not in unique:
 
-        unique[key] = draw
+            unique[key] = draw
 
+        else:
+
+            if (
+                record_score(draw)
+                >
+                record_score(unique[key])
+            ):
+
+                unique[key] = draw
 
     draws = list(
         unique.values()
     )
 
+    def key_fn(draw):
 
-    def sort_key(draw):
+        dt = parse_date(
+            draw.get("date")
+        )
+
+        return dt or datetime.min
+
+    draws.sort(
+        key=key_fn,
+        reverse=True
+    )
+
+    database["draws"] = draws
+
+    dates = []
+
+    for draw in draws:
 
         dt = parse_date(
             draw.get(
@@ -816,56 +779,13 @@ def clean_database(
             )
         )
 
-
         if dt:
-
-            return dt
-
-
-        return datetime.min
-
-
-    draws.sort(
-        key=sort_key,
-        reverse=True
-    )
-
-
-    database[
-        "draws"
-    ] = draws
-
-
-    dates = [
-
-        parse_date(
-            x.get(
-                "date"
-            )
-        )
-
-        for x in draws
-
-    ]
-
-
-    dates = [
-        x
-        for x in dates
-        if x
-    ]
-
+            dates.append(dt)
 
     if dates:
 
-        newest = max(
-            dates
-        )
-
-        oldest = min(
-            dates
-        )
-
+        newest = max(dates)
+        oldest = min(dates)
 
         database[
             "lastUpdated"
@@ -873,77 +793,107 @@ def clean_database(
             "%Y-%m-%d"
         )
 
-
         database[
             "historyCoverage"
         ] = {
-
-            "drawCount":
-            len(draws),
-
+            "drawCount": len(draws),
             "oldestDate":
-            oldest.strftime(
-                "%Y-%m-%d"
-            ),
-
+                oldest.strftime(
+                    "%Y-%m-%d"
+                ),
             "newestDate":
-            newest.strftime(
-                "%Y-%m-%d"
-            )
-
+                newest.strftime(
+                    "%Y-%m-%d"
+                )
         }
-
 
     else:
 
         database[
             "historyCoverage"
         ] = {
-
-            "drawCount":
-            len(draws),
-
-            "oldestDate":
-            "",
-
-            "newestDate":
-            ""
-
+            "drawCount": len(draws),
+            "oldestDate": "",
+            "newestDate": ""
         }
 
 
 # =========================================================
-# DOWNLOAD DATE
+# FIND PAGE DATE
 # =========================================================
 
-def download_date(
-    session,
-    target_date
-):
+def find_page_date(soup):
 
-    url = URL.format(
-
-        date=
-        target_date.strftime(
-            "%Y-%m-%d"
-        )
-
+    text = soup.get_text(
+        " ",
+        strip=True
     )
 
+    matches = re.findall(
+        r"\b"
+        r"(\d{1,2}-[A-Za-z]{3}-\d{4})"
+        r"\b",
+        text
+    )
+
+    if not matches:
+        return None
+
+    dates = []
+
+    for value in matches:
+
+        dt = parse_date(value)
+
+        if dt:
+            dates.append(dt)
+
+    if not dates:
+        return None
+
+    # Semua market dalam page biasanya tarikh sama.
+    return dates[0]
+
+
+# =========================================================
+# FIND OLDER LINK
+# =========================================================
+
+def find_older_url(soup, current_url):
+
+    for a in soup.find_all(
+        "a",
+        href=True
+    ):
+
+        label = a.get_text(
+            " ",
+            strip=True
+        ).lower()
+
+        if label == "older":
+
+            return urljoin(
+                current_url,
+                a["href"]
+            )
+
+    return None
+
+
+# =========================================================
+# FETCH
+# =========================================================
+
+def fetch_page(session, url):
 
     response = session.get(
-
         url,
-
         headers=HEADERS,
-
-        timeout=25
-
+        timeout=30
     )
 
-
     response.raise_for_status()
-
 
     return response.text
 
@@ -954,232 +904,275 @@ def download_date(
 
 def main():
 
+    print(
+        "========================================"
+    )
+
+    print(
+        "4D HISTORY UPDATER V4.5"
+    )
+
+    print(
+        "MODE: FOLLOW ARCHIVE OLDER LINKS"
+    )
+
+    print(
+        "========================================"
+    )
+
+
     DATA.mkdir(
         parents=True,
         exist_ok=True
     )
 
 
-    meta = load_json(
-
-        META_FILE,
-
-        {
-            "backfillCompleted": False
-        }
-
-    )
-
-
-    first_backfill = not bool(
-
-        meta.get(
-            "backfillCompleted"
-        )
-
-    )
-
-
-    if first_backfill:
-
-        days_to_scan = (
-            BACKFILL_DAYS
-        )
-
-        print(
-            "MODE: 90 DAY HISTORY BACKFILL"
-        )
-
-    else:
-
-        days_to_scan = (
-            NORMAL_DAYS
-        )
-
-        print(
-            "MODE: NORMAL UPDATE"
-        )
-
-
-    print(
-        "Scanning:",
-        days_to_scan,
-        "days"
-    )
-
-
     databases = {}
 
+    for key, cfg in MARKETS.items():
 
-    for key, config in MARKETS.items():
-
-        file_path = (
-            DATA
-            /
-            config["file"]
-        )
-
-
-        databases[key] = (
-            load_database(
-
-                file_path,
-
-                config["names"][0]
-
-            )
+        databases[key] = load_database(
+            DATA / cfg["file"],
+            cfg["operator"]
         )
 
 
     session = requests.Session()
 
 
-    parsed_dates = 0
+    # Mulakan dari latest archive.
+    current_url = START_URL
 
-    total_updates = 0
+    visited_urls = set()
+
+    total_pages = 0
+    total_records_seen = 0
+    total_changes = 0
 
 
-    today = datetime.now()
+    newest_archive_date = None
+
+    cutoff_date = (
+        datetime.now()
+        -
+        timedelta(
+            days=HISTORY_DAYS
+        )
+    )
 
 
-    for day_index in range(
-        days_to_scan
+    while (
+        current_url
+        and total_pages < MAX_PAGES
     ):
 
-        target_date = (
+        if current_url in visited_urls:
 
-            today
-            -
-            timedelta(
-                days=day_index
+            print(
+                "STOP: repeated URL"
             )
 
+            break
+
+
+        visited_urls.add(
+            current_url
         )
 
 
-        date_string = (
-            target_date.strftime(
-                "%Y-%m-%d"
-            )
-        )
-
-
+        print()
         print(
-            "Checking:",
-            date_string
+            "PAGE:",
+            current_url
         )
 
 
         try:
 
-            html = download_date(
-
+            html = fetch_page(
                 session,
-
-                target_date
-
+                current_url
             )
-
-
-            lines = get_page_lines(
-                html
-            )
-
-
-            date_has_result = False
-
-
-            for key, config in MARKETS.items():
-
-                block = find_market_block(
-
-                    lines,
-
-                    config["names"]
-
-                )
-
-
-                record = parse_market(
-                    block
-                )
-
-
-                if not record:
-
-                    continue
-
-
-                # Safety:
-                # result date must match requested date
-                result_dt = parse_date(
-                    record["date"]
-                )
-
-
-                if result_dt:
-
-                    if (
-                        result_dt.date()
-                        !=
-                        target_date.date()
-                    ):
-
-                        continue
-
-
-                changed = merge_record(
-
-                    databases[key],
-
-                    record
-
-                )
-
-
-                if changed:
-
-                    total_updates += 1
-
-
-                date_has_result = True
-
-
-                print(
-
-                    "  ",
-
-                    key,
-
-                    record["date"],
-
-                    record["draw"],
-
-                    record["first"],
-
-                    record["second"],
-
-                    record["third"]
-
-                )
-
-
-            if date_has_result:
-
-                parsed_dates += 1
-
 
         except Exception as error:
 
             print(
-
-                "WARNING:",
-
-                date_string,
-
-                str(error)
-
+                "FETCH ERROR:",
+                error
             )
+
+            break
+
+
+        soup = BeautifulSoup(
+            html,
+            "html.parser"
+        )
+
+
+        page_date = find_page_date(
+            soup
+        )
+
+
+        if page_date:
+
+            print(
+                "DATE:",
+                page_date.strftime(
+                    "%Y-%m-%d"
+                )
+            )
+
+
+            if newest_archive_date is None:
+
+                newest_archive_date = page_date
+
+
+            if (
+                page_date
+                <
+                cutoff_date
+            ):
+
+                print(
+                    "Reached 90-day cutoff."
+                )
+
+                break
+
+
+        # First parser
+        sections = extract_market_sections(
+            soup
+        )
+
+
+        # Fallback parser
+        if len(sections) < 2:
+
+            fallback = (
+                extract_market_sections_from_text(
+                    soup
+                )
+            )
+
+            for k, v in fallback.items():
+
+                sections.setdefault(
+                    k,
+                    v
+                )
+
+
+        found_this_page = 0
+
+
+        for key, cfg in MARKETS.items():
+
+            block = sections.get(
+                key
+            )
+
+
+            if not block:
+                continue
+
+
+            record = parse_market_block(
+                block
+            )
+
+
+            if not record:
+                continue
+
+
+            # Safety: if page date exists,
+            # result date should match.
+            record_dt = parse_date(
+                record.get(
+                    "date"
+                )
+            )
+
+
+            if (
+                page_date
+                and record_dt
+                and record_dt.date()
+                != page_date.date()
+            ):
+
+                print(
+                    "SKIP DATE MISMATCH:",
+                    key,
+                    record.get("date")
+                )
+
+                continue
+
+
+            found_this_page += 1
+            total_records_seen += 1
+
+
+            changed = merge_record(
+                databases[key],
+                record
+            )
+
+
+            if changed:
+                total_changes += 1
+
+
+            print(
+                " ",
+                key.upper(),
+                record["date"],
+                record["draw"],
+                record["first"],
+                record["second"],
+                record["third"],
+                "S:",
+                len(
+                    record["special"]
+                ),
+                "C:",
+                len(
+                    record["consolation"]
+                )
+            )
+
+
+        if found_this_page == 0:
+
+            print(
+                "No target-market draw on this date."
+            )
+
+
+        total_pages += 1
+
+
+        older_url = find_older_url(
+            soup,
+            current_url
+        )
+
+
+        if not older_url:
+
+            print(
+                "No Older link found."
+            )
+
+            break
+
+
+        current_url = older_url
 
 
         time.sleep(
@@ -1188,50 +1181,42 @@ def main():
 
 
     # =====================================================
-    # SAVE ALL DATABASES
+    # SAVE
     # =====================================================
 
-    for key, config in MARKETS.items():
+    print()
+    print(
+        "========================================"
+    )
 
-        database = (
-            databases[key]
-        )
+    print(
+        "SAVING DATABASES"
+    )
 
+    print(
+        "========================================"
+    )
+
+
+    for key, cfg in MARKETS.items():
+
+        database = databases[key]
 
         clean_database(
             database
         )
 
-
-        file_path = (
-
-            DATA
-            /
-            config["file"]
-
-        )
-
-
         save_json(
-
-            file_path,
-
+            DATA / cfg["file"],
             database
-
         )
-
 
         coverage = database.get(
-
             "historyCoverage",
-
             {}
-
         )
 
-
         print()
-
         print(
             key.upper()
         )
@@ -1261,116 +1246,34 @@ def main():
         )
 
 
-    # =====================================================
-    # META
-    # =====================================================
-
-    meta[
-        "lastRun"
-    ] = datetime.now().strftime(
-
-        "%Y-%m-%d %H:%M:%S"
-
-    )
-
-
-    meta[
-        "lastParsedDates"
-    ] = parsed_dates
-
-
-    meta[
-        "lastUpdates"
-    ] = total_updates
-
-
-    if first_backfill:
-
-        # Only mark successful when enough result dates
-        # were actually parsed.
-
-        if parsed_dates >= 10:
-
-            meta[
-                "backfillCompleted"
-            ] = True
-
-
-            meta[
-                "backfillDays"
-            ] = BACKFILL_DAYS
-
-
-            meta[
-                "backfillCompletedAt"
-            ] = datetime.now().strftime(
-
-                "%Y-%m-%d %H:%M:%S"
-
-            )
-
-
-            print()
-
-            print(
-                "90 DAY BACKFILL COMPLETED ✓"
-            )
-
-
-        else:
-
-            meta[
-                "backfillCompleted"
-            ] = False
-
-
-            print()
-
-            print(
-                "BACKFILL NOT COMPLETED"
-            )
-
-            print(
-                "Only",
-                parsed_dates,
-                "result dates parsed."
-            )
-
-
-    save_json(
-
-        META_FILE,
-
-        meta
-
-    )
-
-
     print()
-
     print(
-        "================================"
+        "========================================"
     )
 
     print(
-        "UPDATE FINISHED"
+        "UPDATE COMPLETE ✓"
     )
 
     print(
-        "Result dates:",
-        parsed_dates
+        "Pages visited:",
+        total_pages
+    )
+
+    print(
+        "Records parsed:",
+        total_records_seen
     )
 
     print(
         "New/changed records:",
-        total_updates
+        total_changes
     )
 
     print(
-        "================================"
+        "========================================"
     )
 
 
 if __name__ == "__main__":
-
     main()
