@@ -346,5 +346,10 @@
       ]
     }
   ],
-  "market": "Magnum 4D"
+  "market": "Magnum 4D",
+  "historyCoverage": {
+    "drawCount": 11,
+    "oldestDate": "2026-08-12",
+    "newestDate": "2026-09-02"
+  }
 }

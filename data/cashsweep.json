@@ -315,5 +315,10 @@
       ]
     }
   ],
-  "market": "Cash Sweep"
+  "market": "Cash Sweep",
+  "historyCoverage": {
+    "drawCount": 10,
+    "oldestDate": "2026-08-12",
+    "newestDate": "2026-09-02"
+  }
 }
