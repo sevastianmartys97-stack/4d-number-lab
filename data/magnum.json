@@ -351,5 +351,10 @@
     "drawCount": 11,
     "oldestDate": "2026-08-12",
     "newestDate": "2026-09-02"
-  }
+  },
+  "historyRange": {
+    "from": "2020-01-01",
+    "to": "2026-09-04"
+  },
+  "historySource": "4dmanager.net + existing records"
 }
