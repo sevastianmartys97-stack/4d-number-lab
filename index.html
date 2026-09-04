@@ -263,7 +263,7 @@ td{
 
 .detail-grid{
   display:grid;
-  grid-template-columns:1fr 1fr;
+  grid-template-columns:1fr 1.3fr;
   gap:10px;
 }
 
@@ -323,7 +323,7 @@ td{
 }
 
 .market-table table{
-  min-width:580px;
+  min-width:620px;
 }
 
 .found{
@@ -336,10 +336,51 @@ td{
   font-weight:bold;
 }
 
+.exact{
+  color:#ffd23f;
+  font-weight:bold;
+}
+
+.permutation{
+  color:#62b8ff;
+  font-weight:bold;
+}
+
 .market-detail{
   color:#8298ae;
   font-size:7px;
   margin-top:3px;
+}
+
+.history-market{
+  margin-top:10px;
+  background:#061522;
+  border:1px solid #173047;
+  border-radius:8px;
+  overflow:hidden;
+}
+
+.history-market-title{
+  display:flex;
+  justify-content:space-between;
+  padding:9px;
+  background:#0c2132;
+  font-size:8px;
+}
+
+.history-table{
+  width:100%;
+  border-collapse:collapse;
+}
+
+.history-table th{
+  font-size:7px;
+  padding:7px 4px;
+}
+
+.history-table td{
+  font-size:7px;
+  padding:7px 4px;
 }
 
 .empty{
@@ -384,10 +425,9 @@ td{
     <h1>4D CHARTA ANALYZER</h1>
     <div class="version">V4.2 • AUTO FAV + PERMUTATION</div>
     <div class="subtitle">
-      Multiple Favourite Numbers • Auto Analyze • Permutation • Market History
+      Multiple Favourite Numbers • Auto Analyze • Exact + Permutation History
     </div>
   </div>
-
 
   <div class="card">
 
@@ -529,18 +569,15 @@ td{
 
 
   <div class="footer">
-    CHARTA HIT menunjukkan padanan corak/pusingan dengan Charta,
-    bukan jaminan keputusan cabutan akan datang.
+    Exact Hit = nombor favourite asal.
+    Permutation Hit = salah satu pusingan unik favourite.
+    Latest ditentukan berdasarkan tarikh result.
   </div>
 
 </div>
 
 
 <script>
-
-/* =========================
-DATABASE
-========================= */
 
 const dbFiles = {
   toto:"data/toto.json",
@@ -568,6 +605,113 @@ let selectedIndex = 0;
 
 
 /* =========================
+DATE PARSER
+========================= */
+
+function parseResultDate(dateValue){
+
+  if(!dateValue){
+    return 0;
+  }
+
+  const value =
+  String(dateValue).trim();
+
+  /* DD/MM/YYYY */
+  let match =
+  value.match(
+    /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/
+  );
+
+  if(match){
+
+    const day =
+    Number(match[1]);
+
+    const month =
+    Number(match[2])-1;
+
+    const year =
+    Number(match[3]);
+
+    return new Date(
+      year,
+      month,
+      day
+    ).getTime();
+
+  }
+
+
+  /* YYYY-MM-DD */
+  match =
+  value.match(
+    /^(\d{4})-(\d{1,2})-(\d{1,2})$/
+  );
+
+  if(match){
+
+    const year =
+    Number(match[1]);
+
+    const month =
+    Number(match[2])-1;
+
+    const day =
+    Number(match[3]);
+
+    return new Date(
+      year,
+      month,
+      day
+    ).getTime();
+
+  }
+
+
+  const fallback =
+  Date.parse(value);
+
+  return isNaN(fallback)
+  ?
+  0
+  :
+  fallback;
+
+}
+
+
+function formatResultDate(dateValue){
+
+  const timestamp =
+  parseResultDate(dateValue);
+
+  if(!timestamp){
+    return dateValue || "-";
+  }
+
+  const date =
+  new Date(timestamp);
+
+  const d =
+  String(
+    date.getDate()
+  ).padStart(2,"0");
+
+  const m =
+  String(
+    date.getMonth()+1
+  ).padStart(2,"0");
+
+  const y =
+  date.getFullYear();
+
+  return `${d}/${m}/${y}`;
+
+}
+
+
+/* =========================
 CHARTA INPUT
 ========================= */
 
@@ -590,7 +734,6 @@ chartInputs.forEach((input,index)=>{
     }
 
     saveCharta();
-
     autoRefresh();
 
   });
@@ -599,7 +742,7 @@ chartInputs.forEach((input,index)=>{
 
 
 /* =========================
-DATABASE LOAD
+DATABASE
 ========================= */
 
 async function loadDatabases(){
@@ -613,7 +756,11 @@ async function loadDatabases(){
 
       const response =
       await fetch(
-        dbFiles[key] + "?v=" + Date.now()
+        dbFiles[key]
+        +
+        "?v="
+        +
+        Date.now()
       );
 
       if(!response.ok){
@@ -637,6 +784,8 @@ async function loadDatabases(){
     status.className = "error";
     status.innerText = "DATABASE ERROR";
 
+    console.error(error);
+
   }
 
 }
@@ -649,14 +798,19 @@ BUILD CHARTA
 function buildCharta(){
 
   const values =
-  [...chartInputs].map(x=>x.value);
+  [...chartInputs]
+  .map(x=>x.value);
 
   if(
-    values.some(x=>!/^[0-9]$/.test(x))
+    values.some(
+      x=>!/^[0-9]$/.test(x)
+    )
   ){
+
     chartMatrix = [];
     chartLines = [];
     return false;
+
   }
 
   chartMatrix = [
@@ -668,6 +822,7 @@ function buildCharta(){
 
   chartLines = [];
 
+
   for(let r=0;r<4;r++){
 
     chartLines.push({
@@ -677,9 +832,10 @@ function buildCharta(){
 
   }
 
+
   for(let c=0;c<4;c++){
 
-    let number = "";
+    let number="";
 
     for(let r=0;r<4;r++){
       number += chartMatrix[r][c];
@@ -691,6 +847,7 @@ function buildCharta(){
     });
 
   }
+
 
   let d1="";
   let d2="";
@@ -747,23 +904,28 @@ function buildCharta(){
   });
 
 
-  const normal =
+  const original =
   [...chartLines];
 
-  normal.forEach(item=>{
-
-    const reverse =
-    item.number
-    .split("")
-    .reverse()
-    .join("");
+  original.forEach(item=>{
 
     chartLines.push({
-      number:reverse,
-      type:"Reverse "+item.type
+
+      number:
+      item.number
+      .split("")
+      .reverse()
+      .join(""),
+
+      type:
+      "Reverse "
+      +
+      item.type
+
     });
 
   });
+
 
   return true;
 
@@ -771,13 +933,15 @@ function buildCharta(){
 
 
 /* =========================
-DISPLAY CHARTA LINES
+CHARTA DISPLAY
 ========================= */
 
 function renderChartaLines(){
 
   const box =
-  document.getElementById("chartaLines");
+  document.getElementById(
+    "chartaLines"
+  );
 
   if(!buildCharta()){
 
@@ -788,30 +952,17 @@ function renderChartaLines(){
 
   }
 
-  const unique = [];
-
-  chartLines.forEach(item=>{
-
-    if(
-      !unique.some(
-        x => x.number === item.number
-        && x.type === item.type
-      )
-    ){
-      unique.push(item);
-    }
-
-  });
-
   box.innerHTML = "";
 
-  unique.slice(0,12)
+  chartLines
+  .slice(0,12)
   .forEach(item=>{
 
     const div =
     document.createElement("div");
 
-    div.className = "line-item";
+    div.className =
+    "line-item";
 
     div.innerHTML =
     `
@@ -827,28 +978,44 @@ function renderChartaLines(){
 
 
 /* =========================
-PERMUTATION
+PERMUTATIONS
 ========================= */
 
 function getPermutations(number){
 
-  const results = new Set();
+  const results =
+  new Set();
 
-  function permute(prefix, remaining){
+  function permute(
+    prefix,
+    remaining
+  ){
 
-    if(remaining.length === 0){
+    if(
+      remaining.length === 0
+    ){
 
       results.add(prefix);
       return;
 
     }
 
-    for(let i=0;i<remaining.length;i++){
+    for(
+      let i=0;
+      i<remaining.length;
+      i++
+    ){
 
       permute(
-        prefix + remaining[i],
-        remaining.slice(0,i) +
+
+        prefix
+        +
+        remaining[i],
+
+        remaining.slice(0,i)
+        +
         remaining.slice(i+1)
+
       );
 
     }
@@ -863,7 +1030,7 @@ function getPermutations(number){
 
 
 /* =========================
-MATCH
+CHARTA MATCH
 ========================= */
 
 function checkCharta(number){
@@ -881,11 +1048,38 @@ function checkCharta(number){
   const permutations =
   getPermutations(number);
 
-  for(const permutation of permutations){
+  /* EXACT favourite priority */
+
+  const exactOriginal =
+  chartLines.find(
+    line =>
+    line.number === number
+  );
+
+  if(exactOriginal){
+
+    return{
+      hit:true,
+      best:number,
+      type:
+      "EXACT • "
+      +
+      exactOriginal.type
+    };
+
+  }
+
+
+  for(
+    const permutation
+    of
+    permutations
+  ){
 
     const exact =
     chartLines.find(
-      line => line.number === permutation
+      line =>
+      line.number === permutation
     );
 
     if(exact){
@@ -893,12 +1087,16 @@ function checkCharta(number){
       return{
         hit:true,
         best:permutation,
-        type:exact.type
+        type:
+        "PUSINGAN • "
+        +
+        exact.type
       };
 
     }
 
   }
+
 
   return{
     hit:false,
@@ -910,11 +1108,12 @@ function checkCharta(number){
 
 
 /* =========================
-MARKET SEARCH
+MARKET HISTORY FINDER
 ========================= */
 
-function findInDatabase(
+function findAllHistory(
   database,
+  favourite,
   permutations
 ){
 
@@ -923,90 +1122,162 @@ function findInDatabase(
   if(
     !database
     ||
-    !Array.isArray(database.draws)
+    !Array.isArray(
+      database.draws
+    )
   ){
+
     return appearances;
+
   }
 
-  database.draws.forEach(draw=>{
 
-    const entries = [
+  database.draws.forEach(
+    draw=>{
 
-      {
-        number:draw.first,
-        position:"1st"
-      },
+      const drawDate =
+      draw.date || "";
 
-      {
-        number:draw.second,
-        position:"2nd"
-      },
 
-      {
-        number:draw.third,
-        position:"3rd"
-      }
-
-    ];
-
-    entries.forEach(item=>{
-
-      if(
-        permutations.includes(item.number)
+      function addMatch(
+        number,
+        position
       ){
 
+        if(
+          !permutations.includes(
+            number
+          )
+        ){
+          return;
+        }
+
         appearances.push({
-          number:item.number,
-          position:item.position,
-          draw:draw.draw || "--",
-          date:draw.date || ""
+
+          number,
+
+          position,
+
+          draw:
+          draw.draw
+          ||
+          "--",
+
+          date:
+          drawDate,
+
+          timestamp:
+          parseResultDate(
+            drawDate
+          ),
+
+          matchType:
+          number === favourite
+          ?
+          "EXACT"
+          :
+          "PUSINGAN"
+
         });
 
       }
 
-    });
+
+      addMatch(
+        draw.first,
+        "1st"
+      );
+
+      addMatch(
+        draw.second,
+        "2nd"
+      );
+
+      addMatch(
+        draw.third,
+        "3rd"
+      );
 
 
-    if(Array.isArray(draw.special)){
+      if(
+        Array.isArray(
+          draw.special
+        )
+      ){
 
-      draw.special.forEach(number=>{
-
-        if(permutations.includes(number)){
-
-          appearances.push({
+        draw.special
+        .forEach(
+          number =>
+          addMatch(
             number,
-            position:"Special",
-            draw:draw.draw || "--",
-            date:draw.date || ""
-          });
+            "Special"
+          )
+        );
 
-        }
+      }
 
-      });
+
+      if(
+        Array.isArray(
+          draw.consolation
+        )
+      ){
+
+        draw.consolation
+        .forEach(
+          number =>
+          addMatch(
+            number,
+            "Consolation"
+          )
+        );
+
+      }
 
     }
+  );
 
 
-    if(Array.isArray(draw.consolation)){
+  /* newest date first */
+  appearances.sort(
+    (a,b)=>{
 
-      draw.consolation.forEach(number=>{
+      if(
+        b.timestamp !==
+        a.timestamp
+      ){
 
-        if(permutations.includes(number)){
+        return(
+          b.timestamp
+          -
+          a.timestamp
+        );
 
-          appearances.push({
-            number,
-            position:"Consolation",
-            draw:draw.draw || "--",
-            date:draw.date || ""
-          });
+      }
 
-        }
+      /* Exact priority if same date */
 
-      });
+      if(
+        a.matchType === "EXACT"
+        &&
+        b.matchType !== "EXACT"
+      ){
+        return -1;
+      }
+
+      if(
+        b.matchType === "EXACT"
+        &&
+        a.matchType !== "EXACT"
+      ){
+        return 1;
+      }
+
+      return 0;
 
     }
+  );
 
-  });
 
   return appearances;
 
@@ -1014,18 +1285,26 @@ function findInDatabase(
 
 
 /* =========================
-FAVOURITE TABLE
+FAV TABLE
 ========================= */
 
 function setSlots(count){
 
   slotCount = count;
 
-  document.getElementById("slot10")
-  .classList.toggle("active",count===10);
+  document
+  .getElementById("slot10")
+  .classList.toggle(
+    "active",
+    count===10
+  );
 
-  document.getElementById("slot20")
-  .classList.toggle("active",count===20);
+  document
+  .getElementById("slot20")
+  .classList.toggle(
+    "active",
+    count===20
+  );
 
   renderFavTable();
 
@@ -1035,16 +1314,24 @@ function setSlots(count){
 function renderFavTable(){
 
   const body =
-  document.getElementById("favBody");
+  document.getElementById(
+    "favBody"
+  );
 
   body.innerHTML = "";
 
-  for(let i=0;i<slotCount;i++){
+
+  for(
+    let i=0;
+    i<slotCount;
+    i++
+  ){
 
     const fav =
     favourites[i];
 
     let permutations = [];
+
     let charta = {
       hit:false,
       best:null,
@@ -1054,40 +1341,64 @@ function renderFavTable(){
     let totalMarketHits = 0;
 
 
-    if(/^[0-9]{4}$/.test(fav)){
+    if(
+      /^[0-9]{4}$/.test(
+        fav
+      )
+    ){
 
       permutations =
-      getPermutations(fav);
+      getPermutations(
+        fav
+      );
 
       charta =
-      checkCharta(fav);
+      checkCharta(
+        fav
+      );
 
-      Object.keys(databases)
-      .forEach(key=>{
 
-        totalMarketHits +=
-        findInDatabase(
-          databases[key],
-          permutations
-        ).length;
+      Object.keys(
+        databases
+      )
+      .forEach(
+        key=>{
 
-      });
+          totalMarketHits +=
+          findAllHistory(
+            databases[key],
+            fav,
+            permutations
+          ).length;
+
+        }
+      );
 
     }
 
 
     const tr =
-    document.createElement("tr");
+    document.createElement(
+      "tr"
+    );
 
 
-    if(i===selectedIndex){
-      tr.classList.add("selected-row");
+    if(
+      i===selectedIndex
+    ){
+
+      tr.classList.add(
+        "selected-row"
+      );
+
     }
 
 
     tr.innerHTML =
     `
-    <td>${i+1}</td>
+    <td>
+      ${i+1}
+    </td>
 
     <td>
       <input
@@ -1101,9 +1412,7 @@ function renderFavTable(){
     <td>
       ${
         permutations.length
-        ?
-        permutations.length
-        :
+        ||
         "-"
       }
     </td>
@@ -1136,7 +1445,7 @@ function renderFavTable(){
         ?
         totalMarketHits>0
         ?
-        '<span class="found">✓ '+totalMarketHits+' HIT</span>'
+        '<span class="found">✓ '+totalMarketHits+' RECORD</span>'
         :
         '<span class="notfound">✕ NOT FOUND</span>'
         :
@@ -1173,6 +1482,7 @@ function renderFavTable(){
         selectedIndex = i;
 
         renderFavTable();
+
         renderSelectedDetail();
 
       }
@@ -1184,7 +1494,10 @@ function renderFavTable(){
   }
 
 
-  document.querySelectorAll(".fav-input")
+  document
+  .querySelectorAll(
+    ".fav-input"
+  )
   .forEach(input=>{
 
     input.addEventListener(
@@ -1198,27 +1511,29 @@ function renderFavTable(){
         );
 
         const index =
-        Number(this.dataset.index);
+        Number(
+          this.dataset.index
+        );
 
         favourites[index] =
         this.value;
 
-        selectedIndex = index;
+        selectedIndex =
+        index;
 
         saveFavourites();
 
-        if(this.value.length===4){
+
+        if(
+          this.value.length===4
+        ){
 
           renderFavTable();
-          renderSelectedDetail();
 
         }
 
-        else{
 
-          renderSelectedDetail();
-
-        }
+        renderSelectedDetail();
 
       }
     );
@@ -1229,15 +1544,22 @@ function renderFavTable(){
 
 
 /* =========================
-SELECTED DETAIL
+DETAIL
 ========================= */
 
 function renderSelectedDetail(){
 
   const fav =
-  favourites[selectedIndex];
+  favourites[
+    selectedIndex
+  ];
 
-  if(!/^[0-9]{4}$/.test(fav)){
+
+  if(
+    !/^[0-9]{4}$/.test(
+      fav
+    )
+  ){
 
     document.getElementById(
       "permutationDetail"
@@ -1260,10 +1582,15 @@ function renderSelectedDetail(){
 
 
   const permutations =
-  getPermutations(fav);
+  getPermutations(
+    fav
+  );
+
 
   const charta =
-  checkCharta(fav);
+  checkCharta(
+    fav
+  );
 
 
   renderPermutationDetail(
@@ -1317,20 +1644,23 @@ function renderPermutationDetail(
   `;
 
 
-  permutations.forEach(number=>{
+  permutations
+  .forEach(
+    number=>{
 
-    html +=
-    `
-    <div class="perm">
-      ${number}
-    </div>
-    `;
+      html +=
+      `
+      <div class="perm">
+        ${number}
+      </div>
+      `;
 
-  });
+    }
+  );
 
 
   html +=
-  `</div>`;
+  "</div>";
 
 
   box.innerHTML = html;
@@ -1339,7 +1669,7 @@ function renderPermutationDetail(
 
 
 /* =========================
-HIT DETAIL
+CHARTA DETAIL
 ========================= */
 
 function renderHitDetail(
@@ -1427,7 +1757,7 @@ function renderMarketDetail(
   permutations
 ){
 
-  let html =
+  let summary =
   `
   <div class="market-table">
 
@@ -1437,14 +1767,18 @@ function renderMarketDetail(
       <tr>
         <th>MARKET</th>
         <th>STATUS</th>
-        <th>HIT PUSINGAN</th>
-        <th>TOTAL</th>
-        <th>LATEST</th>
+        <th>LATEST DATE</th>
+        <th>HIT NO.</th>
+        <th>TYPE</th>
+        <th>POSITION</th>
       </tr>
     </thead>
 
     <tbody>
   `;
+
+
+  const allMarketRecords = [];
 
 
   [
@@ -1453,78 +1787,101 @@ function renderMarketDetail(
     "damacai",
     "cashsweep"
   ]
-  .forEach(key=>{
+  .forEach(
+    key=>{
 
-    const hits =
-    findInDatabase(
-      databases[key],
-      permutations
-    );
-
-    const latest =
-    hits[0];
-
-
-    html +=
-    `
-    <tr>
-
-      <td>
-        ${dbNames[key]}
-      </td>
-
-      <td>
-        ${
-          hits.length
-          ?
-          '<span class="found">✓ FOUND</span>'
-          :
-          '<span class="notfound">✕ NOT FOUND</span>'
-        }
-      </td>
-
-      <td class="best">
-        ${
-          hits.length
-          ?
-          hits.map(x=>x.number)
-          .filter(
-            (x,i,a)=>
-            a.indexOf(x)===i
-          )
-          .slice(0,3)
-          .join(", ")
-          :
-          "-"
-        }
-      </td>
-
-      <td>
-        ${hits.length}
-      </td>
-
-      <td>
-        ${
-          latest
-          ?
-          `
-          ${latest.draw}
-          <div class="market-detail">
-            ${latest.position}
-          </div>
-          `
-          :
-          "-"
-        }
-      </td>
-
-    </tr>
-    `;
-
-  });
+      const hits =
+      findAllHistory(
+        databases[key],
+        fav,
+        permutations
+      );
 
 
-  html +=
+      const latest =
+      hits[0]
+      ||
+      null;
+
+
+      allMarketRecords.push({
+        key,
+        hits
+      });
+
+
+      summary +=
+      `
+      <tr>
+
+        <td>
+          ${dbNames[key]}
+        </td>
+
+        <td>
+          ${
+            hits.length
+            ?
+            '<span class="found">✓ FOUND ('+hits.length+')</span>'
+            :
+            '<span class="notfound">✕ NOT FOUND</span>'
+          }
+        </td>
+
+        <td>
+          ${
+            latest
+            ?
+            formatResultDate(
+              latest.date
+            )
+            :
+            "-"
+          }
+        </td>
+
+        <td class="best">
+          ${
+            latest
+            ?
+            latest.number
+            :
+            "-"
+          }
+        </td>
+
+        <td>
+          ${
+            latest
+            ?
+            latest.matchType==="EXACT"
+            ?
+            '<span class="exact">★ EXACT</span>'
+            :
+            '<span class="permutation">PUSINGAN</span>'
+            :
+            "-"
+          }
+        </td>
+
+        <td>
+          ${
+            latest
+            ?
+            latest.position
+            :
+            "-"
+          }
+        </td>
+
+      </tr>
+      `;
+
+    }
+  );
+
+
+  summary +=
   `
     </tbody>
   </table>
@@ -1532,9 +1889,115 @@ function renderMarketDetail(
   `;
 
 
+/* FULL RECORD HISTORY */
+
+  let historyHtml = "";
+
+
+  allMarketRecords
+  .forEach(
+    market=>{
+
+      if(
+        market.hits.length===0
+      ){
+        return;
+      }
+
+
+      historyHtml +=
+      `
+      <div class="history-market">
+
+        <div class="history-market-title">
+
+          <span>
+            ${dbNames[market.key]}
+          </span>
+
+          <span class="found">
+            ${market.hits.length}
+            RECORD
+          </span>
+
+        </div>
+
+
+        <table class="history-table">
+
+          <thead>
+            <tr>
+              <th>DATE</th>
+              <th>NUMBER</th>
+              <th>TYPE</th>
+              <th>POSITION</th>
+              <th>DRAW</th>
+            </tr>
+          </thead>
+
+          <tbody>
+      `;
+
+
+      market.hits
+      .forEach(
+        hit=>{
+
+          historyHtml +=
+          `
+          <tr>
+
+            <td>
+              ${formatResultDate(hit.date)}
+            </td>
+
+            <td class="best">
+              ${hit.number}
+            </td>
+
+            <td>
+              ${
+                hit.matchType==="EXACT"
+                ?
+                '<span class="exact">★ EXACT</span>'
+                :
+                '<span class="permutation">PUSINGAN</span>'
+              }
+            </td>
+
+            <td>
+              ${hit.position}
+            </td>
+
+            <td>
+              ${hit.draw}
+            </td>
+
+          </tr>
+          `;
+
+        }
+      );
+
+
+      historyHtml +=
+      `
+          </tbody>
+        </table>
+
+      </div>
+      `;
+
+    }
+  );
+
+
   document.getElementById(
     "marketDetail"
-  ).innerHTML = html;
+  ).innerHTML =
+  summary
+  +
+  historyHtml;
 
 }
 
@@ -1564,7 +2027,8 @@ function clearFavourite(index){
 
   saveFavourites();
 
-  selectedIndex = index;
+  selectedIndex =
+  index;
 
   renderFavTable();
 
@@ -1575,8 +2039,10 @@ function clearFavourite(index){
 
 function clearCharta(){
 
-  chartInputs.forEach(
-    input=>input.value=""
+  chartInputs
+  .forEach(
+    input =>
+    input.value=""
   );
 
   localStorage.removeItem(
@@ -1609,7 +2075,9 @@ function saveFavourites(){
 
   localStorage.setItem(
     "4dFavV42",
-    JSON.stringify(favourites)
+    JSON.stringify(
+      favourites
+    )
   );
 
 }
@@ -1639,9 +2107,14 @@ function restore(){
       savedCharta.length===16
     ){
 
-      savedCharta.forEach(
+      savedCharta
+      .forEach(
         (value,index)=>{
-          chartInputs[index].value=value;
+
+          chartInputs[index]
+          .value =
+          value;
+
         }
       );
 
@@ -1658,12 +2131,20 @@ function restore(){
     );
 
 
-    if(Array.isArray(savedFav)){
+    if(
+      Array.isArray(
+        savedFav
+      )
+    ){
 
-      savedFav.slice(0,20)
+      savedFav
+      .slice(0,20)
       .forEach(
         (value,index)=>{
-          favourites[index]=value;
+
+          favourites[index] =
+          value;
+
         }
       );
 
