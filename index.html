@@ -3,11 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<title>4D Number Lab V3.2</title>
+<title>4D Number Lab V3.3</title>
 
 <style>
-
 *{
   box-sizing:border-box;
   margin:0;
@@ -16,7 +14,7 @@
 
 body{
   background:#06101a;
-  color:#ffffff;
+  color:#fff;
   font-family:Arial,Helvetica,sans-serif;
   min-height:100vh;
   padding:12px;
@@ -165,9 +163,7 @@ button{
 }
 
 
-/* =========================
-   MANUAL CHARTA
-========================= */
+/* CHARTA */
 
 .charta-top{
   display:flex;
@@ -232,6 +228,13 @@ button{
   border-radius:9px;
 }
 
+.charta-status{
+  margin-top:8px;
+  text-align:center;
+  color:#43df83;
+  font-size:9px;
+}
+
 .charta-note{
   margin-top:8px;
   color:#718399;
@@ -240,18 +243,35 @@ button{
   text-align:center;
 }
 
-.charta-status{
-  margin-top:7px;
+.pattern-box{
+  margin-top:9px;
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:6px;
+}
+
+.pattern-item{
+  background:#07131e;
+  border-radius:7px;
+  padding:8px;
   text-align:center;
-  color:#43df83;
-  font-size:9px;
-  min-height:12px;
+}
+
+.pattern-item span{
+  display:block;
+  color:#63758a;
+  font-size:7px;
+}
+
+.pattern-item strong{
+  display:block;
+  color:#ffc928;
+  font-size:10px;
+  margin-top:4px;
 }
 
 
-/* =========================
-   DOUBLE FOCUS BOX
-========================= */
+/* FOCUS */
 
 .focus-list{
   display:grid;
@@ -301,9 +321,7 @@ button{
 }
 
 
-/* =========================
-   GENERATOR
-========================= */
+/* GENERATOR */
 
 .generator{
   text-align:center;
@@ -332,14 +350,8 @@ button{
   border-radius:9px;
 }
 
-.generate:active{
-  transform:scale(.99);
-}
 
-
-/* =========================
-   STATS
-========================= */
+/* STATS */
 
 .stats{
   display:grid;
@@ -404,9 +416,7 @@ button{
 }
 
 
-/* =========================
-   PICKS
-========================= */
+/* PICKS */
 
 .picks{
   display:grid;
@@ -443,9 +453,7 @@ button{
 }
 
 
-/* =========================
-   HISTORY
-========================= */
+/* HISTORY */
 
 .history-head{
   display:flex;
@@ -489,31 +497,22 @@ button{
 </style>
 </head>
 
-
 <body>
 
 <div class="app">
 
-
-<!-- HEADER -->
-
 <div class="header">
-
   <h1>4D NUMBER LAB</h1>
-
   <div class="version">
-    V3.2 • CHARTA ENGINE
+    V3.3 • MULTI-DIRECTION CHARTA ENGINE
   </div>
-
   <p>
-    Historical Data + Manual Charta + Double Focus
+    Horizontal + Vertical + Diagonal + Reverse Pair + Double Focus
   </p>
-
 </div>
 
 
-
-<!-- MANUAL CHARTA -->
+<!-- CHARTA -->
 
 <div class="card">
 
@@ -534,7 +533,7 @@ button{
 
   <div class="charta-grid">
 
-    <div></div>
+    <div class="row-label">R1</div>
 
     <input class="chart-input" maxlength="1">
     <input class="chart-input" maxlength="1">
@@ -581,22 +580,46 @@ button{
   </div>
 
 
+  <div class="pattern-box">
+
+    <div class="pattern-item">
+      <span>HORIZONTAL</span>
+      <strong id="horizontalInfo">--</strong>
+    </div>
+
+    <div class="pattern-item">
+      <span>VERTICAL</span>
+      <strong id="verticalInfo">--</strong>
+    </div>
+
+    <div class="pattern-item">
+      <span>DIAGONAL</span>
+      <strong id="diagonalInfo">--</strong>
+    </div>
+
+    <div class="pattern-item">
+      <span>STRONG CHARTA PAIR</span>
+      <strong id="chartPairInfo">--</strong>
+    </div>
+
+  </div>
+
+
   <div class="charta-note">
-    Isi 16 digit mengikut carta anda.
-    Charta akan digabungkan dengan historical database
-    untuk Statistical Mode.
+    Engine membaca carta dari beberapa arah.
+    Charta manual digunakan bersama historical database.
   </div>
 
 </div>
 
 
 
-<!-- DOUBLE FOCUS -->
+<!-- FOCUS PICKS -->
 
 <div class="card">
 
   <div class="title">
-    CHARTA PICKS • DOUBLE FOCUS
+    CHARTA PICKS • MULTI-DIRECTION DOUBLE FOCUS
   </div>
 
   <div
@@ -822,74 +845,33 @@ button{
   <div class="stats">
 
     <div class="stat">
-
       <span>HOT DIGITS</span>
-
-      <strong
-        class="green"
-        id="hotDigits">
-        --
-      </strong>
-
+      <strong class="green" id="hotDigits">--</strong>
     </div>
 
-
     <div class="stat">
-
       <span>COLD DIGITS</span>
-
-      <strong
-        class="blue"
-        id="coldDigits">
-        --
-      </strong>
-
+      <strong class="blue" id="coldDigits">--</strong>
     </div>
 
-
     <div class="stat">
-
       <span>STRONG PAIR</span>
-
-      <strong
-        class="yellow"
-        id="strongPair">
-        --
-      </strong>
-
+      <strong class="yellow" id="strongPair">--</strong>
     </div>
 
-
     <div class="stat">
-
       <span>NUMBERS ANALYSED</span>
-
-      <strong id="dataSize">
-        0
-      </strong>
-
+      <strong id="dataSize">0</strong>
     </div>
 
-
     <div class="stat">
-
       <span>REPEAT DIGIT RATE</span>
-
-      <strong id="repeatRate">
-        --
-      </strong>
-
+      <strong id="repeatRate">--</strong>
     </div>
 
-
     <div class="stat">
-
       <span>AVG DIGIT SUM</span>
-
-      <strong id="avgSum">
-        --
-      </strong>
-
+      <strong id="avgSum">--</strong>
     </div>
 
   </div>
@@ -987,102 +969,108 @@ button{
 
 
 <div class="notice">
-
-  Charta Engine menggunakan carta manual dan historical data
-  untuk memberikan Pattern Score.
-  Ia bukan probability atau jaminan keputusan cabutan.
-
+  Multi-Direction Charta Engine membaca corak carta dan historical data.
+  Pattern Score bukan probability atau jaminan keputusan cabutan.
 </div>
 
 </div>
-
 
 
 <script>
 
-/* ==========================================
-   SETTINGS
-========================================== */
+/* SETTINGS */
 
-let selectedMarket =
-"Sports Toto";
-
-let selectedMode =
-"statistical";
-
-let selectedCount =
-10;
-
-let selectedWindow =
-10;
+let selectedMarket = "Sports Toto";
+let selectedMode = "statistical";
+let selectedCount = 10;
+let selectedWindow = 10;
 
 let database = null;
-
 let activeDraws = [];
-
 let numbersData = [];
 
 let chartaApplied = false;
 
-let chartaDigits = [];
+let chartMatrix = [];
 
-let chartaRows = [];
-
-let focusResults = [];
-
+let chartHorizontal = [];
+let chartVertical = [];
+let chartDiagonal = [];
+let chartReverse = [];
+let chartPairs = {};
 
 let historyData =
 JSON.parse(
-  localStorage.getItem(
-    "4dHistoryV32"
-  )
+  localStorage.getItem("4dHistoryV33")
   || "[]"
 );
 
 
-
-/* ==========================================
-   DATABASE FILES
-========================================== */
+/* DATABASE */
 
 const databaseFiles = {
 
-  "Sports Toto":
-  "data/toto.json",
-
-  "Magnum":
-  "data/magnum.json",
-
-  "Da Ma Cai":
-  "data/damacai.json",
-
-  "Cash Sweep":
-  "data/cashsweep.json"
+  "Sports Toto":"data/toto.json",
+  "Magnum":"data/magnum.json",
+  "Da Ma Cai":"data/damacai.json",
+  "Cash Sweep":"data/cashsweep.json"
 
 };
 
 
+/* INPUT */
 
-/* ==========================================
-   LOAD DATABASE
-========================================== */
+const chartInputs =
+document.querySelectorAll(
+  ".chart-input"
+);
+
+
+chartInputs.forEach(
+  (input,index)=>{
+
+    input.addEventListener(
+      "input",
+      function(){
+
+        this.value =
+        this.value.replace(
+          /[^0-9]/g,
+          ""
+        );
+
+        if(
+          this.value.length === 1
+          &&
+          chartInputs[index+1]
+        ){
+
+          chartInputs[index+1]
+          .focus();
+
+        }
+
+      }
+    );
+
+  }
+);
+
+
+/* LOAD DB */
 
 async function loadDatabase(){
 
   database = null;
-
   activeDraws = [];
-
   numbersData = [];
 
   resetStatistics();
-
 
   const status =
   document.getElementById(
     "dbStatus"
   );
-
 
   status.className =
   "loading";
@@ -1098,16 +1086,10 @@ async function loadDatabase(){
       selectedMarket
     ];
 
-
     const response =
     await fetch(
-      file
-      +
-      "?v="
-      +
-      Date.now()
+      file + "?v=" + Date.now()
     );
-
 
     if(!response.ok){
 
@@ -1117,13 +1099,10 @@ async function loadDatabase(){
 
     }
 
-
     database =
     await response.json();
 
-
     applyWindow();
-
 
     status.className =
     "db-live";
@@ -1131,11 +1110,9 @@ async function loadDatabase(){
     status.innerText =
     "REAL DATA ✓";
 
-
     updateDatabaseInfo();
 
     calculateAllStatistics();
-
 
     if(chartaApplied){
 
@@ -1145,7 +1122,6 @@ async function loadDatabase(){
 
   }
 
-
   catch(error){
 
     status.className =
@@ -1154,30 +1130,12 @@ async function loadDatabase(){
     status.innerText =
     "NOT CONNECTED";
 
-
-    document.getElementById(
-      "latestDraw"
-    ).innerText =
-    "--";
-
-
-    document.getElementById(
-      "lastUpdated"
-    ).innerText =
-    "--";
-
-
-    resetStatistics();
-
   }
 
 }
 
 
-
-/* ==========================================
-   WINDOW
-========================================== */
+/* WINDOW */
 
 function selectWindow(
   button,
@@ -1187,26 +1145,23 @@ function selectWindow(
   selectedWindow =
   value;
 
-
   document.querySelectorAll(
     ".window"
   )
-  .forEach(btn=>
+  .forEach(
+    btn =>
     btn.classList.remove(
       "active"
     )
   );
 
-
   button.classList.add(
     "active"
   );
 
-
   applyWindow();
 
   calculateAllStatistics();
-
 
   if(chartaApplied){
 
@@ -1215,7 +1170,6 @@ function selectWindow(
   }
 
 }
-
 
 
 function applyWindow(){
@@ -1228,14 +1182,9 @@ function applyWindow(){
     )
   ){
 
-    activeDraws = [];
-
-    numbersData = [];
-
     return;
 
   }
-
 
   if(
     selectedWindow ===
@@ -1257,37 +1206,31 @@ function applyWindow(){
 
   }
 
-
   flattenDatabase();
 
 }
 
 
-
-/* ==========================================
-   FLATTEN HISTORICAL DATA
-========================================== */
+/* FLATTEN */
 
 function flattenDatabase(){
 
   numbersData = [];
 
-
   activeDraws.forEach(
     (draw,index)=>{
 
       const weight =
-      recencyWeight(index);
-
+      Math.max(
+        0.72,
+        1-index*0.028
+      );
 
       const main = [
-
         draw.first,
         draw.second,
         draw.third
-
       ];
-
 
       main.forEach(
         number=>{
@@ -1295,17 +1238,14 @@ function flattenDatabase(){
           if(valid4D(number)){
 
             numbersData.push({
-
               number,
               weight
-
             });
 
           }
 
         }
       );
-
 
       if(
         Array.isArray(
@@ -1319,10 +1259,8 @@ function flattenDatabase(){
             if(valid4D(number)){
 
               numbersData.push({
-
                 number,
                 weight
-
               });
 
             }
@@ -1331,7 +1269,6 @@ function flattenDatabase(){
         );
 
       }
-
 
       if(
         Array.isArray(
@@ -1345,10 +1282,8 @@ function flattenDatabase(){
             if(valid4D(number)){
 
               numbersData.push({
-
                 number,
                 weight
-
               });
 
             }
@@ -1364,90 +1299,21 @@ function flattenDatabase(){
 }
 
 
-
-function recencyWeight(index){
-
-  return Math.max(
-
-    0.72,
-
-    1 -
-    index * 0.028
-
-  );
-
-}
-
-
-
 function valid4D(number){
 
   return(
-
     typeof number ===
     "string"
-
     &&
-
     /^[0-9]{4}$/.test(
       number
     )
-
   );
 
 }
 
 
-
-/* ==========================================
-   CHARTA INPUT AUTO MOVE
-========================================== */
-
-const chartInputs =
-document.querySelectorAll(
-  ".chart-input"
-);
-
-
-chartInputs.forEach(
-  (input,index)=>{
-
-    input.addEventListener(
-      "input",
-      function(){
-
-        this.value =
-        this.value.replace(
-          /[^0-9]/g,
-          ""
-        );
-
-
-        if(
-          this.value.length === 1
-          &&
-          chartInputs[
-            index + 1
-          ]
-        ){
-
-          chartInputs[
-            index + 1
-          ].focus();
-
-        }
-
-      }
-    );
-
-  }
-);
-
-
-
-/* ==========================================
-   APPLY CHARTA
-========================================== */
+/* APPLY CHARTA */
 
 function applyCharta(){
 
@@ -1458,13 +1324,10 @@ function applyCharta(){
     input.value.trim()
   );
 
-
   if(
     values.some(
       value =>
-      !/^[0-9]$/.test(
-        value
-      )
+      !/^[0-9]$/.test(value)
     )
   ){
 
@@ -1478,28 +1341,26 @@ function applyCharta(){
   }
 
 
-  chartaDigits =
-  [...values];
+  chartMatrix = [
 
+    values.slice(0,4),
 
-  chartaRows = [
+    values.slice(4,8),
 
-    values.slice(0,4).join(""),
+    values.slice(8,12),
 
-    values.slice(4,8).join(""),
-
-    values.slice(8,12).join(""),
-
-    values.slice(12,16).join("")
+    values.slice(12,16)
 
   ];
 
+
+  buildChartaPatterns();
 
   chartaApplied = true;
 
 
   localStorage.setItem(
-    "4dChartaV32",
+    "4dChartaV33",
     JSON.stringify(values)
   );
 
@@ -1507,35 +1368,269 @@ function applyCharta(){
   document.getElementById(
     "chartaStatus"
   ).innerText =
+  "MULTI-DIRECTION CHARTA APPLIED ✓";
 
-  "CHARTA APPLIED ✓  "
-  +
-  chartaRows.join(
-    " • "
-  );
 
+  updatePatternDisplay();
 
   generateFocusPicks();
 
 }
 
 
+/* BUILD PATTERNS */
 
-/* ==========================================
-   RESTORE CHARTA
-========================================== */
+function buildChartaPatterns(){
+
+  chartHorizontal = [];
+  chartVertical = [];
+  chartDiagonal = [];
+  chartReverse = [];
+  chartPairs = {};
+
+
+  /* HORIZONTAL */
+
+  for(let r=0;r<4;r++){
+
+    chartHorizontal.push(
+      chartMatrix[r].join("")
+    );
+
+  }
+
+
+  /* VERTICAL */
+
+  for(let c=0;c<4;c++){
+
+    let number = "";
+
+    for(let r=0;r<4;r++){
+
+      number +=
+      chartMatrix[r][c];
+
+    }
+
+    chartVertical.push(
+      number
+    );
+
+  }
+
+
+  /* MAIN DIAGONALS */
+
+  let diag1 = "";
+  let diag2 = "";
+
+  for(let i=0;i<4;i++){
+
+    diag1 +=
+    chartMatrix[i][i];
+
+    diag2 +=
+    chartMatrix[i][3-i];
+
+  }
+
+  chartDiagonal.push(
+    diag1,
+    diag2
+  );
+
+
+  /* X / CROSS PATTERNS */
+
+  const cross1 =
+    chartMatrix[0][0]
+    +
+    chartMatrix[1][1]
+    +
+    chartMatrix[2][1]
+    +
+    chartMatrix[3][0];
+
+  const cross2 =
+    chartMatrix[0][3]
+    +
+    chartMatrix[1][2]
+    +
+    chartMatrix[2][2]
+    +
+    chartMatrix[3][3];
+
+  const cross3 =
+    chartMatrix[0][1]
+    +
+    chartMatrix[1][2]
+    +
+    chartMatrix[2][1]
+    +
+    chartMatrix[3][2];
+
+  const cross4 =
+    chartMatrix[0][2]
+    +
+    chartMatrix[1][1]
+    +
+    chartMatrix[2][2]
+    +
+    chartMatrix[3][1];
+
+  chartDiagonal.push(
+    cross1,
+    cross2,
+    cross3,
+    cross4
+  );
+
+
+  /* REVERSE NUMBERS */
+
+  const allLines = [
+
+    ...chartHorizontal,
+    ...chartVertical,
+    ...chartDiagonal
+
+  ];
+
+  allLines.forEach(
+    line=>{
+
+      const reverse =
+      line
+      .split("")
+      .reverse()
+      .join("");
+
+      chartReverse.push(
+        reverse
+      );
+
+    }
+  );
+
+
+  /* PAIRS */
+
+  const pairLines = [
+
+    ...chartHorizontal,
+    ...chartVertical,
+    ...chartDiagonal
+
+  ];
+
+
+  pairLines.forEach(
+    line=>{
+
+      for(let i=0;i<3;i++){
+
+        const pair =
+        line[i]
+        +
+        line[i+1];
+
+        chartPairs[pair] =
+        (
+          chartPairs[pair]
+          ||
+          0
+        )
+        +
+        1;
+
+
+        const reversePair =
+        pair[1]
+        +
+        pair[0];
+
+        chartPairs[reversePair] =
+        (
+          chartPairs[
+            reversePair
+          ]
+          ||
+          0
+        )
+        +
+        0.6;
+
+      }
+
+    }
+  );
+
+}
+
+
+/* DISPLAY PATTERN */
+
+function updatePatternDisplay(){
+
+  document.getElementById(
+    "horizontalInfo"
+  ).innerText =
+  chartHorizontal
+  .slice(0,2)
+  .join(" • ");
+
+
+  document.getElementById(
+    "verticalInfo"
+  ).innerText =
+  chartVertical
+  .slice(0,2)
+  .join(" • ");
+
+
+  document.getElementById(
+    "diagonalInfo"
+  ).innerText =
+  chartDiagonal
+  .slice(0,2)
+  .join(" • ");
+
+
+  const strongest =
+  Object.entries(
+    chartPairs
+  )
+  .sort(
+    (a,b)=>
+    b[1]-a[1]
+  )[0];
+
+
+  document.getElementById(
+    "chartPairInfo"
+  ).innerText =
+  strongest
+  ?
+  strongest[0]
+  :
+  "--";
+
+}
+
+
+/* RESTORE CHARTA */
 
 function restoreCharta(){
 
   const saved =
   JSON.parse(
     localStorage.getItem(
-      "4dChartaV32"
+      "4dChartaV33"
     )
     ||
     "null"
   );
-
 
   if(
     !Array.isArray(saved)
@@ -1547,57 +1642,42 @@ function restoreCharta(){
 
   }
 
-
   saved.forEach(
     (value,index)=>{
 
-      chartInputs[
-        index
-      ].value =
+      chartInputs[index].value =
       value;
 
     }
   );
 
+  chartMatrix = [
 
-  chartaDigits =
-  [...saved];
+    saved.slice(0,4),
 
+    saved.slice(4,8),
 
-  chartaRows = [
+    saved.slice(8,12),
 
-    saved.slice(0,4).join(""),
-
-    saved.slice(4,8).join(""),
-
-    saved.slice(8,12).join(""),
-
-    saved.slice(12,16).join("")
+    saved.slice(12,16)
 
   ];
 
+  buildChartaPatterns();
 
-  chartaApplied =
-  true;
-
+  chartaApplied = true;
 
   document.getElementById(
     "chartaStatus"
   ).innerText =
+  "SAVED CHARTA ✓";
 
-  "SAVED CHARTA ✓  "
-  +
-  chartaRows.join(
-    " • "
-  );
+  updatePatternDisplay();
 
 }
 
 
-
-/* ==========================================
-   CLEAR CHARTA
-========================================== */
+/* CLEAR CHARTA */
 
 function clearCharta(){
 
@@ -1606,32 +1686,42 @@ function clearCharta(){
     input.value = ""
   );
 
+  chartaApplied = false;
 
-  chartaApplied =
-  false;
-
-  chartaDigits = [];
-
-  chartaRows = [];
-
-  focusResults = [];
-
+  chartMatrix = [];
+  chartHorizontal = [];
+  chartVertical = [];
+  chartDiagonal = [];
+  chartReverse = [];
+  chartPairs = {};
 
   localStorage.removeItem(
-    "4dChartaV32"
+    "4dChartaV33"
   );
-
 
   document.getElementById(
     "chartaStatus"
-  ).innerText =
-  "";
+  ).innerText = "";
 
+  document.getElementById(
+    "horizontalInfo"
+  ).innerText = "--";
+
+  document.getElementById(
+    "verticalInfo"
+  ).innerText = "--";
+
+  document.getElementById(
+    "diagonalInfo"
+  ).innerText = "--";
+
+  document.getElementById(
+    "chartPairInfo"
+  ).innerText = "--";
 
   document.getElementById(
     "focusList"
   ).innerHTML =
-
   `
   <div class="empty">
     Apply Charta dahulu.
@@ -1641,16 +1731,12 @@ function clearCharta(){
 }
 
 
-
-/* ==========================================
-   HISTORICAL FREQUENCY
-========================================== */
+/* HISTORICAL FREQUENCY */
 
 function digitFrequency(){
 
   const freq =
   Array(10).fill(0);
-
 
   numbersData.forEach(
     item=>{
@@ -1672,11 +1758,9 @@ function digitFrequency(){
     }
   );
 
-
   return freq;
 
 }
-
 
 
 function positionFrequency(){
@@ -1690,15 +1774,10 @@ function positionFrequency(){
 
   ];
 
-
   numbersData.forEach(
     item=>{
 
-      for(
-        let i=0;
-        i<4;
-        i++
-      ){
+      for(let i=0;i<4;i++){
 
         positions[i][
           Number(
@@ -1713,32 +1792,24 @@ function positionFrequency(){
     }
   );
 
-
   return positions;
 
 }
-
 
 
 function pairFrequency(){
 
   const pairs = {};
 
-
   numbersData.forEach(
     item=>{
 
-      for(
-        let i=0;
-        i<3;
-        i++
-      ){
+      for(let i=0;i<3;i++){
 
         const pair =
         item.number[i]
         +
         item.number[i+1];
-
 
         pairs[pair] =
         (
@@ -1754,171 +1825,46 @@ function pairFrequency(){
     }
   );
 
-
   return pairs;
 
 }
 
 
-
-/* ==========================================
-   CHARTA FREQUENCY
-========================================== */
-
-function chartaFrequency(){
-
-  const freq =
-  Array(10).fill(0);
-
-
-  chartaDigits.forEach(
-    digit=>{
-
-      freq[
-        Number(digit)
-      ]++;
-
-    }
-  );
-
-
-  return freq;
-
-}
-
-
-
-function chartaPositionFrequency(){
-
-  const positions = [
-
-    Array(10).fill(0),
-    Array(10).fill(0),
-    Array(10).fill(0),
-    Array(10).fill(0)
-
-  ];
-
-
-  chartaRows.forEach(
-    row=>{
-
-      for(
-        let i=0;
-        i<4;
-        i++
-      ){
-
-        positions[i][
-          Number(row[i])
-        ]++;
-
-      }
-
-    }
-  );
-
-
-  return positions;
-
-}
-
-
-
-function chartaPairFrequency(){
-
-  const pairs = {};
-
-
-  chartaRows.forEach(
-    row=>{
-
-      for(
-        let i=0;
-        i<3;
-        i++
-      ){
-
-        const pair =
-        row[i]
-        +
-        row[i+1];
-
-
-        pairs[pair] =
-        (
-          pairs[pair]
-          ||
-          0
-        )
-        +
-        1;
-
-      }
-
-    }
-  );
-
-
-  return pairs;
-
-}
-
-
-
-/* ==========================================
-   BASIC STATS
-========================================== */
+/* STATS */
 
 function getHotCold(){
 
   const freq =
   digitFrequency();
 
-
-  const data =
+  const sorted =
   freq.map(
     (count,digit)=>({
-
       digit,
       count
-
     })
-  );
-
-
-  const sorted =
-  [...data]
+  )
   .sort(
     (a,b)=>
-    b.count -
-    a.count
+    b.count-a.count
   );
-
 
   return{
 
     hot:
     sorted
     .slice(0,3)
-    .map(
-      item =>
-      item.digit
-    ),
+    .map(x=>x.digit),
 
     cold:
     sorted
     .slice(-3)
     .reverse()
-    .map(
-      item =>
-      item.digit
-    )
+    .map(x=>x.digit)
 
   };
 
 }
-
 
 
 function strongPair(){
@@ -1926,15 +1872,12 @@ function strongPair(){
   const pairs =
   pairFrequency();
 
-
   const sorted =
   Object.entries(pairs)
   .sort(
     (a,b)=>
-    b[1] -
-    a[1]
+    b[1]-a[1]
   );
-
 
   return(
     sorted[0]
@@ -1947,7 +1890,6 @@ function strongPair(){
 }
 
 
-
 function averageDigitSum(){
 
   if(
@@ -1958,9 +1900,7 @@ function averageDigitSum(){
 
   }
 
-
   let total = 0;
-
 
   numbersData.forEach(
     item=>{
@@ -1970,23 +1910,19 @@ function averageDigitSum(){
       .split("")
       .map(Number)
       .reduce(
-        (a,b)=>
-        a+b,
+        (a,b)=>a+b,
         0
       );
 
     }
   );
 
-
   return(
-    total
-    /
+    total /
     numbersData.length
   );
 
 }
-
 
 
 function repeatRate(){
@@ -1999,9 +1935,7 @@ function repeatRate(){
 
   }
 
-
   let repeat = 0;
-
 
   numbersData.forEach(
     item=>{
@@ -2019,48 +1953,14 @@ function repeatRate(){
     }
   );
 
-
   return(
-    repeat
-    /
-    numbersData.length
-    *
+    repeat /
+    numbersData.length *
     100
   );
 
 }
 
-
-
-function positionHot(){
-
-  const positions =
-  positionFrequency();
-
-
-  return positions.map(
-    freq=>{
-
-      const max =
-      Math.max(
-        ...freq
-      );
-
-
-      return(
-        freq.indexOf(max)
-      );
-
-    }
-  );
-
-}
-
-
-
-/* ==========================================
-   STAT DISPLAY
-========================================== */
 
 function calculateAllStatistics(){
 
@@ -2074,47 +1974,35 @@ function calculateAllStatistics(){
 
   }
 
-
   const hc =
   getHotCold();
-
 
   document.getElementById(
     "hotDigits"
   ).innerText =
-  hc.hot.join(
-    " • "
-  );
-
+  hc.hot.join(" • ");
 
   document.getElementById(
     "coldDigits"
   ).innerText =
-  hc.cold.join(
-    " • "
-  );
-
+  hc.cold.join(" • ");
 
   document.getElementById(
     "strongPair"
   ).innerText =
   strongPair();
 
-
   document.getElementById(
     "dataSize"
   ).innerText =
   numbersData.length;
 
-
   document.getElementById(
     "repeatRate"
   ).innerText =
-  repeatRate()
-  .toFixed(1)
+  repeatRate().toFixed(1)
   +
   "%";
-
 
   document.getElementById(
     "avgSum"
@@ -2123,87 +2011,65 @@ function calculateAllStatistics(){
   .toFixed(1);
 
 
-  const pos =
-  positionHot();
+  const positions =
+  positionFrequency();
 
+  for(let i=0;i<4;i++){
 
-  for(
-    let i=0;
-    i<4;
-    i++
-  ){
+    const max =
+    Math.max(
+      ...positions[i]
+    );
 
     document.getElementById(
-      "pos"
-      +
-      (i+1)
+      "pos"+(i+1)
     ).innerText =
-    pos[i];
+    positions[i]
+    .indexOf(max);
 
   }
 
 }
-
 
 
 function resetStatistics(){
 
   document.getElementById(
     "hotDigits"
-  ).innerText =
-  "--";
-
+  ).innerText = "--";
 
   document.getElementById(
     "coldDigits"
-  ).innerText =
-  "--";
-
+  ).innerText = "--";
 
   document.getElementById(
     "strongPair"
-  ).innerText =
-  "--";
-
+  ).innerText = "--";
 
   document.getElementById(
     "dataSize"
-  ).innerText =
-  "0";
-
+  ).innerText = "0";
 
   document.getElementById(
     "repeatRate"
-  ).innerText =
-  "--";
-
+  ).innerText = "--";
 
   document.getElementById(
     "avgSum"
-  ).innerText =
-  "--";
+  ).innerText = "--";
 
-
-  for(
-    let i=1;
-    i<=4;
-    i++
-  ){
+  for(let i=1;i<=4;i++){
 
     document.getElementById(
       "pos"+i
-    ).innerText =
-    "-";
+    ).innerText = "-";
 
   }
 
 }
 
 
-
-/* ==========================================
-   DB INFO
-========================================== */
+/* DB INFO */
 
 function updateDatabaseInfo(){
 
@@ -2211,10 +2077,8 @@ function updateDatabaseInfo(){
     return;
   }
 
-
   const latest =
   database.draws?.[0];
-
 
   document.getElementById(
     "latestDraw"
@@ -2222,7 +2086,6 @@ function updateDatabaseInfo(){
   latest?.draw
   ||
   "--";
-
 
   document.getElementById(
     "lastUpdated"
@@ -2234,10 +2097,7 @@ function updateDatabaseInfo(){
 }
 
 
-
-/* ==========================================
-   MARKET / MODE / COUNT
-========================================== */
+/* SELECT */
 
 function selectMarket(
   button,
@@ -2246,7 +2106,6 @@ function selectMarket(
 
   selectedMarket =
   market;
-
 
   document.querySelectorAll(
     ".market"
@@ -2258,11 +2117,9 @@ function selectMarket(
     )
   );
 
-
   button.classList.add(
     "active"
   );
-
 
   updateLabel();
 
@@ -2273,7 +2130,6 @@ function selectMarket(
 }
 
 
-
 function selectMode(
   button,
   mode
@@ -2281,7 +2137,6 @@ function selectMode(
 
   selectedMode =
   mode;
-
 
   document.querySelectorAll(
     ".mode"
@@ -2293,16 +2148,13 @@ function selectMode(
     )
   );
 
-
   button.classList.add(
     "active"
   );
 
-
   updateLabel();
 
 }
-
 
 
 function selectCount(
@@ -2312,7 +2164,6 @@ function selectCount(
 
   selectedCount =
   count;
-
 
   document.querySelectorAll(
     ".count"
@@ -2324,7 +2175,6 @@ function selectCount(
     )
   );
 
-
   button.classList.add(
     "active"
   );
@@ -2332,13 +2182,11 @@ function selectCount(
 }
 
 
-
 function updateLabel(){
 
   document.getElementById(
     "marketLabel"
   ).innerText =
-
   selectedMarket.toUpperCase()
   +
   " • "
@@ -2348,17 +2196,12 @@ function updateLabel(){
 }
 
 
-
-/* ==========================================
-   RANDOM
-========================================== */
+/* RANDOM */
 
 function random4D(){
 
   return Math.floor(
-    Math.random()
-    *
-    10000
+    Math.random()*10000
   )
   .toString()
   .padStart(
@@ -2369,15 +2212,11 @@ function random4D(){
 }
 
 
-
-/* ==========================================
-   DOUBLE DETECTION
-========================================== */
+/* DOUBLE TYPE */
 
 function doubleType(number){
 
   const counts = {};
-
 
   number
   .split("")
@@ -2396,14 +2235,11 @@ function doubleType(number){
     }
   );
 
-
   const values =
   Object.values(counts)
   .sort(
-    (a,b)=>
-    b-a
+    (a,b)=>b-a
   );
-
 
   if(
     values[0] === 2
@@ -2415,7 +2251,6 @@ function doubleType(number){
 
   }
 
-
   if(
     values[0] === 2
   ){
@@ -2423,7 +2258,6 @@ function doubleType(number){
     return "ONE DOUBLE";
 
   }
-
 
   if(
     values[0] === 3
@@ -2433,42 +2267,33 @@ function doubleType(number){
 
   }
 
-
   return "NORMAL";
 
 }
 
-
-
-/* ==========================================
-   DOUBLE BONUS
-========================================== */
 
 function doubleBonus(number){
 
   const type =
   doubleType(number);
 
-
   if(
     type ===
     "DOUBLE PAIR"
   ){
 
-    return 14;
+    return 15;
 
   }
-
 
   if(
     type ===
     "ONE DOUBLE"
   ){
 
-    return 8;
+    return 9;
 
   }
-
 
   if(
     type ===
@@ -2479,16 +2304,12 @@ function doubleBonus(number){
 
   }
 
-
   return 0;
 
 }
 
 
-
-/* ==========================================
-   HISTORICAL SCORE
-========================================== */
+/* HISTORICAL SCORE */
 
 function historicalScore(number){
 
@@ -2500,22 +2321,14 @@ function historicalScore(number){
 
   }
 
-
   const overall =
   digitFrequency();
-
 
   const positions =
   positionFrequency();
 
-
   const pairs =
   pairFrequency();
-
-
-  const avg =
-  averageDigitSum();
-
 
   const maxOverall =
   Math.max(
@@ -2524,35 +2337,23 @@ function historicalScore(number){
   ||
   1;
 
-
   const pairValues =
   Object.values(pairs);
-
 
   const maxPair =
   pairValues.length
   ?
-  Math.max(
-    ...pairValues
-  )
+  Math.max(...pairValues)
   :
   1;
-
 
   let score = 0;
 
 
-  /* POSITION */
-
-  for(
-    let i=0;
-    i<4;
-    i++
-  ){
+  for(let i=0;i<4;i++){
 
     const digit =
     Number(number[i]);
-
 
     const maxPos =
     Math.max(
@@ -2561,7 +2362,6 @@ function historicalScore(number){
     ||
     1;
 
-
     score +=
     (
       positions[i][digit]
@@ -2569,18 +2369,12 @@ function historicalScore(number){
       maxPos
     )
     *
-    6;
+    5;
 
   }
 
 
-  /* OVERALL */
-
-  for(
-    let i=0;
-    i<4;
-    i++
-  ){
+  for(let i=0;i<4;i++){
 
     score +=
     (
@@ -2591,24 +2385,17 @@ function historicalScore(number){
       maxOverall
     )
     *
-    2.5;
+    2.3;
 
   }
 
 
-  /* PAIRS */
-
-  for(
-    let i=0;
-    i<3;
-    i++
-  ){
+  for(let i=0;i<3;i++){
 
     const pair =
     number[i]
     +
     number[i+1];
-
 
     score +=
     (
@@ -2621,47 +2408,36 @@ function historicalScore(number){
       maxPair
     )
     *
-    4;
+    3.5;
 
   }
 
-
-  /* SUM */
 
   const sum =
   number
   .split("")
   .map(Number)
   .reduce(
-    (a,b)=>
-    a+b,
+    (a,b)=>a+b,
     0
   );
 
-
   score +=
   Math.max(
-
     0,
-
-    10
-    -
+    8 -
     Math.abs(
-      sum - avg
+      sum -
+      averageDigitSum()
     )
-
   );
-
 
   return score;
 
 }
 
 
-
-/* ==========================================
-   CHARTA SCORE
-========================================== */
+/* MULTI-DIRECTION CHARTA SCORE */
 
 function chartaScore(number){
 
@@ -2673,117 +2449,119 @@ function chartaScore(number){
 
   }
 
-
-  const freq =
-  chartaFrequency();
+  let score = 0;
 
 
-  const positions =
-  chartaPositionFrequency();
+  const allLines = [
+
+    ...chartHorizontal,
+    ...chartVertical,
+    ...chartDiagonal,
+    ...chartReverse
+
+  ];
 
 
-  const pairs =
-  chartaPairFrequency();
+  /* EXACT LINE */
+
+  if(
+    allLines.includes(number)
+  ){
+
+    score += 18;
+
+  }
 
 
-  const maxFreq =
+  /* DIGIT PRESENCE */
+
+  const flat =
+  chartMatrix.flat();
+
+  const counts =
+  Array(10).fill(0);
+
+  flat.forEach(
+    digit=>{
+
+      counts[
+        Number(digit)
+      ]++;
+
+    }
+  );
+
+  const maxDigit =
   Math.max(
-    ...freq
+    ...counts
   )
   ||
   1;
 
 
-  let score = 0;
+  number
+  .split("")
+  .forEach(
+    digit=>{
+
+      score +=
+      (
+        counts[
+          Number(digit)
+        ]
+        /
+        maxDigit
+      )
+      *
+      3;
+
+    }
+  );
 
 
-  /* CHARTA DIGITS */
+  /* PAIR */
 
-  for(
-    let i=0;
-    i<4;
-    i++
-  ){
-
-    score +=
-    (
-      freq[
-        Number(number[i])
-      ]
-      /
-      maxFreq
-    )
-    *
-    5;
-
-  }
-
-
-  /* CHARTA POSITION */
-
-  for(
-    let i=0;
-    i<4;
-    i++
-  ){
-
-    const maxPos =
-    Math.max(
-      ...positions[i]
-    )
-    ||
-    1;
-
-
-    score +=
-    (
-      positions[i][
-        Number(number[i])
-      ]
-      /
-      maxPos
-    )
-    *
-    4;
-
-  }
-
-
-  /* CHARTA PAIR */
-
-  for(
-    let i=0;
-    i<3;
-    i++
-  ){
+  for(let i=0;i<3;i++){
 
     const pair =
     number[i]
     +
     number[i+1];
 
-
     score +=
     (
-      pairs[pair]
+      chartPairs[pair]
       ||
       0
     )
     *
-    3;
+    3.2;
 
   }
 
 
-  /* EXACT ROW BONUS */
+  /* POSITION MATCH ACROSS ROWS */
 
-  if(
-    chartaRows.includes(
-      number
-    )
-  ){
+  for(let pos=0;pos<4;pos++){
 
-    score += 4;
+    let posCount = 0;
+
+    for(let row=0;row<4;row++){
+
+      if(
+        chartMatrix[row][pos]
+        ===
+        number[pos]
+      ){
+
+        posCount++;
+
+      }
+
+    }
+
+    score +=
+    posCount * 2;
 
   }
 
@@ -2793,30 +2571,18 @@ function chartaScore(number){
 }
 
 
-
-/* ==========================================
-   FINAL SCORE
-========================================== */
+/* FINAL SCORE */
 
 function scoreNumber(number){
 
   let score =
   historicalScore(number);
 
-
-  if(
-    chartaApplied
-  ){
-
-    score +=
-    chartaScore(number);
-
-  }
-
+  score +=
+  chartaScore(number);
 
   score +=
   doubleBonus(number);
-
 
   return Math.min(
     100,
@@ -2826,19 +2592,14 @@ function scoreNumber(number){
 }
 
 
-
-/* ==========================================
-   PICK REASON
-========================================== */
+/* REASON */
 
 function getReason(number){
 
   const reasons = [];
 
-
   const type =
   doubleType(number);
-
 
   if(
     type ===
@@ -2863,107 +2624,89 @@ function getReason(number){
   }
 
 
-  if(chartaApplied){
+  const allLines = [
 
-    const freq =
-    chartaFrequency();
+    ...chartHorizontal,
+    ...chartVertical,
+    ...chartDiagonal,
+    ...chartReverse
+
+  ];
 
 
-    let strong = 0;
+  if(
+    allLines.includes(number)
+  ){
 
-
-    number
-    .split("")
-    .forEach(
-      digit=>{
-
-        if(
-          freq[
-            Number(digit)
-          ]
-          >=
-          Math.max(...freq)
-          *
-          0.75
-        ){
-
-          strong++;
-
-        }
-
-      }
+    reasons.push(
+      "Exact Charta Line"
     );
 
+  }
+
+
+  let pairStrong = 0;
+
+  for(let i=0;i<3;i++){
+
+    const pair =
+    number[i]
+    +
+    number[i+1];
 
     if(
-      strong >= 2
+      (
+        chartPairs[pair]
+        ||
+        0
+      )
+      >=
+      1.5
     ){
 
-      reasons.push(
-        "Charta Strong"
-      );
+      pairStrong++;
 
     }
 
   }
 
 
-  const avg =
-  averageDigitSum();
-
-
-  const sum =
-  number
-  .split("")
-  .map(Number)
-  .reduce(
-    (a,b)=>
-    a+b,
-    0
-  );
-
-
-  if(
-    Math.abs(
-      sum - avg
-    )
-    <=
-    3
-  ){
+  if(pairStrong > 0){
 
     reasons.push(
-      "Sum Balanced"
+      pairStrong
+      +
+      " Charta Pair"
     );
 
   }
 
 
-  return(
-    reasons
-    .slice(0,3)
-    .join(" • ")
-    ||
-    "Balanced Pattern"
-  );
+  if(
+    reasons.length < 3
+  ){
+
+    reasons.push(
+      "Multi-Direction"
+    );
+
+  }
+
+
+  return reasons
+  .slice(0,3)
+  .join(" • ");
 
 }
 
 
-
-/* ==========================================
-   SIMILARITY
-========================================== */
+/* SIMILARITY */
 
 function similarity(a,b){
 
   let same = 0;
 
-
-  for(
-    let i=0;
-    i<4;
-    i++
-  ){
+  for(let i=0;i<4;i++){
 
     if(
       a[i] === b[i]
@@ -2975,36 +2718,26 @@ function similarity(a,b){
 
   }
 
-
   return same;
 
 }
 
 
-
-/* ==========================================
-   STATISTICAL PICKS
-========================================== */
+/* STATISTICAL PICKS */
 
 function statisticalPicks(count){
 
   const map =
   new Map();
 
-
-  /*
-   Generate banyak calon.
-  */
-
   for(
     let i=0;
-    i<16000;
+    i<18000;
     i++
   ){
 
     const number =
     random4D();
-
 
     if(
       map.has(number)
@@ -3014,16 +2747,12 @@ function statisticalPicks(count){
 
     }
 
-
     map.set(
       number,
       {
-
         number,
-
         score:
         scoreNumber(number)
-
       }
     );
 
@@ -3034,23 +2763,13 @@ function statisticalPicks(count){
   [...map.values()]
   .sort(
     (a,b)=>
-    b.score -
-    a.score
+    b.score-a.score
   );
 
-
-  const results = [];
-
-
-  /*
-   Priority kepada double numbers,
-   tapi masih kekalkan diversity.
-  */
 
   const doubleCandidates =
   candidates.filter(
     item =>
-
     doubleType(
       item.number
     )
@@ -3059,25 +2778,7 @@ function statisticalPicks(count){
   );
 
 
-  const normalCandidates =
-  candidates.filter(
-    item =>
-
-    doubleType(
-      item.number
-    )
-    ===
-    "NORMAL"
-  );
-
-
-  const preferredCount =
-  Math.max(
-    1,
-    Math.ceil(
-      count * 0.7
-    )
-  );
+  const results = [];
 
 
   function addCandidate(item){
@@ -3085,7 +2786,6 @@ function statisticalPicks(count){
     const tooSimilar =
     results.some(
       selected =>
-
       similarity(
         selected.number,
         item.number
@@ -3093,7 +2793,6 @@ function statisticalPicks(count){
       >=
       3
     );
-
 
     if(
       !tooSimilar
@@ -3104,12 +2803,17 @@ function statisticalPicks(count){
         item.number
       );
 
-
       results.push(item);
 
     }
 
   }
+
+
+  const doubleTarget =
+  Math.ceil(
+    count * 0.7
+  );
 
 
   for(
@@ -3120,11 +2824,10 @@ function statisticalPicks(count){
 
     addCandidate(item);
 
-
     if(
       results.length
       >=
-      preferredCount
+      doubleTarget
     ){
 
       break;
@@ -3141,15 +2844,13 @@ function statisticalPicks(count){
   ){
 
     if(
-      results.length
-      >=
+      results.length >=
       count
     ){
 
       break;
 
     }
-
 
     if(
       results.some(
@@ -3162,7 +2863,6 @@ function statisticalPicks(count){
       continue;
 
     }
-
 
     addCandidate(item);
 
@@ -3177,23 +2877,13 @@ function statisticalPicks(count){
 }
 
 
-
-/* ==========================================
-   CHARTA FOCUS PICKS
-========================================== */
+/* FOCUS */
 
 function generateFocusPicks(){
 
   if(
     !chartaApplied
-  ){
-
-    return;
-
-  }
-
-
-  if(
+    ||
     numbersData.length === 0
   ){
 
@@ -3201,34 +2891,18 @@ function generateFocusPicks(){
 
   }
 
-
-  focusResults =
+  const results =
   statisticalPicks(10);
-
-
-  renderFocusPicks();
-
-}
-
-
-
-/* ==========================================
-   RENDER FOCUS
-========================================== */
-
-function renderFocusPicks(){
 
   const container =
   document.getElementById(
     "focusList"
   );
 
-
   container.innerHTML = "";
 
 
-  focusResults
-  .forEach(
+  results.forEach(
     (item,index)=>{
 
       const div =
@@ -3236,16 +2910,13 @@ function renderFocusPicks(){
         "div"
       );
 
-
       div.className =
       "focus-item";
 
-
       div.innerHTML =
       `
-
       <div class="focus-rank">
-        ${index + 1}
+        ${index+1}
       </div>
 
       <div>
@@ -3260,13 +2931,11 @@ function renderFocusPicks(){
         </div>
 
         <div class="focus-tag">
-          ${getReason(item.number)}
+          ${item.reason}
         </div>
 
       </div>
-
       `;
-
 
       container.appendChild(
         div
@@ -3278,15 +2947,11 @@ function renderFocusPicks(){
 }
 
 
-
-/* ==========================================
-   GENERATE
-========================================== */
+/* GENERATE */
 
 function generateNumbers(){
 
   let results = [];
-
 
   if(
     selectedMode ===
@@ -3306,7 +2971,6 @@ function generateNumbers(){
 
     }
 
-
     results =
     statisticalPicks(
       selectedCount
@@ -3314,22 +2978,18 @@ function generateNumbers(){
 
   }
 
-
   else{
 
     const used =
     new Set();
 
-
     while(
-      results.length
-      <
+      results.length <
       selectedCount
     ){
 
       const number =
       random4D();
-
 
       if(
         !used.has(number)
@@ -3337,16 +2997,10 @@ function generateNumbers(){
 
         used.add(number);
 
-
         results.push({
-
           number,
-
           score:null,
-
-          reason:
-          "Random Pick"
-
+          reason:"Random Pick"
         });
 
       }
@@ -3361,7 +3015,6 @@ function generateNumbers(){
   ).innerText =
   results[0].number;
 
-
   displayPicks(results);
 
   saveHistory(results);
@@ -3369,10 +3022,7 @@ function generateNumbers(){
 }
 
 
-
-/* ==========================================
-   DISPLAY PICKS
-========================================== */
+/* DISPLAY PICKS */
 
 function displayPicks(results){
 
@@ -3381,24 +3031,16 @@ function displayPicks(results){
     "generatedPicks"
   );
 
-
-  container.innerHTML =
-  "";
+  container.innerHTML = "";
 
 
-  results
-  .slice(
-    0,
-    selectedCount
-  )
-  .forEach(
+  results.forEach(
     item=>{
 
       const div =
       document.createElement(
         "div"
       );
-
 
       div.className =
       "pick";
@@ -3411,7 +3053,6 @@ function displayPicks(results){
 
         div.innerHTML =
         `
-
         <div class="pick-number">
           ${item.number}
         </div>
@@ -3424,17 +3065,14 @@ function displayPicks(results){
         <div class="pick-reason">
           ${item.reason}
         </div>
-
         `;
 
       }
-
 
       else{
 
         div.innerHTML =
         `
-
         <div class="pick-number">
           ${item.number}
         </div>
@@ -3442,11 +3080,9 @@ function displayPicks(results){
         <div class="pick-reason">
           RANDOM PICK
         </div>
-
         `;
 
       }
-
 
       container.appendChild(
         div
@@ -3458,10 +3094,7 @@ function displayPicks(results){
 }
 
 
-
-/* ==========================================
-   HISTORY
-========================================== */
+/* HISTORY */
 
 function saveHistory(results){
 
@@ -3469,48 +3102,34 @@ function saveHistory(results){
     item=>{
 
       historyData.unshift({
-
         market:
         selectedMarket,
 
-        mode:
-        selectedMode,
-
         number:
-        item.number
+        item.number,
 
+        mode:
+        selectedMode
       });
 
     }
   );
 
 
-  /*
-   buang duplicate
-  */
-
   const unique = [];
-
 
   historyData.forEach(
     item=>{
 
       const exists =
       unique.some(
-        saved =>
-
-        saved.market
-        ===
+        x =>
+        x.market ===
         item.market
-
         &&
-
-        saved.number
-        ===
+        x.number ===
         item.number
-
       );
-
 
       if(!exists){
 
@@ -3521,31 +3140,21 @@ function saveHistory(results){
     }
   );
 
-
   historyData =
-  unique.slice(
-    0,
-    100
-  );
+  unique.slice(0,100);
 
 
   localStorage.setItem(
-    "4dHistoryV32",
+    "4dHistoryV33",
     JSON.stringify(
       historyData
     )
   );
 
-
   renderHistory();
 
 }
 
-
-
-/* ==========================================
-   RENDER HISTORY
-========================================== */
 
 function renderHistory(){
 
@@ -3554,16 +3163,12 @@ function renderHistory(){
     "history"
   );
 
-
   const filtered =
   historyData.filter(
     item =>
-
     item.market ===
     selectedMarket
-
   );
-
 
   if(
     filtered.length === 0
@@ -3571,23 +3176,17 @@ function renderHistory(){
 
     container.innerHTML =
     `
-
     <div class="empty">
       Belum ada history untuk
       ${selectedMarket}.
     </div>
-
     `;
-
 
     return;
 
   }
 
-
-  container.innerHTML =
-  "";
-
+  container.innerHTML = "";
 
   filtered
   .slice(0,20)
@@ -3599,14 +3198,11 @@ function renderHistory(){
         "div"
       );
 
-
       row.className =
       "history-row";
 
-
       row.innerHTML =
       `
-
       <span>
         ${item.market}
         •
@@ -3616,9 +3212,7 @@ function renderHistory(){
       <span class="history-number">
         ${item.number}
       </span>
-
       `;
-
 
       container.appendChild(
         row
@@ -3630,48 +3224,32 @@ function renderHistory(){
 }
 
 
-
-/* ==========================================
-   CLEAR HISTORY
-========================================== */
-
 function clearHistory(){
 
   historyData =
   historyData.filter(
     item =>
-
-    item.market
-    !==
+    item.market !==
     selectedMarket
-
   );
 
-
   localStorage.setItem(
-    "4dHistoryV32",
+    "4dHistoryV33",
     JSON.stringify(
       historyData
     )
   );
-
 
   renderHistory();
 
 }
 
 
-
-/* ==========================================
-   START APP
-========================================== */
+/* START */
 
 restoreCharta();
-
 renderHistory();
-
 updateLabel();
-
 loadDatabase();
 
 </script>
