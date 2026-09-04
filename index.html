@@ -1434,6 +1434,16 @@ body.v46-ui .pattern-panel{
 }
 
 </style>
+
+<!-- V4.7.4-PWA -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#030f1c">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="4D Charta">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+
 </head>
 
 <body>
@@ -4925,6 +4935,73 @@ document.addEventListener("DOMContentLoaded",function(){
   });
   mo.observe(document.body,{childList:true,subtree:true,characterData:true});
 });
+})();
+</script>
+
+
+<style>
+/* V4.7.4-PWA */
+#pwaInstallBtn{
+  display:none;
+  position:fixed;
+  right:14px;
+  bottom:82px;
+  z-index:9998;
+  border:1px solid rgba(246,200,76,.55);
+  background:rgba(3,20,35,.96);
+  color:#f6c84c;
+  border-radius:14px;
+  padding:10px 13px;
+  font-weight:800;
+  font-size:12px;
+  box-shadow:0 10px 30px rgba(0,0,0,.28);
+}
+#pwaInstallBtn.show{display:block}
+@media (display-mode: standalone){
+  #pwaInstallBtn{display:none!important}
+}
+</style>
+
+<button id="pwaInstallBtn" type="button">👑 INSTALL APP</button>
+
+<script>
+/* V4.7.4-PWA */
+(function(){
+  let deferredPrompt=null;
+  const btn=document.getElementById("pwaInstallBtn");
+
+  if("serviceWorker" in navigator){
+    window.addEventListener("load",()=>{
+      navigator.serviceWorker.register("./sw.js").catch(()=>{});
+    });
+  }
+
+  window.addEventListener("beforeinstallprompt",e=>{
+    e.preventDefault();
+    deferredPrompt=e;
+    if(btn) btn.classList.add("show");
+  });
+
+  if(btn){
+    btn.addEventListener("click",async()=>{
+      if(!deferredPrompt) return;
+      deferredPrompt.prompt();
+      try{ await deferredPrompt.userChoice; }catch(e){}
+      deferredPrompt=null;
+      btn.classList.remove("show");
+    });
+  }
+
+  window.addEventListener("appinstalled",()=>{
+    if(btn) btn.classList.remove("show");
+    deferredPrompt=null;
+  });
+
+  document.addEventListener("DOMContentLoaded",()=>{
+    const v=document.querySelector(".version");
+    if(v) v.textContent="V4.7.4 • PWA READY";
+    document.title="4D Charta Analyzer";
+  });
 })();
 </script>
 

@@ -1,0 +1,25 @@
+{
+  "name": "4D Charta Analyzer",
+  "short_name": "4D Charta",
+  "description": "4D Charta Analyzer - chart, pattern, favourite and market history.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#030f1c",
+  "theme_color": "#030f1c",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
