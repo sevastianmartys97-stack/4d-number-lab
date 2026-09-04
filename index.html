@@ -3,11 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<title>4D Charta Analyzer V4.0</title>
+<title>4D Charta Analyzer V4.2</title>
 
 <style>
-
 *{
   box-sizing:border-box;
   margin:0;
@@ -23,30 +21,30 @@ body{
 }
 
 .app{
-  max-width:620px;
+  width:100%;
+  max-width:760px;
   margin:auto;
 }
 
 .header{
   text-align:center;
-  padding:16px 5px 14px;
+  padding:14px 5px;
 }
 
 .header h1{
   color:#ffc92f;
-  font-size:25px;
-  letter-spacing:1px;
+  font-size:27px;
 }
 
 .version{
   color:#ffc92f;
   font-size:10px;
-  margin-top:4px;
   font-weight:bold;
+  margin-top:4px;
 }
 
 .subtitle{
-  color:#778ca4;
+  color:#7d91a5;
   font-size:9px;
   margin-top:5px;
 }
@@ -66,24 +64,40 @@ body{
   margin-bottom:10px;
 }
 
-.charta-head{
+.status-bar{
   display:flex;
   justify-content:space-between;
-  align-items:center;
+  background:#071522;
+  padding:9px 10px;
+  border-radius:8px;
+  font-size:8px;
   margin-bottom:10px;
 }
 
-.charta-head .title{
-  margin:0;
+.live{
+  color:#42e783;
+  font-weight:bold;
 }
 
-.small-btn{
-  background:#0e1c2a;
-  border:1px solid #40556c;
-  color:#dbe5ef;
-  border-radius:7px;
-  padding:7px 10px;
-  font-size:8px;
+.loading{
+  color:#ffc82e;
+}
+
+.error{
+  color:#ff6a6a;
+}
+
+.flex{
+  display:flex;
+  gap:10px;
+}
+
+.charta-section{
+  flex:1;
+}
+
+.lines-section{
+  flex:1.2;
 }
 
 .charta-grid{
@@ -109,230 +123,207 @@ body{
   border-color:#ffd340;
 }
 
-.favorite-label{
-  margin-top:13px;
-  margin-bottom:7px;
-  color:#a9b8c8;
-  font-size:9px;
-  font-weight:bold;
-}
-
-.favorite-input{
-  width:100%;
-  background:#071522;
-  border:1px solid #536578;
-  color:white;
-  border-radius:9px;
-  height:55px;
-  text-align:center;
-  font-size:27px;
-  letter-spacing:7px;
-  font-weight:bold;
-  outline:none;
-}
-
-.analyze{
-  width:100%;
-  margin-top:10px;
-  border:none;
-  border-radius:9px;
-  padding:14px;
-  background:#ffca32;
-  color:#111;
-  font-size:12px;
-  font-weight:bold;
-  cursor:pointer;
-}
-
-.status-bar{
-  margin-bottom:10px;
-  background:#071522;
-  border-radius:8px;
-  padding:9px 10px;
-  display:flex;
-  justify-content:space-between;
-  font-size:8px;
-}
-
-.live{
-  color:#41e681;
-  font-weight:bold;
-}
-
-.loading{
-  color:#ffc82e;
-}
-
-.error{
-  color:#ff6767;
-}
-
-.favorite-result{
-  display:none;
-}
-
-.favorite-top{
+.top-row{
   display:flex;
   justify-content:space-between;
   align-items:center;
-  gap:10px;
   margin-bottom:10px;
 }
 
-.favorite-number{
-  color:#ffc82e;
-  font-size:37px;
-  font-weight:bold;
-  letter-spacing:7px;
-}
-
-.match-badge{
-  border:1px solid #2dbf68;
-  background:#092719;
-  border-radius:9px;
-  padding:10px;
-  text-align:center;
-  min-width:125px;
-}
-
-.match-badge strong{
-  color:#59ee93;
-  display:block;
-  font-size:10px;
-}
-
-.match-badge span{
-  display:block;
-  margin-top:4px;
+.small-btn{
+  background:#0e1c2a;
+  border:1px solid #40556c;
+  color:#dbe5ef;
+  border-radius:7px;
+  padding:7px 10px;
   font-size:8px;
-  color:#aeeac6;
 }
 
-.match-badge.weak{
-  background:#291910;
-  border-color:#b97932;
+.lines-grid{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:6px;
 }
 
-.match-badge.weak strong{
-  color:#ffc85e;
-}
-
-.match-badge.none{
-  background:#291213;
-  border-color:#b44747;
-}
-
-.match-badge.none strong{
-  color:#ff7979;
-}
-
-.result-list{
+.line-item{
   background:#061522;
-  border-radius:9px;
-  padding:8px 10px;
+  border-radius:7px;
+  padding:8px;
+  font-size:8px;
 }
 
-.result-row{
+.line-item span{
+  color:#72879b;
+}
+
+.line-item strong{
+  display:block;
+  color:#ffc82e;
+  margin-top:4px;
+  font-size:11px;
+  letter-spacing:1px;
+}
+
+.slot-controls{
   display:flex;
   justify-content:space-between;
-  gap:10px;
-  border-bottom:1px solid #173047;
-  padding:8px 0;
+  align-items:center;
+  gap:8px;
+  margin-bottom:10px;
+}
+
+.slot-controls .title{
+  margin:0;
+}
+
+.slot-btns{
+  display:flex;
+  gap:6px;
+}
+
+.slot-btn{
+  background:#142438;
+  border:1px solid #36506b;
+  color:#b9c7d5;
+  border-radius:7px;
+  padding:8px 16px;
   font-size:9px;
 }
 
-.result-row:last-child{
-  border-bottom:none;
+.slot-btn.active{
+  background:#3a3110;
+  border-color:#d5ac24;
+  color:#ffd142;
 }
 
-.result-row span:first-child{
-  color:#8094aa;
-}
-
-.good{
-  color:#44e685;
-  font-weight:bold;
-}
-
-.mid{
-  color:#ffd04c;
-}
-
-.bad{
-  color:#ff6f6f;
-}
-
-.top-picks{
-  display:grid;
-  grid-template-columns:repeat(2,1fr);
-  gap:7px;
-}
-
-.pick{
-  background:#061522;
-  border:1px solid #142d42;
-  border-radius:9px;
-  padding:10px;
-  text-align:center;
-}
-
-.rank{
-  color:#758ba2;
-  font-size:8px;
-}
-
-.pick-number{
-  color:#ffc82e;
-  font-size:20px;
-  font-weight:bold;
-  letter-spacing:4px;
-  margin-top:4px;
-}
-
-.pick-score{
-  color:#53e1d0;
-  font-size:8px;
-  margin-top:4px;
-}
-
-.pick-tag{
-  color:#8599ad;
-  font-size:7px;
-  line-height:1.35;
-  margin-top:5px;
-}
-
-.market-table{
+.fav-table{
   overflow-x:auto;
 }
 
 table{
   width:100%;
   border-collapse:collapse;
-  min-width:560px;
-  background:#061522;
 }
 
 th{
   background:#102437;
-  color:#d2deea;
-  padding:10px 5px;
-  border:1px solid #1b374f;
-  font-size:8px;
+  border:1px solid #1c3850;
+  padding:8px 5px;
+  font-size:7px;
+  color:#cad8e5;
 }
 
 td{
   border:1px solid #153047;
-  padding:9px 6px;
+  padding:6px;
   font-size:8px;
-  vertical-align:top;
+  text-align:center;
 }
 
-.market-number{
+.fav-input{
+  width:82px;
+  background:#061522;
+  border:1px solid #4b647b;
+  border-radius:6px;
   color:#ffc82e;
-  font-size:14px;
+  font-size:17px;
+  letter-spacing:3px;
   font-weight:bold;
-  letter-spacing:2px;
+  text-align:center;
+  padding:6px 3px;
+  outline:none;
+}
+
+.hit{
+  color:#43e987;
+  font-weight:bold;
+}
+
+.nohit{
+  color:#ff6666;
+  font-weight:bold;
+}
+
+.best{
+  color:#ffc82e;
+  font-weight:bold;
+}
+
+.delete-btn{
+  background:none;
+  border:none;
+  color:#ff5c5c;
+  font-size:14px;
+  cursor:pointer;
+}
+
+.selected-row{
+  background:#0d2638;
+}
+
+.detail-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+
+.big-number{
+  color:#ffc82e;
+  font-size:34px;
+  font-weight:bold;
+  letter-spacing:6px;
+  margin-bottom:4px;
+}
+
+.permutation-count{
+  color:#96a8ba;
+  font-size:9px;
+}
+
+.permutation-list{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:6px;
+  margin-top:10px;
+}
+
+.perm{
+  background:#061522;
+  border:1px solid #304960;
+  border-radius:7px;
+  padding:8px 4px;
+  text-align:center;
+  font-size:10px;
+}
+
+.info-list{
+  background:#061522;
+  border-radius:8px;
+  padding:8px 10px;
+}
+
+.info-row{
+  display:flex;
+  justify-content:space-between;
+  padding:8px 0;
+  border-bottom:1px solid #173047;
+  font-size:8px;
+}
+
+.info-row:last-child{
+  border-bottom:none;
+}
+
+.info-row span:first-child{
+  color:#8195aa;
+}
+
+.market-table{
+  overflow-x:auto;
+}
+
+.market-table table{
+  min-width:580px;
 }
 
 .found{
@@ -345,40 +336,43 @@ td{
   font-weight:bold;
 }
 
-.detail{
-  margin-top:4px;
-  color:#8399b0;
-  line-height:1.4;
+.market-detail{
+  color:#8298ae;
+  font-size:7px;
+  margin-top:3px;
 }
 
 .empty{
   text-align:center;
-  color:#6d8197;
-  font-size:9px;
+  color:#6c8196;
   padding:12px;
+  font-size:9px;
 }
 
 .footer{
-  color:#52677c;
   text-align:center;
-  padding:4px 12px 18px;
+  color:#506478;
   font-size:8px;
-  line-height:1.5;
+  padding:6px 10px 18px;
 }
 
-@media(max-width:420px){
-
-  .chart-input{
-    height:47px;
-    font-size:20px;
+@media(max-width:650px){
+  .flex{
+    display:block;
   }
 
-  .favorite-number{
-    font-size:30px;
+  .lines-section{
+    margin-top:10px;
   }
 
+  .detail-grid{
+    grid-template-columns:1fr;
+  }
+
+  .permutation-list{
+    grid-template-columns:repeat(3,1fr);
+  }
 }
-
 </style>
 </head>
 
@@ -387,241 +381,102 @@ td{
 <div class="app">
 
   <div class="header">
-
     <h1>4D CHARTA ANALYZER</h1>
-
-    <div class="version">
-      V4.0 • SIMPLE & FOCUS
-    </div>
-
+    <div class="version">V4.2 • AUTO FAV + PERMUTATION</div>
     <div class="subtitle">
-      Charta • Favourite Number • Charta Hits • Market History
+      Multiple Favourite Numbers • Auto Analyze • Permutation • Market History
     </div>
-
   </div>
 
 
   <div class="card">
 
     <div class="status-bar">
-
       <span>DATABASE</span>
+      <span id="dbStatus" class="loading">LOADING...</span>
+    </div>
 
-      <span
-        id="dbStatus"
-        class="loading">
-        LOADING...
-      </span>
+    <div class="flex">
+
+      <div class="charta-section">
+
+        <div class="top-row">
+          <div class="title" style="margin:0">MANUAL CHARTA 4 × 4</div>
+          <button class="small-btn" onclick="clearCharta()">CLEAR</button>
+        </div>
+
+        <div class="charta-grid">
+          <input class="chart-input" maxlength="1">
+          <input class="chart-input" maxlength="1">
+          <input class="chart-input" maxlength="1">
+          <input class="chart-input" maxlength="1">
+
+          <input class="chart-input" maxlength="1">
+          <input class="chart-input" maxlength="1">
+          <input class="chart-input" maxlength="1">
+          <input class="chart-input" maxlength="1">
+
+          <input class="chart-input" maxlength="1">
+          <input class="chart-input" maxlength="1">
+          <input class="chart-input" maxlength="1">
+          <input class="chart-input" maxlength="1">
+
+          <input class="chart-input" maxlength="1">
+          <input class="chart-input" maxlength="1">
+          <input class="chart-input" maxlength="1">
+          <input class="chart-input" maxlength="1">
+        </div>
+
+      </div>
+
+      <div class="lines-section">
+
+        <div class="title">CHARTA LINES • AUTO SCAN</div>
+
+        <div id="chartaLines" class="lines-grid">
+          <div class="empty">Isi semua Charta dahulu.</div>
+        </div>
+
+      </div>
 
     </div>
 
+  </div>
 
-    <div class="charta-head">
+
+  <div class="card">
+
+    <div class="slot-controls">
 
       <div class="title">
-        MANUAL CHARTA 4 × 4
+        FAVOURITE NUMBERS • AUTO ANALYZE
       </div>
 
-      <button
-        class="small-btn"
-        onclick="clearAll()">
-        CLEAR
-      </button>
-
-    </div>
-
-
-    <div class="charta-grid">
-
-      <input class="chart-input" maxlength="1">
-      <input class="chart-input" maxlength="1">
-      <input class="chart-input" maxlength="1">
-      <input class="chart-input" maxlength="1">
-
-      <input class="chart-input" maxlength="1">
-      <input class="chart-input" maxlength="1">
-      <input class="chart-input" maxlength="1">
-      <input class="chart-input" maxlength="1">
-
-      <input class="chart-input" maxlength="1">
-      <input class="chart-input" maxlength="1">
-      <input class="chart-input" maxlength="1">
-      <input class="chart-input" maxlength="1">
-
-      <input class="chart-input" maxlength="1">
-      <input class="chart-input" maxlength="1">
-      <input class="chart-input" maxlength="1">
-      <input class="chart-input" maxlength="1">
-
-    </div>
-
-
-    <div class="favorite-label">
-      FAVOURITE NUMBER
-    </div>
-
-    <input
-      id="favoriteInput"
-      class="favorite-input"
-      maxlength="4"
-      placeholder="----">
-
-
-    <button
-      class="analyze"
-      onclick="analyzeCharta()">
-      ANALYZE CHARTA
-    </button>
-
-  </div>
-
-
-
-  <div
-    id="favoriteCard"
-    class="card favorite-result">
-
-    <div class="title">
-      FAVOURITE NUMBER ANALYSIS
-    </div>
-
-
-    <div class="favorite-top">
-
-      <div
-        id="favoriteNumber"
-        class="favorite-number">
-        ----
-      </div>
-
-      <div
-        id="matchBadge"
-        class="match-badge">
-
-        <strong id="matchText">
-          --
-        </strong>
-
-        <span id="matchScore">
-          MATCH SCORE: --
-        </span>
-
+      <div class="slot-btns">
+        <button id="slot10" class="slot-btn active" onclick="setSlots(10)">10</button>
+        <button id="slot20" class="slot-btn" onclick="setSlots(20)">20</button>
       </div>
 
     </div>
 
-
-    <div class="result-list">
-
-      <div class="result-row">
-        <span>Charta Match</span>
-        <span id="chartMatch">--</span>
-      </div>
-
-      <div class="result-row">
-        <span>Best Match</span>
-        <span id="matchType">--</span>
-      </div>
-
-      <div class="result-row">
-        <span>Digits in Charta</span>
-        <span id="digitMatch">--</span>
-      </div>
-
-      <div class="result-row">
-        <span>Double / Pair</span>
-        <span id="doubleInfo">--</span>
-      </div>
-
-      <div class="result-row">
-        <span>Historical Appearance</span>
-        <span id="historicalTotal">--</span>
-      </div>
-
-      <div class="result-row">
-        <span>Historical Hit Rate</span>
-        <span id="historicalRate">--</span>
-      </div>
-
-    </div>
-
-  </div>
-
-
-
-  <div class="card">
-
-    <div class="title">
-      CHARTA HIT • TOP 5
-    </div>
-
-    <div
-      id="topPicks"
-      class="top-picks">
-
-      <div class="empty">
-        Isi Charta kemudian tekan Analyze.
-      </div>
-
-    </div>
-
-  </div>
-
-
-
-  <div class="card">
-
-    <div class="title">
-      MARKET HISTORY CHECK
-    </div>
-
-    <div class="market-table">
+    <div class="fav-table">
 
       <table>
 
         <thead>
-
           <tr>
-
-            <th>
-              NUMBER
-            </th>
-
-            <th>
-              SPORTS TOTO
-            </th>
-
-            <th>
-              MAGNUM
-            </th>
-
-            <th>
-              DA MA CAI
-            </th>
-
-            <th>
-              CASH SWEEP
-            </th>
-
+            <th>#</th>
+            <th>FAVOURITE</th>
+            <th>PUSINGAN</th>
+            <th>CHARTA HIT</th>
+            <th>BEST MATCH</th>
+            <th>MATCH TYPE</th>
+            <th>MARKET HIT</th>
+            <th>✕</th>
           </tr>
-
         </thead>
 
-        <tbody id="marketBody">
-
-          <tr>
-
-            <td colspan="5">
-
-              <div class="empty">
-                Belum dianalisis.
-              </div>
-
-            </td>
-
-          </tr>
-
-        </tbody>
+        <tbody id="favBody"></tbody>
 
       </table>
 
@@ -630,12 +485,52 @@ td{
   </div>
 
 
+  <div class="card">
+
+    <div class="title">PERMUTATION DETAIL • AUTO</div>
+
+    <div id="permutationDetail">
+      <div class="empty">
+        Pilih atau isi Favourite Number.
+      </div>
+    </div>
+
+  </div>
+
+
+  <div class="detail-grid">
+
+    <div class="card">
+
+      <div class="title">CHARTA HIT ANALYSIS</div>
+
+      <div id="hitDetail">
+        <div class="empty">
+          Belum ada Favourite dipilih.
+        </div>
+      </div>
+
+    </div>
+
+
+    <div class="card">
+
+      <div class="title">MARKET HISTORY CHECK</div>
+
+      <div id="marketDetail">
+        <div class="empty">
+          Belum ada Favourite dipilih.
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+
   <div class="footer">
-
-    Match Score mengukur padanan corak Charta.
-    Historical Hit Rate hanya berdasarkan database keputusan yang disimpan
-    dan bukan kebarangkalian cabutan akan datang.
-
+    CHARTA HIT menunjukkan padanan corak/pusingan dengan Charta,
+    bukan jaminan keputusan cabutan akan datang.
   </div>
 
 </div>
@@ -643,59 +538,654 @@ td{
 
 <script>
 
-/* ==========================
+/* =========================
 DATABASE
-========================== */
+========================= */
 
 const dbFiles = {
-
   toto:"data/toto.json",
-
   magnum:"data/magnum.json",
-
   damacai:"data/damacai.json",
-
   cashsweep:"data/cashsweep.json"
-
 };
-
 
 const dbNames = {
-
   toto:"Sports Toto",
-
   magnum:"Magnum",
-
   damacai:"Da Ma Cai",
-
   cashsweep:"Cash Sweep"
-
 };
-
 
 let databases = {};
 
 let chartMatrix = [];
-
 let chartLines = [];
 
-let chartPairs = {};
+let slotCount = 10;
+let favourites = Array(20).fill("");
 
-let lastPicks = [];
+let selectedIndex = 0;
 
 
-/* ==========================
-INPUT
-========================== */
+/* =========================
+CHARTA INPUT
+========================= */
 
 const chartInputs =
-document.querySelectorAll(
-  ".chart-input"
-);
+document.querySelectorAll(".chart-input");
+
+chartInputs.forEach((input,index)=>{
+
+  input.addEventListener("input",function(){
+
+    this.value =
+    this.value.replace(/[^0-9]/g,"");
+
+    if(
+      this.value.length === 1
+      &&
+      chartInputs[index+1]
+    ){
+      chartInputs[index+1].focus();
+    }
+
+    saveCharta();
+
+    autoRefresh();
+
+  });
+
+});
 
 
-chartInputs.forEach(
-  (input,index)=>{
+/* =========================
+DATABASE LOAD
+========================= */
+
+async function loadDatabases(){
+
+  const status =
+  document.getElementById("dbStatus");
+
+  try{
+
+    for(const key of Object.keys(dbFiles)){
+
+      const response =
+      await fetch(
+        dbFiles[key] + "?v=" + Date.now()
+      );
+
+      if(!response.ok){
+        throw new Error(key);
+      }
+
+      databases[key] =
+      await response.json();
+
+    }
+
+    status.className = "live";
+    status.innerText = "4 MARKETS CONNECTED ✓";
+
+    autoRefresh();
+
+  }
+
+  catch(error){
+
+    status.className = "error";
+    status.innerText = "DATABASE ERROR";
+
+  }
+
+}
+
+
+/* =========================
+BUILD CHARTA
+========================= */
+
+function buildCharta(){
+
+  const values =
+  [...chartInputs].map(x=>x.value);
+
+  if(
+    values.some(x=>!/^[0-9]$/.test(x))
+  ){
+    chartMatrix = [];
+    chartLines = [];
+    return false;
+  }
+
+  chartMatrix = [
+    values.slice(0,4),
+    values.slice(4,8),
+    values.slice(8,12),
+    values.slice(12,16)
+  ];
+
+  chartLines = [];
+
+  for(let r=0;r<4;r++){
+
+    chartLines.push({
+      number:chartMatrix[r].join(""),
+      type:"Horizontal R"+(r+1)
+    });
+
+  }
+
+  for(let c=0;c<4;c++){
+
+    let number = "";
+
+    for(let r=0;r<4;r++){
+      number += chartMatrix[r][c];
+    }
+
+    chartLines.push({
+      number,
+      type:"Vertical C"+(c+1)
+    });
+
+  }
+
+  let d1="";
+  let d2="";
+
+  for(let i=0;i<4;i++){
+
+    d1 += chartMatrix[i][i];
+    d2 += chartMatrix[i][3-i];
+
+  }
+
+  chartLines.push({
+    number:d1,
+    type:"Diagonal ↘"
+  });
+
+  chartLines.push({
+    number:d2,
+    type:"Diagonal ↙"
+  });
+
+
+  const crosses = [
+
+    chartMatrix[0][0]
+    +chartMatrix[1][1]
+    +chartMatrix[2][1]
+    +chartMatrix[3][0],
+
+    chartMatrix[0][3]
+    +chartMatrix[1][2]
+    +chartMatrix[2][2]
+    +chartMatrix[3][3],
+
+    chartMatrix[0][1]
+    +chartMatrix[1][2]
+    +chartMatrix[2][1]
+    +chartMatrix[3][2],
+
+    chartMatrix[0][2]
+    +chartMatrix[1][1]
+    +chartMatrix[2][2]
+    +chartMatrix[3][1]
+
+  ];
+
+  crosses.forEach((number,index)=>{
+
+    chartLines.push({
+      number,
+      type:"Cross X"+(index+1)
+    });
+
+  });
+
+
+  const normal =
+  [...chartLines];
+
+  normal.forEach(item=>{
+
+    const reverse =
+    item.number
+    .split("")
+    .reverse()
+    .join("");
+
+    chartLines.push({
+      number:reverse,
+      type:"Reverse "+item.type
+    });
+
+  });
+
+  return true;
+
+}
+
+
+/* =========================
+DISPLAY CHARTA LINES
+========================= */
+
+function renderChartaLines(){
+
+  const box =
+  document.getElementById("chartaLines");
+
+  if(!buildCharta()){
+
+    box.innerHTML =
+    '<div class="empty">Isi semua Charta dahulu.</div>';
+
+    return;
+
+  }
+
+  const unique = [];
+
+  chartLines.forEach(item=>{
+
+    if(
+      !unique.some(
+        x => x.number === item.number
+        && x.type === item.type
+      )
+    ){
+      unique.push(item);
+    }
+
+  });
+
+  box.innerHTML = "";
+
+  unique.slice(0,12)
+  .forEach(item=>{
+
+    const div =
+    document.createElement("div");
+
+    div.className = "line-item";
+
+    div.innerHTML =
+    `
+    <span>${item.type}</span>
+    <strong>${item.number}</strong>
+    `;
+
+    box.appendChild(div);
+
+  });
+
+}
+
+
+/* =========================
+PERMUTATION
+========================= */
+
+function getPermutations(number){
+
+  const results = new Set();
+
+  function permute(prefix, remaining){
+
+    if(remaining.length === 0){
+
+      results.add(prefix);
+      return;
+
+    }
+
+    for(let i=0;i<remaining.length;i++){
+
+      permute(
+        prefix + remaining[i],
+        remaining.slice(0,i) +
+        remaining.slice(i+1)
+      );
+
+    }
+
+  }
+
+  permute("",number);
+
+  return [...results];
+
+}
+
+
+/* =========================
+MATCH
+========================= */
+
+function checkCharta(number){
+
+  if(!buildCharta()){
+
+    return{
+      hit:false,
+      best:null,
+      type:null
+    };
+
+  }
+
+  const permutations =
+  getPermutations(number);
+
+  for(const permutation of permutations){
+
+    const exact =
+    chartLines.find(
+      line => line.number === permutation
+    );
+
+    if(exact){
+
+      return{
+        hit:true,
+        best:permutation,
+        type:exact.type
+      };
+
+    }
+
+  }
+
+  return{
+    hit:false,
+    best:null,
+    type:null
+  };
+
+}
+
+
+/* =========================
+MARKET SEARCH
+========================= */
+
+function findInDatabase(
+  database,
+  permutations
+){
+
+  const appearances = [];
+
+  if(
+    !database
+    ||
+    !Array.isArray(database.draws)
+  ){
+    return appearances;
+  }
+
+  database.draws.forEach(draw=>{
+
+    const entries = [
+
+      {
+        number:draw.first,
+        position:"1st"
+      },
+
+      {
+        number:draw.second,
+        position:"2nd"
+      },
+
+      {
+        number:draw.third,
+        position:"3rd"
+      }
+
+    ];
+
+    entries.forEach(item=>{
+
+      if(
+        permutations.includes(item.number)
+      ){
+
+        appearances.push({
+          number:item.number,
+          position:item.position,
+          draw:draw.draw || "--",
+          date:draw.date || ""
+        });
+
+      }
+
+    });
+
+
+    if(Array.isArray(draw.special)){
+
+      draw.special.forEach(number=>{
+
+        if(permutations.includes(number)){
+
+          appearances.push({
+            number,
+            position:"Special",
+            draw:draw.draw || "--",
+            date:draw.date || ""
+          });
+
+        }
+
+      });
+
+    }
+
+
+    if(Array.isArray(draw.consolation)){
+
+      draw.consolation.forEach(number=>{
+
+        if(permutations.includes(number)){
+
+          appearances.push({
+            number,
+            position:"Consolation",
+            draw:draw.draw || "--",
+            date:draw.date || ""
+          });
+
+        }
+
+      });
+
+    }
+
+  });
+
+  return appearances;
+
+}
+
+
+/* =========================
+FAVOURITE TABLE
+========================= */
+
+function setSlots(count){
+
+  slotCount = count;
+
+  document.getElementById("slot10")
+  .classList.toggle("active",count===10);
+
+  document.getElementById("slot20")
+  .classList.toggle("active",count===20);
+
+  renderFavTable();
+
+}
+
+
+function renderFavTable(){
+
+  const body =
+  document.getElementById("favBody");
+
+  body.innerHTML = "";
+
+  for(let i=0;i<slotCount;i++){
+
+    const fav =
+    favourites[i];
+
+    let permutations = [];
+    let charta = {
+      hit:false,
+      best:null,
+      type:null
+    };
+
+    let totalMarketHits = 0;
+
+
+    if(/^[0-9]{4}$/.test(fav)){
+
+      permutations =
+      getPermutations(fav);
+
+      charta =
+      checkCharta(fav);
+
+      Object.keys(databases)
+      .forEach(key=>{
+
+        totalMarketHits +=
+        findInDatabase(
+          databases[key],
+          permutations
+        ).length;
+
+      });
+
+    }
+
+
+    const tr =
+    document.createElement("tr");
+
+
+    if(i===selectedIndex){
+      tr.classList.add("selected-row");
+    }
+
+
+    tr.innerHTML =
+    `
+    <td>${i+1}</td>
+
+    <td>
+      <input
+        class="fav-input"
+        maxlength="4"
+        value="${fav}"
+        data-index="${i}"
+      >
+    </td>
+
+    <td>
+      ${
+        permutations.length
+        ?
+        permutations.length
+        :
+        "-"
+      }
+    </td>
+
+    <td>
+      ${
+        charta.hit
+        ?
+        '<span class="hit">✓ HIT</span>'
+        :
+        fav.length===4
+        ?
+        '<span class="nohit">✕ NO MATCH</span>'
+        :
+        "-"
+      }
+    </td>
+
+    <td class="best">
+      ${charta.best || "-"}
+    </td>
+
+    <td>
+      ${charta.type || "-"}
+    </td>
+
+    <td>
+      ${
+        fav.length===4
+        ?
+        totalMarketHits>0
+        ?
+        '<span class="found">✓ '+totalMarketHits+' HIT</span>'
+        :
+        '<span class="notfound">✕ NOT FOUND</span>'
+        :
+        "-"
+      }
+    </td>
+
+    <td>
+      <button
+        class="delete-btn"
+        onclick="clearFavourite(${i})">
+        ×
+      </button>
+    </td>
+    `;
+
+
+    tr.addEventListener(
+      "click",
+      event=>{
+
+        if(
+          event.target.classList.contains(
+            "fav-input"
+          )
+          ||
+          event.target.classList.contains(
+            "delete-btn"
+          )
+        ){
+          return;
+        }
+
+        selectedIndex = i;
+
+        renderFavTable();
+        renderSelectedDetail();
+
+      }
+    );
+
+
+    body.appendChild(tr);
+
+  }
+
+
+  document.querySelectorAll(".fav-input")
+  .forEach(input=>{
 
     input.addEventListener(
       "input",
@@ -707,1581 +1197,436 @@ chartInputs.forEach(
           ""
         );
 
-        if(
-          this.value.length === 1
-          &&
-          chartInputs[index+1]
-        ){
+        const index =
+        Number(this.dataset.index);
 
-          chartInputs[
-            index+1
-          ].focus();
+        favourites[index] =
+        this.value;
+
+        selectedIndex = index;
+
+        saveFavourites();
+
+        if(this.value.length===4){
+
+          renderFavTable();
+          renderSelectedDetail();
+
+        }
+
+        else{
+
+          renderSelectedDetail();
 
         }
 
       }
     );
-
-  }
-);
-
-
-const favoriteInput =
-document.getElementById(
-  "favoriteInput"
-);
-
-
-favoriteInput.addEventListener(
-  "input",
-  function(){
-
-    this.value =
-    this.value.replace(
-      /[^0-9]/g,
-      ""
-    );
-
-  }
-);
-
-
-/* ==========================
-LOAD DATABASE
-========================== */
-
-async function loadDatabases(){
-
-  const status =
-  document.getElementById(
-    "dbStatus"
-  );
-
-  status.className =
-  "loading";
-
-  status.innerText =
-  "LOADING...";
-
-
-  try{
-
-    for(
-      const key
-      of
-      Object.keys(dbFiles)
-    ){
-
-      const response =
-      await fetch(
-        dbFiles[key]
-        +
-        "?v="
-        +
-        Date.now()
-      );
-
-      if(!response.ok){
-
-        throw new Error(
-          key
-        );
-
-      }
-
-      databases[key] =
-      await response.json();
-
-    }
-
-
-    status.className =
-    "live";
-
-    status.innerText =
-    "4 MARKETS CONNECTED ✓";
-
-  }
-
-  catch(error){
-
-    status.className =
-    "error";
-
-    status.innerText =
-    "DATABASE ERROR";
-
-    console.error(error);
-
-  }
-
-}
-
-
-/* ==========================
-CHARTA
-========================== */
-
-function buildCharta(){
-
-  const values =
-  [...chartInputs]
-  .map(
-    input =>
-    input.value
-  );
-
-
-  if(
-    values.some(
-      x =>
-      !/^[0-9]$/.test(x)
-    )
-  ){
-
-    return false;
-
-  }
-
-
-  chartMatrix = [
-
-    values.slice(0,4),
-
-    values.slice(4,8),
-
-    values.slice(8,12),
-
-    values.slice(12,16)
-
-  ];
-
-
-  chartLines = [];
-
-  chartPairs = {};
-
-
-  /* HORIZONTAL */
-
-  for(let r=0;r<4;r++){
-
-    chartLines.push({
-
-      number:
-      chartMatrix[r]
-      .join(""),
-
-      type:
-      "Horizontal R"
-      +
-      (r+1),
-
-      weight:5
-
-    });
-
-  }
-
-
-  /* VERTICAL */
-
-  for(let c=0;c<4;c++){
-
-    let number = "";
-
-    for(let r=0;r<4;r++){
-
-      number +=
-      chartMatrix[r][c];
-
-    }
-
-    chartLines.push({
-
-      number,
-
-      type:
-      "Vertical C"
-      +
-      (c+1),
-
-      weight:4.7
-
-    });
-
-  }
-
-
-  /* DIAGONAL */
-
-  let d1 = "";
-  let d2 = "";
-
-  for(let i=0;i<4;i++){
-
-    d1 +=
-    chartMatrix[i][i];
-
-    d2 +=
-    chartMatrix[i][3-i];
-
-  }
-
-
-  chartLines.push({
-
-    number:d1,
-
-    type:"Diagonal ↘",
-
-    weight:4.8
 
   });
 
-
-  chartLines.push({
-
-    number:d2,
-
-    type:"Diagonal ↙",
-
-    weight:4.8
-
-  });
-
-
-  /* CROSS / X */
-
-  const crosses = [
-
-    chartMatrix[0][0]
-    +
-    chartMatrix[1][1]
-    +
-    chartMatrix[2][1]
-    +
-    chartMatrix[3][0],
-
-    chartMatrix[0][3]
-    +
-    chartMatrix[1][2]
-    +
-    chartMatrix[2][2]
-    +
-    chartMatrix[3][3],
-
-    chartMatrix[0][1]
-    +
-    chartMatrix[1][2]
-    +
-    chartMatrix[2][1]
-    +
-    chartMatrix[3][2],
-
-    chartMatrix[0][2]
-    +
-    chartMatrix[1][1]
-    +
-    chartMatrix[2][2]
-    +
-    chartMatrix[3][1]
-
-  ];
-
-
-  crosses.forEach(
-    (number,index)=>{
-
-      chartLines.push({
-
-        number,
-
-        type:
-        "Cross X"
-        +
-        (index+1),
-
-        weight:4.1
-
-      });
-
-    }
-  );
-
-
-  /* REVERSE */
-
-  const normalLines =
-  [...chartLines];
-
-
-  normalLines.forEach(
-    item=>{
-
-      chartLines.push({
-
-        number:
-        item.number
-        .split("")
-        .reverse()
-        .join(""),
-
-        type:
-        "Reverse "
-        +
-        item.type,
-
-        weight:
-        item.weight * 0.84
-
-      });
-
-    }
-  );
-
-
-  /* PAIR FREQUENCY */
-
-  chartLines.forEach(
-    line=>{
-
-      for(let i=0;i<3;i++){
-
-        const pair =
-        line.number[i]
-        +
-        line.number[i+1];
-
-
-        chartPairs[pair] =
-        (
-          chartPairs[pair]
-          ||
-          0
-        )
-        +
-        line.weight;
-
-
-        const reverse =
-        pair[1]
-        +
-        pair[0];
-
-
-        chartPairs[reverse] =
-        (
-          chartPairs[reverse]
-          ||
-          0
-        )
-        +
-        line.weight * 0.5;
-
-      }
-
-    }
-  );
-
-
-  return true;
-
 }
 
 
-/* ==========================
-DOUBLE
-========================== */
-
-function getDoubleType(number){
-
-  const count = {};
-
-  [...number]
-  .forEach(
-    digit=>{
-
-      count[digit] =
-      (
-        count[digit]
-        ||
-        0
-      )
-      +
-      1;
-
-    }
-  );
-
-
-  const values =
-  Object.values(count)
-  .sort(
-    (a,b)=>
-    b-a
-  );
-
-
-  if(
-    values[0] === 2
-    &&
-    values[1] === 2
-  ){
-
-    return "DOUBLE PAIR";
-
-  }
-
-
-  if(
-    values[0] === 3
-  ){
-
-    return "TRIPLE";
-
-  }
-
-
-  if(
-    values[0] === 2
-  ){
-
-    return "ONE DOUBLE";
-
-  }
-
-
-  return "NORMAL";
-
-}
-
-
-/* ==========================
-SCORE
-========================== */
-
-function chartScore(number){
-
-  let score = 0;
-
-  let bestType =
-  "Partial Charta";
-
-  let bestValue = 0;
-
-
-  /* EXACT LINES */
-
-  chartLines.forEach(
-    line=>{
-
-      if(
-        number ===
-        line.number
-      ){
-
-        const bonus =
-        45 +
-        line.weight * 5;
-
-        score += bonus;
-
-        if(
-          bonus >
-          bestValue
-        ){
-
-          bestValue =
-          bonus;
-
-          bestType =
-          line.type;
-
-        }
-
-      }
-
-    }
-  );
-
-
-  /* DIGIT FREQUENCY */
-
-  const flat =
-  chartMatrix.flat();
-
-  const freq =
-  Array(10).fill(0);
-
-
-  flat.forEach(
-    digit=>{
-
-      freq[
-        Number(digit)
-      ]++;
-
-    }
-  );
-
-
-  const maxFreq =
-  Math.max(...freq)
-  ||
-  1;
-
-
-  for(
-    const digit
-    of
-    number
-  ){
-
-    score +=
-    (
-      freq[
-        Number(digit)
-      ]
-      /
-      maxFreq
-    )
-    *
-    4;
-
-  }
-
-
-  /* PAIRS */
-
-  for(let i=0;i<3;i++){
-
-    const pair =
-    number[i]
-    +
-    number[i+1];
-
-    score +=
-    Math.min(
-      8,
-      (
-        chartPairs[pair]
-        ||
-        0
-      )
-      *
-      0.45
-    );
-
-  }
-
-
-  /* POSITION */
-
-  for(let pos=0;pos<4;pos++){
-
-    let count = 0;
-
-    for(let row=0;row<4;row++){
-
-      if(
-        chartMatrix[row][pos]
-        ===
-        number[pos]
-      ){
-
-        count++;
-
-      }
-
-    }
-
-    score +=
-    count * 2.2;
-
-  }
-
-
-  /* DOUBLE BONUS */
-
-  const doubleType =
-  getDoubleType(number);
-
-
-  if(
-    doubleType ===
-    "DOUBLE PAIR"
-  ){
-
-    score += 10;
-
-  }
-
-  else if(
-    doubleType ===
-    "ONE DOUBLE"
-  ){
-
-    score += 6;
-
-  }
-
-  else if(
-    doubleType ===
-    "TRIPLE"
-  ){
-
-    score += 3;
-
-  }
-
-
-  return{
-
-    score:
-    Math.min(
-      100,
-      score
-    ),
-
-    type:
-    bestType
-
-  };
-
-}
-
-
-/* ==========================
-GENERATE CHARTA HITS
-========================== */
-
-function generateTopHits(){
-
-  const map =
-  new Map();
-
-
-  /* INCLUDE ALL EXACT CHARTA LINES */
-
-  chartLines.forEach(
-    line=>{
-
-      map.set(
-        line.number,
-        line.number
-      );
-
-    }
-  );
-
-
-  /* RANDOM CANDIDATE POOL */
-
-  for(
-    let i=0;
-    i<18000;
-    i++
-  ){
-
-    const number =
-    Math.floor(
-      Math.random()*10000
-    )
-    .toString()
-    .padStart(
-      4,
-      "0"
-    );
-
-
-    map.set(
-      number,
-      number
-    );
-
-  }
-
-
-  let list =
-  [...map.values()]
-  .map(
-    number=>{
-
-      const result =
-      chartScore(number);
-
-      return{
-
-        number,
-
-        score:
-        result.score,
-
-        type:
-        result.type,
-
-        double:
-        getDoubleType(number)
-
-      };
-
-    }
-  )
-  .sort(
-    (a,b)=>
-    b.score-a.score
-  );
-
-
-  /* DIVERSITY */
-
-  const results = [];
-
-
-  for(
-    const item
-    of
-    list
-  ){
-
-    const tooSimilar =
-    results.some(
-      chosen =>
-      similarity(
-        chosen.number,
-        item.number
-      )
-      >=
-      3
-    );
-
-
-    if(!tooSimilar){
-
-      results.push(item);
-
-    }
-
-
-    if(
-      results.length === 5
-    ){
-
-      break;
-
-    }
-
-  }
-
-
-  return results;
-
-}
-
-
-function similarity(a,b){
-
-  let same = 0;
-
-
-  for(let i=0;i<4;i++){
-
-    if(
-      a[i] === b[i]
-    ){
-
-      same++;
-
-    }
-
-  }
-
-
-  return same;
-
-}
-
-
-/* ==========================
-MARKET SEARCH
-========================== */
-
-function findNumberInDatabase(
-  database,
-  number
-){
-
-  const appearances = [];
-
-
-  if(
-    !database
-    ||
-    !Array.isArray(
-      database.draws
-    )
-  ){
-
-    return{
-
-      count:0,
-
-      latest:null
-
-    };
-
-  }
-
-
-  database.draws.forEach(
-    draw=>{
-
-      const positions = [
-
-        {
-          value:draw.first,
-          position:"1st"
-        },
-
-        {
-          value:draw.second,
-          position:"2nd"
-        },
-
-        {
-          value:draw.third,
-          position:"3rd"
-        }
-
-      ];
-
-
-      positions.forEach(
-        item=>{
-
-          if(
-            item.value ===
-            number
-          ){
-
-            appearances.push({
-
-              draw:
-              draw.draw
-              ||
-              "--",
-
-              date:
-              draw.date
-              ||
-              "",
-
-              position:
-              item.position
-
-            });
-
-          }
-
-        }
-      );
-
-
-      if(
-        Array.isArray(
-          draw.special
-        )
-        &&
-        draw.special.includes(
-          number
-        )
-      ){
-
-        appearances.push({
-
-          draw:
-          draw.draw
-          ||
-          "--",
-
-          date:
-          draw.date
-          ||
-          "",
-
-          position:
-          "Special"
-
-        });
-
-      }
-
-
-      if(
-        Array.isArray(
-          draw.consolation
-        )
-        &&
-        draw.consolation.includes(
-          number
-        )
-      ){
-
-        appearances.push({
-
-          draw:
-          draw.draw
-          ||
-          "--",
-
-          date:
-          draw.date
-          ||
-          "",
-
-          position:
-          "Consolation"
-
-        });
-
-      }
-
-    }
-  );
-
-
-  return{
-
-    count:
-    appearances.length,
-
-    latest:
-    appearances[0]
-    ||
-    null
-
-  };
-
-}
-
-
-/* ==========================
-HISTORICAL RATE
-========================== */
-
-function totalDrawCount(){
-
-  let total = 0;
-
-
-  Object.values(
-    databases
-  )
-  .forEach(
-    database=>{
-
-      if(
-        Array.isArray(
-          database?.draws
-        )
-      ){
-
-        total +=
-        database.draws.length;
-
-      }
-
-    }
-  );
-
-
-  return total;
-
-}
-
-
-function allMarketAppearance(number){
-
-  let total = 0;
-
-
-  Object.values(
-    databases
-  )
-  .forEach(
-    database=>{
-
-      total +=
-      findNumberInDatabase(
-        database,
-        number
-      ).count;
-
-    }
-  );
-
-
-  return total;
-
-}
-
-
-/* ==========================
-ANALYZE
-========================== */
-
-function analyzeCharta(){
-
-  if(
-    !buildCharta()
-  ){
-
-    alert(
-      "Isi semua 16 kotak Charta dahulu."
-    );
+/* =========================
+SELECTED DETAIL
+========================= */
+
+function renderSelectedDetail(){
+
+  const fav =
+  favourites[selectedIndex];
+
+  if(!/^[0-9]{4}$/.test(fav)){
+
+    document.getElementById(
+      "permutationDetail"
+    ).innerHTML =
+    '<div class="empty">Isi Favourite Number 4 digit.</div>';
+
+    document.getElementById(
+      "hitDetail"
+    ).innerHTML =
+    '<div class="empty">Belum ada nombor lengkap.</div>';
+
+    document.getElementById(
+      "marketDetail"
+    ).innerHTML =
+    '<div class="empty">Belum ada nombor lengkap.</div>';
 
     return;
 
   }
 
 
-  const favorite =
-  favoriteInput.value.trim();
+  const permutations =
+  getPermutations(fav);
+
+  const charta =
+  checkCharta(fav);
 
 
-  if(
-    !/^[0-9]{4}$/.test(
-      favorite
-    )
-  ){
-
-    alert(
-      "Masukkan Favourite Number 4 digit."
-    );
-
-    return;
-
-  }
-
-
-  const result =
-  chartScore(
-    favorite
+  renderPermutationDetail(
+    fav,
+    permutations
   );
 
 
-  const totalAppeared =
-  allMarketAppearance(
-    favorite
+  renderHitDetail(
+    fav,
+    charta,
+    permutations
   );
 
 
-  const drawCount =
-  totalDrawCount();
-
-
-  const rate =
-  drawCount > 0
-  ?
-  (
-    totalAppeared
-    /
-    drawCount
-    *
-    100
-  )
-  :
-  0;
-
-
-  renderFavorite(
-    favorite,
-    result,
-    totalAppeared,
-    rate
-  );
-
-
-  lastPicks =
-  generateTopHits();
-
-
-  /* Guarantee favorite included */
-
-  if(
-    !lastPicks.some(
-      x =>
-      x.number ===
-      favorite
-    )
-  ){
-
-    lastPicks.unshift({
-
-      number:
-      favorite,
-
-      score:
-      result.score,
-
-      type:
-      result.type,
-
-      double:
-      getDoubleType(
-        favorite
-      )
-
-    });
-
-    lastPicks =
-    lastPicks.slice(
-      0,
-      5
-    );
-
-  }
-
-
-  lastPicks.sort(
-    (a,b)=>
-    b.score-a.score
-  );
-
-
-  renderTopPicks();
-
-  renderMarketTable();
-
-
-  localStorage.setItem(
-    "4dChartaV40",
-    JSON.stringify(
-      [...chartInputs]
-      .map(
-        input =>
-        input.value
-      )
-    )
-  );
-
-
-  localStorage.setItem(
-    "4dFavouriteV40",
-    favorite
+  renderMarketDetail(
+    fav,
+    permutations
   );
 
 }
 
 
-/* ==========================
-FAVOURITE DISPLAY
-========================== */
+/* =========================
+PERM DETAIL
+========================= */
 
-function renderFavorite(
-  number,
-  result,
-  totalAppeared,
-  rate
+function renderPermutationDetail(
+  fav,
+  permutations
 ){
 
-  const card =
+  const box =
   document.getElementById(
-    "favoriteCard"
+    "permutationDetail"
   );
 
 
-  card.style.display =
-  "block";
+  let html =
+  `
+  <div class="big-number">
+    ${fav}
+  </div>
+
+  <div class="permutation-count">
+    ${permutations.length}
+    pusingan unik
+  </div>
+
+  <div class="permutation-list">
+  `;
 
 
-  document.getElementById(
-    "favoriteNumber"
-  ).innerText =
-  number;
+  permutations.forEach(number=>{
+
+    html +=
+    `
+    <div class="perm">
+      ${number}
+    </div>
+    `;
+
+  });
 
 
-  const badge =
-  document.getElementById(
-    "matchBadge"
-  );
+  html +=
+  `</div>`;
 
 
-  const text =
-  document.getElementById(
-    "matchText"
-  );
+  box.innerHTML = html;
+
+}
 
 
-  const scoreText =
-  document.getElementById(
-    "matchScore"
-  );
+/* =========================
+HIT DETAIL
+========================= */
 
-
-  badge.className =
-  "match-badge";
-
-
-  if(
-    result.score >= 75
-  ){
-
-    text.innerText =
-    "STRONG MATCH ✓";
-
-  }
-
-  else if(
-    result.score >= 50
-  ){
-
-    badge.classList.add(
-      "weak"
-    );
-
-    text.innerText =
-    "MEDIUM MATCH";
-
-  }
-
-  else{
-
-    badge.classList.add(
-      "none"
-    );
-
-    text.innerText =
-    "LOW MATCH";
-
-  }
-
-
-  scoreText.innerText =
-  "MATCH SCORE: "
-  +
-  result.score.toFixed(1)
-  +
-  " / 100";
-
-
-  const exact =
-  chartLines.find(
-    line =>
-    line.number ===
-    number
-  );
-
-
-  document.getElementById(
-    "chartMatch"
-  ).innerHTML =
-  exact
-  ?
-  '<span class="good">FOUND ✓</span>'
-  :
-  '<span class="mid">PARTIAL</span>';
-
-
-  document.getElementById(
-    "matchType"
-  ).innerText =
-  exact
-  ?
-  exact.type
-  :
-  result.type;
-
+function renderHitDetail(
+  fav,
+  charta,
+  permutations
+){
 
   const flat =
   chartMatrix.flat();
 
 
-  const matchedDigits =
-  [...number]
+  const digitStatus =
+  [...fav]
   .map(
     digit =>
     flat.includes(digit)
     ?
-    digit + " ✓"
+    digit+" ✓"
     :
-    digit + " ✕"
+    digit+" ✕"
   )
   .join("  ");
 
 
   document.getElementById(
-    "digitMatch"
-  ).innerText =
-  matchedDigits;
-
-
-  document.getElementById(
-    "doubleInfo"
-  ).innerText =
-  getDoubleType(
-    number
-  );
-
-
-  document.getElementById(
-    "historicalTotal"
-  ).innerText =
-  totalAppeared
-  +
-  " appearance";
-
-
-  document.getElementById(
-    "historicalRate"
-  ).innerText =
-  rate.toFixed(2)
-  +
-  "%";
-
-}
-
-
-/* ==========================
-TOP PICKS DISPLAY
-========================== */
-
-function renderTopPicks(){
-
-  const container =
-  document.getElementById(
-    "topPicks"
-  );
-
-
-  container.innerHTML = "";
-
-
-  lastPicks.forEach(
-    (item,index)=>{
-
-      const div =
-      document.createElement(
-        "div"
-      );
-
-
-      div.className =
-      "pick";
-
-
-      div.innerHTML =
-      `
-      <div class="rank">
-        #${index+1}
-      </div>
-
-      <div class="pick-number">
-        ${item.number}
-      </div>
-
-      <div class="pick-score">
-        SCORE:
-        ${item.score.toFixed(1)}/100
-      </div>
-
-      <div class="pick-tag">
-        ${item.type}
-        •
-        ${item.double}
-      </div>
-      `;
-
-
-      container.appendChild(
-        div
-      );
-
-    }
-  );
-
-}
-
-
-/* ==========================
-MARKET TABLE
-========================== */
-
-function renderMarketTable(){
-
-  const body =
-  document.getElementById(
-    "marketBody"
-  );
-
-
-  body.innerHTML = "";
-
-
-  lastPicks.forEach(
-    pick=>{
-
-      const tr =
-      document.createElement(
-        "tr"
-      );
-
-
-      let html =
-      `
-      <td>
-        <span class="market-number">
-          ${pick.number}
-        </span>
-      </td>
-      `;
-
-
-      [
-        "toto",
-        "magnum",
-        "damacai",
-        "cashsweep"
-      ]
-      .forEach(
-        key=>{
-
-          const result =
-          findNumberInDatabase(
-            databases[key],
-            pick.number
-          );
-
-
-          if(
-            result.count > 0
-          ){
-
-            html +=
-            `
-            <td>
-
-              <span class="found">
-                ✓ FOUND
-                (${result.count}×)
-              </span>
-
-              <div class="detail">
-                Latest:
-                ${result.latest.draw}
-                <br>
-                ${result.latest.position}
-              </div>
-
-            </td>
-            `;
-
-          }
-
-          else{
-
-            html +=
-            `
-            <td>
-
-              <span class="notfound">
-                ✕ NOT FOUND
-              </span>
-
-            </td>
-            `;
-
-          }
-
-        }
-      );
-
-
-      tr.innerHTML =
-      html;
-
-
-      body.appendChild(
-        tr
-      );
-
-    }
-  );
-
-}
-
-
-/* ==========================
-CLEAR
-========================== */
-
-function clearAll(){
-
-  chartInputs.forEach(
-    input =>
-    input.value = ""
-  );
-
-
-  favoriteInput.value =
-  "";
-
-
-  document.getElementById(
-    "favoriteCard"
-  ).style.display =
-  "none";
-
-
-  document.getElementById(
-    "topPicks"
+    "hitDetail"
   ).innerHTML =
   `
-  <div class="empty">
-    Isi Charta kemudian tekan Analyze.
+  <div class="info-list">
+
+    <div class="info-row">
+      <span>Status</span>
+      <span class="${charta.hit?'hit':'nohit'}">
+        ${
+          charta.hit
+          ?
+          "HIT ✓"
+          :
+          "NO MATCH"
+        }
+      </span>
+    </div>
+
+    <div class="info-row">
+      <span>Best Match</span>
+      <span class="best">
+        ${charta.best || "-"}
+      </span>
+    </div>
+
+    <div class="info-row">
+      <span>Match Type</span>
+      <span>
+        ${charta.type || "-"}
+      </span>
+    </div>
+
+    <div class="info-row">
+      <span>Digits in Charta</span>
+      <span>
+        ${digitStatus}
+      </span>
+    </div>
+
+    <div class="info-row">
+      <span>Pusingan Unik</span>
+      <span>
+        ${permutations.length}
+      </span>
+    </div>
+
+  </div>
+  `;
+
+}
+
+
+/* =========================
+MARKET DETAIL
+========================= */
+
+function renderMarketDetail(
+  fav,
+  permutations
+){
+
+  let html =
+  `
+  <div class="market-table">
+
+  <table>
+
+    <thead>
+      <tr>
+        <th>MARKET</th>
+        <th>STATUS</th>
+        <th>HIT PUSINGAN</th>
+        <th>TOTAL</th>
+        <th>LATEST</th>
+      </tr>
+    </thead>
+
+    <tbody>
+  `;
+
+
+  [
+    "toto",
+    "magnum",
+    "damacai",
+    "cashsweep"
+  ]
+  .forEach(key=>{
+
+    const hits =
+    findInDatabase(
+      databases[key],
+      permutations
+    );
+
+    const latest =
+    hits[0];
+
+
+    html +=
+    `
+    <tr>
+
+      <td>
+        ${dbNames[key]}
+      </td>
+
+      <td>
+        ${
+          hits.length
+          ?
+          '<span class="found">✓ FOUND</span>'
+          :
+          '<span class="notfound">✕ NOT FOUND</span>'
+        }
+      </td>
+
+      <td class="best">
+        ${
+          hits.length
+          ?
+          hits.map(x=>x.number)
+          .filter(
+            (x,i,a)=>
+            a.indexOf(x)===i
+          )
+          .slice(0,3)
+          .join(", ")
+          :
+          "-"
+        }
+      </td>
+
+      <td>
+        ${hits.length}
+      </td>
+
+      <td>
+        ${
+          latest
+          ?
+          `
+          ${latest.draw}
+          <div class="market-detail">
+            ${latest.position}
+          </div>
+          `
+          :
+          "-"
+        }
+      </td>
+
+    </tr>
+    `;
+
+  });
+
+
+  html +=
+  `
+    </tbody>
+  </table>
   </div>
   `;
 
 
   document.getElementById(
-    "marketBody"
-  ).innerHTML =
-  `
-  <tr>
-    <td colspan="5">
-      <div class="empty">
-        Belum dianalisis.
-      </div>
-    </td>
-  </tr>
-  `;
+    "marketDetail"
+  ).innerHTML = html;
+
+}
 
 
-  localStorage.removeItem(
-    "4dChartaV40"
+/* =========================
+AUTO REFRESH
+========================= */
+
+function autoRefresh(){
+
+  renderChartaLines();
+
+  renderFavTable();
+
+  renderSelectedDetail();
+
+}
+
+
+/* =========================
+CLEAR
+========================= */
+
+function clearFavourite(index){
+
+  favourites[index] = "";
+
+  saveFavourites();
+
+  selectedIndex = index;
+
+  renderFavTable();
+
+  renderSelectedDetail();
+
+}
+
+
+function clearCharta(){
+
+  chartInputs.forEach(
+    input=>input.value=""
   );
 
-
   localStorage.removeItem(
-    "4dFavouriteV40"
+    "4dChartaV42"
+  );
+
+  autoRefresh();
+
+}
+
+
+/* =========================
+SAVE
+========================= */
+
+function saveCharta(){
+
+  localStorage.setItem(
+    "4dChartaV42",
+    JSON.stringify(
+      [...chartInputs]
+      .map(x=>x.value)
+    )
   );
 
 }
 
 
-/* ==========================
+function saveFavourites(){
+
+  localStorage.setItem(
+    "4dFavV42",
+    JSON.stringify(favourites)
+  );
+
+}
+
+
+/* =========================
 RESTORE
-========================== */
+========================= */
 
 function restore(){
 
   try{
 
-    const saved =
+    const savedCharta =
     JSON.parse(
       localStorage.getItem(
-        "4dChartaV40"
+        "4dChartaV42"
       )
       ||
       "null"
@@ -2289,35 +1634,38 @@ function restore(){
 
 
     if(
-      Array.isArray(saved)
+      Array.isArray(savedCharta)
       &&
-      saved.length === 16
+      savedCharta.length===16
     ){
 
-      saved.forEach(
+      savedCharta.forEach(
         (value,index)=>{
-
-          chartInputs[
-            index
-          ].value =
-          value;
-
+          chartInputs[index].value=value;
         }
       );
 
     }
 
 
-    const favorite =
-    localStorage.getItem(
-      "4dFavouriteV40"
+    const savedFav =
+    JSON.parse(
+      localStorage.getItem(
+        "4dFavV42"
+      )
+      ||
+      "null"
     );
 
 
-    if(favorite){
+    if(Array.isArray(savedFav)){
 
-      favoriteInput.value =
-      favorite;
+      savedFav.slice(0,20)
+      .forEach(
+        (value,index)=>{
+          favourites[index]=value;
+        }
+      );
 
     }
 
@@ -2332,11 +1680,17 @@ function restore(){
 }
 
 
-/* ==========================
+/* =========================
 START
-========================== */
+========================= */
 
 restore();
+
+renderFavTable();
+
+renderChartaLines();
+
+renderSelectedDetail();
 
 loadDatabases();
 
