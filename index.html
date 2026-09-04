@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>4D Number Lab V3.1</title>
+<title>4D Number Lab V3.1.1</title>
 
 <style>
 *{
@@ -349,7 +349,7 @@ button{
 
   <div class="header">
     <h1>4D NUMBER LAB</h1>
-    <div class="version">V3.1 • DATA ENGINE</div>
+    <div class="version">V3.1.1 • DATA ENGINE FIX</div>
     <p>Historical Pattern & Balanced Statistical Analysis</p>
   </div>
 
@@ -426,7 +426,7 @@ button{
         5
       </button>
 
-      <button class="window"
+      <button class="window active"
         onclick="selectWindow(this,10)">
         10
       </button>
@@ -436,7 +436,7 @@ button{
         20
       </button>
 
-      <button class="window active"
+      <button class="window"
         onclick="selectWindow(this,'all')">
         ALL
       </button>
@@ -634,8 +634,7 @@ button{
 
 
   <div class="notice">
-    Pattern Score menunjukkan kesesuaian nombor dengan
-    corak historical data yang dipilih.
+    Pattern Score menunjukkan kesesuaian nombor dengan corak historical data yang dipilih.
     Ia bukan probability menang dan tidak menjamin keputusan cabutan.
   </div>
 
@@ -651,7 +650,7 @@ button{
 let selectedMarket = "Sports Toto";
 let selectedMode = "random";
 let selectedCount = 1;
-let selectedWindow = "all";
+let selectedWindow = 10;
 
 let database = null;
 let activeDraws = [];
@@ -659,7 +658,7 @@ let numbersData = [];
 
 let historyData =
 JSON.parse(
-  localStorage.getItem("4dHistoryV31")
+  localStorage.getItem("4dHistoryV311")
   || "[]"
 );
 
@@ -959,6 +958,7 @@ function selectMarket(button,market){
 
   updateLabel();
   loadDatabase();
+  renderHistory();
 
 }
 
@@ -1364,16 +1364,17 @@ function scoreNumber(number){
   const maxOverall =
   Math.max(...overall) || 1;
 
+  const pairValues =
+  Object.values(pairs);
+
   const maxPair =
-  Math.max(
-    ...Object.values(pairs),
-    1
-  );
+  pairValues.length
+  ? Math.max(...pairValues)
+  : 1;
 
   let raw = 0;
 
 
-  // POSITION = max 36
   for(let i=0;i<4;i++){
 
     const digit =
@@ -1394,7 +1395,6 @@ function scoreNumber(number){
   }
 
 
-  // OVERALL = max 16
   for(let i=0;i<4;i++){
 
     const digit =
@@ -1410,7 +1410,6 @@ function scoreNumber(number){
   }
 
 
-  // PAIRS = max 18
   for(let i=0;i<3;i++){
 
     const pair =
@@ -1428,7 +1427,6 @@ function scoreNumber(number){
   }
 
 
-  // SUM BALANCE = max 15
   const sum =
   number
   .split("")
@@ -1449,7 +1447,6 @@ function scoreNumber(number){
   );
 
 
-  // REPEAT BALANCE = max 10
   const unique =
   new Set(
     number.split("")
@@ -1466,7 +1463,6 @@ function scoreNumber(number){
   }
 
 
-  // RANGE BONUS = max 5
   const digits =
   number
   .split("")
@@ -1542,13 +1538,15 @@ function getReasons(number){
   }
 
 
-  let strongPairs = 0;
+  const pairValues =
+  Object.values(pairs);
 
   const maxPair =
-  Math.max(
-    ...Object.values(pairs),
-    1
-  );
+  pairValues.length
+  ? Math.max(...pairValues)
+  : 1;
+
+  let strongPairs = 0;
 
   for(let i=0;i<3;i++){
 
@@ -1799,6 +1797,13 @@ function generateNumbers(){
   }
 
 
+  results =
+  results.slice(
+    0,
+    selectedCount
+  );
+
+
   document.getElementById(
     "mainNumber"
   ).innerText =
@@ -1812,7 +1817,7 @@ function generateNumbers(){
 
 
 // ==================================
-// DISPLAY PICKS
+// DISPLAY PICKS - FIXED
 // ==================================
 
 function displayPicks(results){
@@ -1825,7 +1830,9 @@ function displayPicks(results){
   container.innerHTML = "";
 
 
-  results.forEach(item=>{
+  results
+  .slice(0, selectedCount)
+  .forEach(item=>{
 
     const box =
     document.createElement(
@@ -1833,7 +1840,6 @@ function displayPicks(results){
     );
 
     box.className = "pick";
-
 
     let detail = "";
 
@@ -1884,12 +1890,14 @@ function displayPicks(results){
 
 
 // ==================================
-// HISTORY
+// HISTORY - FIXED
 // ==================================
 
 function saveHistory(results){
 
-  results.forEach(item=>{
+  results
+  .slice(0, selectedCount)
+  .forEach(item=>{
 
     historyData.unshift({
 
@@ -1910,12 +1918,12 @@ function saveHistory(results){
   historyData =
   historyData.slice(
     0,
-    20
+    80
   );
 
 
   localStorage.setItem(
-    "4dHistoryV31",
+    "4dHistoryV311",
     JSON.stringify(
       historyData
     )
@@ -1935,13 +1943,21 @@ function renderHistory(){
   );
 
 
+  const filteredHistory =
+  historyData.filter(
+    item =>
+    item.market === selectedMarket
+  );
+
+
   if(
-    historyData.length === 0
+    filteredHistory.length === 0
   ){
 
     container.innerHTML = `
       <div class="empty">
-        Belum ada history.
+        Belum ada history untuk
+        ${selectedMarket}.
       </div>
     `;
 
@@ -1953,7 +1969,9 @@ function renderHistory(){
   container.innerHTML = "";
 
 
-  historyData.forEach(item=>{
+  filteredHistory
+  .slice(0,20)
+  .forEach(item=>{
 
     const row =
     document.createElement(
@@ -1986,10 +2004,17 @@ function renderHistory(){
 
 function clearHistory(){
 
-  historyData = [];
+  historyData =
+  historyData.filter(
+    item =>
+    item.market !== selectedMarket
+  );
 
-  localStorage.removeItem(
-    "4dHistoryV31"
+  localStorage.setItem(
+    "4dHistoryV311",
+    JSON.stringify(
+      historyData
+    )
   );
 
   renderHistory();
@@ -1998,7 +2023,7 @@ function clearHistory(){
 
 
 // ==================================
-// START
+// START APP
 // ==================================
 
 renderHistory();
