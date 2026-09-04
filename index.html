@@ -1,218 +1,322 @@
 <!DOCTYPE html>
 <html lang="ms">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>4D Number Lab V3</title>
 
-  <title>4D Number Lab</title>
+<style>
+*{
+  box-sizing:border-box;
+  margin:0;
+  padding:0;
+}
 
-  <style>
-    *{
-      box-sizing:border-box;
-      margin:0;
-      padding:0;
-    }
+body{
+  background:#070b12;
+  color:#fff;
+  font-family:Arial,Helvetica,sans-serif;
+  min-height:100vh;
+  padding:12px;
+}
 
-    body{
-      background:#070b12;
-      color:white;
-      font-family:Arial,Helvetica,sans-serif;
-      min-height:100vh;
-      padding:14px;
-    }
+.app{
+  width:100%;
+  max-width:500px;
+  margin:auto;
+}
 
-    .app{
-      width:100%;
-      max-width:500px;
-      margin:auto;
-    }
+.header{
+  text-align:center;
+  padding:18px 8px 14px;
+}
 
-    .header{
-      text-align:center;
-      padding:18px 10px 14px;
-    }
+.header h1{
+  color:#f6c744;
+  font-size:24px;
+  letter-spacing:1px;
+}
 
-    .header h1{
-      color:#f6c744;
-      font-size:24px;
-      letter-spacing:1px;
-    }
+.version{
+  color:#f6c744;
+  font-size:9px;
+  margin-top:3px;
+}
 
-    .header p{
-      color:#7c899c;
-      font-size:11px;
-      margin-top:6px;
-    }
+.header p{
+  color:#6f7b8d;
+  font-size:10px;
+  margin-top:5px;
+}
 
-    .card{
-      background:#101722;
-      border:1px solid #243044;
-      border-radius:14px;
-      padding:14px;
-      margin-bottom:12px;
-    }
+.card{
+  background:#101722;
+  border:1px solid #243044;
+  border-radius:14px;
+  padding:13px;
+  margin-bottom:11px;
+}
 
-    .section-title{
-      color:#8c99aa;
-      font-size:11px;
-      font-weight:bold;
-      margin-bottom:10px;
-    }
+.title{
+  font-size:10px;
+  font-weight:bold;
+  color:#8996a8;
+  margin-bottom:9px;
+}
 
-    .grid-2{
-      display:grid;
-      grid-template-columns:1fr 1fr;
-      gap:7px;
-    }
+.grid2{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:7px;
+}
 
-    .grid-3{
-      display:grid;
-      grid-template-columns:repeat(3,1fr);
-      gap:7px;
-    }
+.grid3{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:7px;
+}
 
-    button{
-      cursor:pointer;
-    }
+button{
+  cursor:pointer;
+}
 
-    .market-btn,
-    .mode-btn,
-    .count-btn{
-      border:1px solid #2d394d;
-      background:#192131;
-      color:#bec7d4;
-      padding:11px 5px;
-      border-radius:8px;
-      font-size:11px;
-      font-weight:bold;
-    }
+.market,
+.mode,
+.count{
+  background:#192131;
+  border:1px solid #2b374a;
+  color:#bdc5d2;
+  border-radius:8px;
+  padding:10px 4px;
+  font-size:10px;
+  font-weight:bold;
+}
 
-    .market-btn.active,
-    .mode-btn.active,
-    .count-btn.active{
-      border-color:#f6c744;
-      color:#f6c744;
-      background:#2c2813;
-    }
+.market.active,
+.mode.active,
+.count.active{
+  border-color:#f6c744;
+  background:#2c2813;
+  color:#f6c744;
+}
 
-    .generate-box{
-      text-align:center;
-    }
+.db-status{
+  margin-top:10px;
+  background:#0a111b;
+  border-radius:8px;
+  padding:9px 10px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+  font-size:9px;
+}
 
-    .market-label{
-      color:#748299;
-      font-size:11px;
-      margin-bottom:8px;
-    }
+.db-left{
+  color:#7f8ba0;
+}
 
-    .main-number{
-      font-size:48px;
-      font-weight:bold;
-      letter-spacing:10px;
-      margin:10px 0 15px;
-    }
+.db-live{
+  color:#4ade80;
+  font-weight:bold;
+}
 
-    .generate-btn{
-      width:100%;
-      border:none;
-      background:#f6c744;
-      color:#111;
-      padding:14px;
-      border-radius:9px;
-      font-size:14px;
-      font-weight:bold;
-    }
+.db-off{
+  color:#f87171;
+  font-weight:bold;
+}
 
-    .generate-btn:active{
-      transform:scale(.98);
-    }
+.draw-info{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:7px;
+  margin-top:8px;
+}
 
-    .stats-grid{
-      display:grid;
-      grid-template-columns:1fr 1fr;
-      gap:8px;
-    }
+.info{
+  background:#0a111b;
+  border-radius:8px;
+  padding:9px;
+  text-align:center;
+}
 
-    .stat{
-      background:#0b111b;
-      border-radius:9px;
-      padding:11px;
-      text-align:center;
-    }
+.info span{
+  display:block;
+  color:#657287;
+  font-size:8px;
+  margin-bottom:4px;
+}
 
-    .stat span{
-      display:block;
-      font-size:10px;
-      color:#738095;
-      margin-bottom:5px;
-    }
+.info strong{
+  font-size:11px;
+  color:#dce3ec;
+}
 
-    .stat strong{
-      font-size:14px;
-    }
+.generator{
+  text-align:center;
+}
 
-    .hot{
-      color:#4ade80;
-    }
+.market-label{
+  font-size:9px;
+  color:#718096;
+  margin-bottom:8px;
+}
 
-    .cold{
-      color:#60a5fa;
-    }
+.main-number{
+  font-size:46px;
+  font-weight:bold;
+  letter-spacing:9px;
+  margin:11px 0 14px;
+}
 
-    .pair{
-      color:#f6c744;
-    }
+.generate{
+  width:100%;
+  padding:13px;
+  border:none;
+  border-radius:9px;
+  background:#f6c744;
+  color:#111;
+  font-size:13px;
+  font-weight:bold;
+}
 
-    .picks{
-      display:grid;
-      grid-template-columns:1fr 1fr;
-      gap:7px;
-      margin-top:8px;
-    }
+.generate:active{
+  transform:scale(.98);
+}
 
-    .pick{
-      background:#0b111b;
-      border-radius:8px;
-      padding:12px;
-      text-align:center;
-      font-weight:bold;
-      letter-spacing:3px;
-      color:#f6c744;
-    }
+.stats{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:7px;
+}
 
-    .history-item{
-      display:flex;
-      justify-content:space-between;
-      border-bottom:1px solid #202a39;
-      padding:9px 3px;
-      font-size:12px;
-    }
+.stat{
+  background:#0a111b;
+  border-radius:8px;
+  padding:10px;
+  text-align:center;
+}
 
-    .history-item:last-child{
-      border-bottom:none;
-    }
+.stat span{
+  display:block;
+  color:#657287;
+  font-size:8px;
+  margin-bottom:5px;
+}
 
-    .history-number{
-      color:#f6c744;
-      font-weight:bold;
-      letter-spacing:2px;
-    }
+.stat strong{
+  font-size:12px;
+}
 
-    .empty{
-      color:#687589;
-      text-align:center;
-      font-size:11px;
-      padding:10px;
-    }
+.green{
+  color:#4ade80;
+}
 
-    .note{
-      color:#5f6c7e;
-      font-size:9px;
-      line-height:1.5;
-      text-align:center;
-      padding:5px 12px 15px;
-    }
-  </style>
+.blue{
+  color:#60a5fa;
+}
+
+.yellow{
+  color:#f6c744;
+}
+
+.positions{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:6px;
+}
+
+.position{
+  background:#0a111b;
+  border-radius:8px;
+  text-align:center;
+  padding:10px 3px;
+}
+
+.position span{
+  display:block;
+  color:#657287;
+  font-size:8px;
+  margin-bottom:5px;
+}
+
+.position strong{
+  color:#f6c744;
+  font-size:17px;
+}
+
+.picks{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:7px;
+}
+
+.pick{
+  background:#0a111b;
+  border:1px solid #151e2b;
+  border-radius:8px;
+  padding:11px 5px;
+  text-align:center;
+}
+
+.pick-number{
+  color:#f6c744;
+  font-weight:bold;
+  letter-spacing:3px;
+  font-size:14px;
+}
+
+.pick-score{
+  color:#5f6c7d;
+  font-size:7px;
+  margin-top:4px;
+}
+
+.history-row{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  border-bottom:1px solid #202938;
+  padding:8px 2px;
+  font-size:9px;
+}
+
+.history-row:last-child{
+  border-bottom:none;
+}
+
+.history-number{
+  color:#f6c744;
+  font-weight:bold;
+  letter-spacing:2px;
+}
+
+.empty{
+  color:#647185;
+  font-size:9px;
+  text-align:center;
+  padding:10px;
+}
+
+.loading{
+  color:#f6c744;
+}
+
+.notice{
+  text-align:center;
+  font-size:8px;
+  color:#505d70;
+  line-height:1.5;
+  padding:5px 12px 15px;
+}
+
+.source{
+  color:#536175;
+  font-size:8px;
+  text-align:center;
+  margin-top:8px;
+}
+</style>
 </head>
 
 <body>
@@ -221,95 +325,111 @@
 
   <div class="header">
     <h1>4D NUMBER LAB</h1>
-    <p>Random Generator & Statistical Pattern Analysis</p>
+    <div class="version">V3 • DATA ENGINE</div>
+    <p>Historical Pattern & Statistical Analysis</p>
   </div>
 
 
+  <!-- MARKET -->
   <div class="card">
+    <div class="title">SELECT MARKET</div>
 
-    <div class="section-title">
-      SELECT MARKET
-    </div>
-
-    <div class="grid-2">
-
-      <button class="market-btn active"
+    <div class="grid2">
+      <button class="market active"
         onclick="selectMarket(this,'Sports Toto')">
         SPORTS TOTO
       </button>
 
-      <button class="market-btn"
+      <button class="market"
         onclick="selectMarket(this,'Magnum')">
         MAGNUM
       </button>
 
-      <button class="market-btn"
+      <button class="market"
         onclick="selectMarket(this,'Da Ma Cai')">
         DA MA CAI
       </button>
 
-      <button class="market-btn"
+      <button class="market"
         onclick="selectMarket(this,'Cash Sweep')">
         CASH SWEEP
       </button>
+    </div>
+
+    <div class="db-status">
+      <div class="db-left">
+        DATABASE STATUS
+      </div>
+
+      <div id="dbStatus" class="loading">
+        LOADING...
+      </div>
+    </div>
+
+    <div class="draw-info">
+
+      <div class="info">
+        <span>LATEST DRAW</span>
+        <strong id="latestDraw">--</strong>
+      </div>
+
+      <div class="info">
+        <span>LAST UPDATED</span>
+        <strong id="lastUpdated">--</strong>
+      </div>
 
     </div>
 
   </div>
 
 
+  <!-- MODE -->
   <div class="card">
+    <div class="title">MODE</div>
 
-    <div class="section-title">
-      MODE
-    </div>
+    <div class="grid2">
 
-    <div class="grid-2">
-
-      <button class="mode-btn active"
+      <button class="mode active"
         onclick="selectMode(this,'random')">
         RANDOM
       </button>
 
-      <button class="mode-btn"
+      <button class="mode"
         onclick="selectMode(this,'statistical')">
         STATISTICAL
       </button>
 
     </div>
-
   </div>
 
 
+  <!-- COUNT -->
   <div class="card">
+    <div class="title">NUMBER OF PICKS</div>
 
-    <div class="section-title">
-      NUMBER OF PICKS
-    </div>
+    <div class="grid3">
 
-    <div class="grid-3">
-
-      <button class="count-btn active"
+      <button class="count active"
         onclick="selectCount(this,1)">
         1 PICK
       </button>
 
-      <button class="count-btn"
+      <button class="count"
         onclick="selectCount(this,5)">
         5 PICKS
       </button>
 
-      <button class="count-btn"
+      <button class="count"
         onclick="selectCount(this,10)">
         10 PICKS
       </button>
 
     </div>
-
   </div>
 
 
-  <div class="card generate-box">
+  <!-- GENERATOR -->
+  <div class="card generator">
 
     <div class="market-label" id="marketLabel">
       SPORTS TOTO • RANDOM
@@ -319,7 +439,7 @@
       ----
     </div>
 
-    <button class="generate-btn"
+    <button class="generate"
       onclick="generateNumbers()">
       GENERATE
     </button>
@@ -327,32 +447,55 @@
   </div>
 
 
+  <!-- MAIN STAT -->
   <div class="card">
 
-    <div class="section-title">
+    <div class="title">
       STATISTICAL ANALYSIS
     </div>
 
-    <div class="stats-grid">
+    <div class="stats">
 
       <div class="stat">
         <span>HOT DIGITS</span>
-        <strong class="hot" id="hotDigits">--</strong>
+        <strong class="green" id="hotDigits">
+          --
+        </strong>
       </div>
 
       <div class="stat">
         <span>COLD DIGITS</span>
-        <strong class="cold" id="coldDigits">--</strong>
+        <strong class="blue" id="coldDigits">
+          --
+        </strong>
       </div>
 
       <div class="stat">
         <span>STRONG PAIR</span>
-        <strong class="pair" id="strongPair">--</strong>
+        <strong class="yellow" id="strongPair">
+          --
+        </strong>
       </div>
 
       <div class="stat">
-        <span>DATA SIZE</span>
-        <strong id="dataSize">--</strong>
+        <span>NUMBERS ANALYSED</span>
+        <strong id="dataSize">
+          0
+        </strong>
+      </div>
+
+      <div class="stat">
+        <span>REPEAT DIGIT RATE</span>
+        <strong id="repeatRate">
+          --
+        </strong>
+      </div>
+
+      <div class="stat">
+        <span>AVG DIGIT SUM</span>
+        <strong id="avgSum">
+          --
+        </strong>
       </div>
 
     </div>
@@ -360,39 +503,79 @@
   </div>
 
 
+  <!-- POSITION -->
   <div class="card">
 
-    <div class="section-title">
+    <div class="title">
+      HOT DIGIT BY POSITION
+    </div>
+
+    <div class="positions">
+
+      <div class="position">
+        <span>D1</span>
+        <strong id="pos1">-</strong>
+      </div>
+
+      <div class="position">
+        <span>D2</span>
+        <strong id="pos2">-</strong>
+      </div>
+
+      <div class="position">
+        <span>D3</span>
+        <strong id="pos3">-</strong>
+      </div>
+
+      <div class="position">
+        <span>D4</span>
+        <strong id="pos4">-</strong>
+      </div>
+
+    </div>
+
+  </div>
+
+
+  <!-- PICKS -->
+  <div class="card">
+
+    <div class="title">
       GENERATED PICKS
     </div>
 
     <div id="generatedPicks" class="picks">
+
       <div class="empty">
         Belum generate nombor.
       </div>
+
     </div>
 
   </div>
 
 
+  <!-- HISTORY -->
   <div class="card">
 
-    <div class="section-title">
+    <div class="title">
       RECENT HISTORY
     </div>
 
     <div id="history">
+
       <div class="empty">
         Belum ada history.
       </div>
+
     </div>
 
   </div>
 
 
-  <div class="note">
-    Statistical mode menggunakan corak keputusan lepas.
-    Ia tidak menjamin keputusan cabutan sebenar.
+  <div class="notice">
+    Statistical mode menganalisis corak data keputusan lepas.
+    Ia tidak menjamin atau meramal keputusan cabutan akan datang.
   </div>
 
 </div>
@@ -400,70 +583,246 @@
 
 <script>
 
+// ==============================
+// BASIC APP SETTINGS
+// ==============================
+
 let selectedMarket = "Sports Toto";
 let selectedMode = "random";
 let selectedCount = 1;
 
-let historyData = [];
+let database = null;
+let numbersData = [];
+
+let historyData =
+JSON.parse(
+  localStorage.getItem("4dHistoryV3")
+  || "[]"
+);
 
 
-// DATABASE CONTOH
-// Nanti kita boleh tukar dengan keputusan sebenar.
+// ==============================
+// DATABASE FILES
+// ==============================
 
-const marketData = {
+const databaseFiles = {
 
-  "Sports Toto":[
-    "4287","7319","5624","8831","2047",
-    "6392","4718","9853","1176","3508",
-    "7421","6984","3207","5738","8114",
-    "2469","9082","7355","4623","1897"
-  ],
+  "Sports Toto":
+    "data/toto.json",
 
-  "Magnum":[
-    "5731","8824","2406","7193","6618",
-    "4372","9085","1257","3469","7742",
-    "5628","1934","4077","8165","2398",
-    "6543","9871","3280","4459","7016"
-  ],
+  "Magnum":
+    "data/magnum.json",
 
-  "Da Ma Cai":[
-    "3168","7429","5801","9914","2657",
-    "8372","4016","6285","1739","5542",
-    "7683","9204","3471","8158","2336",
-    "6097","4812","7554","1963","8427"
-  ],
+  "Da Ma Cai":
+    "data/damacai.json",
 
-  "Cash Sweep":[
-    "6502","1874","9238","4417","7059",
-    "3162","8884","5721","2649","9375",
-    "4018","7136","5294","8820","1473",
-    "6951","3087","7564","2198","8432"
-  ]
+  "Cash Sweep":
+    "data/cashsweep.json"
 
 };
 
 
+// ==============================
+// LOAD DATABASE
+// ==============================
+
+async function loadDatabase(){
+
+  database = null;
+  numbersData = [];
+
+  resetStatistics();
+
+  const status =
+  document.getElementById("dbStatus");
+
+  status.className="loading";
+  status.innerText="LOADING...";
+
+  try{
+
+    const file =
+    databaseFiles[selectedMarket];
+
+    const response =
+    await fetch(
+      file + "?v=" + Date.now()
+    );
+
+    if(!response.ok){
+      throw new Error("Database not found");
+    }
+
+    database =
+    await response.json();
+
+    flattenDatabase();
+
+    status.className="db-live";
+    status.innerText="REAL DATA ✓";
+
+    updateDatabaseInfo();
+    calculateAllStatistics();
+
+  }
+
+  catch(error){
+
+    database=null;
+    numbersData=[];
+
+    status.className="db-off";
+    status.innerText="NOT CONNECTED";
+
+    document.getElementById(
+      "latestDraw"
+    ).innerText="--";
+
+    document.getElementById(
+      "lastUpdated"
+    ).innerText="--";
+
+    resetStatistics();
+
+  }
+
+}
+
+
+// ==============================
+// FLATTEN JSON RESULTS
+// ==============================
+
+function flattenDatabase(){
+
+  numbersData=[];
+
+  if(
+    !database ||
+    !Array.isArray(database.draws)
+  ){
+    return;
+  }
+
+  database.draws.forEach(draw=>{
+
+    const main=[
+      draw.first,
+      draw.second,
+      draw.third
+    ];
+
+    main.forEach(number=>{
+
+      if(valid4D(number)){
+        numbersData.push(number);
+      }
+
+    });
+
+
+    if(Array.isArray(draw.special)){
+
+      draw.special.forEach(number=>{
+
+        if(valid4D(number)){
+          numbersData.push(number);
+        }
+
+      });
+
+    }
+
+
+    if(Array.isArray(draw.consolation)){
+
+      draw.consolation.forEach(number=>{
+
+        if(valid4D(number)){
+          numbersData.push(number);
+        }
+
+      });
+
+    }
+
+  });
+
+}
+
+
+function valid4D(number){
+
+  return (
+    typeof number==="string"
+    &&
+    /^[0-9]{4}$/.test(number)
+  );
+
+}
+
+
+// ==============================
+// DATABASE INFO
+// ==============================
+
+function updateDatabaseInfo(){
+
+  if(!database){
+    return;
+  }
+
+  let latest =
+  database.draws?.[0];
+
+  document.getElementById(
+    "latestDraw"
+  ).innerText =
+  latest?.draw || "--";
+
+  document.getElementById(
+    "lastUpdated"
+  ).innerText =
+  database.lastUpdated || "--";
+
+}
+
+
+// ==============================
+// MARKET
+// ==============================
+
 function selectMarket(button,market){
 
-  selectedMarket = market;
+  selectedMarket=market;
 
-  document.querySelectorAll(".market-btn")
-  .forEach(btn=>btn.classList.remove("active"));
+  document.querySelectorAll(
+    ".market"
+  ).forEach(btn=>
+    btn.classList.remove("active")
+  );
 
   button.classList.add("active");
 
   updateLabel();
-  calculateStatistics();
+  loadDatabase();
 
 }
 
+
+// ==============================
+// MODE
+// ==============================
 
 function selectMode(button,mode){
 
-  selectedMode = mode;
+  selectedMode=mode;
 
-  document.querySelectorAll(".mode-btn")
-  .forEach(btn=>btn.classList.remove("active"));
+  document.querySelectorAll(
+    ".mode"
+  ).forEach(btn=>
+    btn.classList.remove("active")
+  );
 
   button.classList.add("active");
 
@@ -472,48 +831,73 @@ function selectMode(button,mode){
 }
 
 
+// ==============================
+// COUNT
+// ==============================
+
 function selectCount(button,count){
 
-  selectedCount = count;
+  selectedCount=count;
 
-  document.querySelectorAll(".count-btn")
-  .forEach(btn=>btn.classList.remove("active"));
+  document.querySelectorAll(
+    ".count"
+  ).forEach(btn=>
+    btn.classList.remove("active")
+  );
 
   button.classList.add("active");
 
 }
 
 
+// ==============================
+// LABEL
+// ==============================
+
 function updateLabel(){
 
-  document.getElementById("marketLabel").innerText =
+  document.getElementById(
+    "marketLabel"
+  ).innerText =
+
   selectedMarket.toUpperCase()
-  + " • "
-  + selectedMode.toUpperCase();
+  +
+  " • "
+  +
+  selectedMode.toUpperCase();
 
 }
 
 
+// ==============================
+// RANDOM NUMBER
+// ==============================
+
 function random4D(){
 
-  return Math.floor(Math.random()*10000)
+  return Math.floor(
+    Math.random()*10000
+  )
   .toString()
   .padStart(4,"0");
 
 }
 
 
-function getDigitFrequency(){
+// ==============================
+// DIGIT FREQUENCY
+// ==============================
 
-  const data = marketData[selectedMarket];
+function digitFrequency(){
 
-  let freq = Array(10).fill(0);
+  let freq =
+  Array(10).fill(0);
 
-  data.forEach(number=>{
+  numbersData.forEach(number=>{
 
-    number.split("").forEach(digit=>{
+    number.split("").forEach(d=>{
 
-      freq[Number(digit)]++;
+      freq[Number(d)]++;
 
     });
 
@@ -524,25 +908,66 @@ function getDigitFrequency(){
 }
 
 
-function getHotColdDigits(){
+// ==============================
+// POSITION FREQUENCY
+// ==============================
 
-  const freq = getDigitFrequency();
+function positionFrequency(){
 
-  const digits =
+  let positions = [
+    Array(10).fill(0),
+    Array(10).fill(0),
+    Array(10).fill(0),
+    Array(10).fill(0)
+  ];
+
+  numbersData.forEach(number=>{
+
+    for(let i=0;i<4;i++){
+
+      positions[i][
+        Number(number[i])
+      ]++;
+
+    }
+
+  });
+
+  return positions;
+
+}
+
+
+// ==============================
+// HOT / COLD
+// ==============================
+
+function getHotCold(){
+
+  const freq =
+  digitFrequency();
+
+  const result =
   freq.map((count,digit)=>({
     digit,
     count
   }));
 
   const sorted =
-  [...digits].sort((a,b)=>b.count-a.count);
+  [...result].sort(
+    (a,b)=>b.count-a.count
+  );
 
   return{
 
-    hot:sorted.slice(0,3)
+    hot:
+    sorted
+    .slice(0,3)
     .map(x=>x.digit),
 
-    cold:sorted.slice(-3)
+    cold:
+    sorted
+    .slice(-3)
     .reverse()
     .map(x=>x.digit)
 
@@ -551,17 +976,19 @@ function getHotColdDigits(){
 }
 
 
-function findStrongPair(){
+// ==============================
+// STRONG PAIR
+// ==============================
 
-  const data = marketData[selectedMarket];
+function strongPair(){
 
   let pairs={};
 
-  data.forEach(number=>{
+  numbersData.forEach(number=>{
 
     for(let i=0;i<3;i++){
 
-      let pair =
+      const pair =
       number[i] + number[i+1];
 
       pairs[pair] =
@@ -571,7 +998,7 @@ function findStrongPair(){
 
   });
 
-  let sorted =
+  const sorted =
   Object.entries(pairs)
   .sort((a,b)=>b[1]-a[1]);
 
@@ -582,86 +1009,467 @@ function findStrongPair(){
 }
 
 
-function generateStatistical(){
+// ==============================
+// REPEAT RATE
+// ==============================
 
-  const stats = getHotColdDigits();
+function repeatRate(){
 
-  const hot = stats.hot;
+  if(numbersData.length===0){
+    return 0;
+  }
 
-  let result = "";
+  let repeat=0;
 
+  numbersData.forEach(number=>{
+
+    const unique =
+    new Set(number.split(""));
+
+    if(unique.size<4){
+      repeat++;
+    }
+
+  });
+
+  return (
+    repeat /
+    numbersData.length *
+    100
+  );
+
+}
+
+
+// ==============================
+// AVERAGE DIGIT SUM
+// ==============================
+
+function averageDigitSum(){
+
+  if(numbersData.length===0){
+    return 0;
+  }
+
+  let total=0;
+
+  numbersData.forEach(number=>{
+
+    total +=
+    number
+    .split("")
+    .map(Number)
+    .reduce(
+      (a,b)=>a+b,
+      0
+    );
+
+  });
+
+  return total /
+  numbersData.length;
+
+}
+
+
+// ==============================
+// POSITION HOT DIGIT
+// ==============================
+
+function getPositionHot(){
+
+  const positions =
+  positionFrequency();
+
+  return positions.map(freq=>{
+
+    let max =
+    Math.max(...freq);
+
+    return freq.indexOf(max);
+
+  });
+
+}
+
+
+// ==============================
+// CALCULATE STATISTICS
+// ==============================
+
+function calculateAllStatistics(){
+
+  if(numbersData.length===0){
+
+    resetStatistics();
+    return;
+
+  }
+
+  const hc =
+  getHotCold();
+
+  document.getElementById(
+    "hotDigits"
+  ).innerText =
+  hc.hot.join(" • ");
+
+  document.getElementById(
+    "coldDigits"
+  ).innerText =
+  hc.cold.join(" • ");
+
+  document.getElementById(
+    "strongPair"
+  ).innerText =
+  strongPair();
+
+  document.getElementById(
+    "dataSize"
+  ).innerText =
+  numbersData.length;
+
+  document.getElementById(
+    "repeatRate"
+  ).innerText =
+  repeatRate().toFixed(1)
+  + "%";
+
+  document.getElementById(
+    "avgSum"
+  ).innerText =
+  averageDigitSum()
+  .toFixed(1);
+
+  const positions =
+  getPositionHot();
+
+  document.getElementById(
+    "pos1"
+  ).innerText=positions[0];
+
+  document.getElementById(
+    "pos2"
+  ).innerText=positions[1];
+
+  document.getElementById(
+    "pos3"
+  ).innerText=positions[2];
+
+  document.getElementById(
+    "pos4"
+  ).innerText=positions[3];
+
+}
+
+
+// ==============================
+// RESET STATISTICS
+// ==============================
+
+function resetStatistics(){
+
+  document.getElementById(
+    "hotDigits"
+  ).innerText="--";
+
+  document.getElementById(
+    "coldDigits"
+  ).innerText="--";
+
+  document.getElementById(
+    "strongPair"
+  ).innerText="--";
+
+  document.getElementById(
+    "dataSize"
+  ).innerText="0";
+
+  document.getElementById(
+    "repeatRate"
+  ).innerText="--";
+
+  document.getElementById(
+    "avgSum"
+  ).innerText="--";
+
+  for(let i=1;i<=4;i++){
+
+    document.getElementById(
+      "pos"+i
+    ).innerText="-";
+
+  }
+
+}
+
+
+// ==============================
+// PAIR FREQUENCY
+// ==============================
+
+function pairFrequency(){
+
+  let pairs={};
+
+  numbersData.forEach(number=>{
+
+    for(let i=0;i<3;i++){
+
+      let pair =
+      number[i]+number[i+1];
+
+      pairs[pair] =
+      (pairs[pair] || 0)+1;
+
+    }
+
+  });
+
+  return pairs;
+
+}
+
+
+// ==============================
+// SCORE NUMBER
+// ==============================
+
+function scoreNumber(number){
+
+  if(numbersData.length===0){
+    return 0;
+  }
+
+  const overall =
+  digitFrequency();
+
+  const positions =
+  positionFrequency();
+
+  const pairs =
+  pairFrequency();
+
+  const maxOverall =
+  Math.max(...overall) || 1;
+
+  let score=0;
+
+
+  // POSITION WEIGHT
   for(let i=0;i<4;i++){
 
-    let useHot =
-    Math.random() < 0.7;
+    const digit =
+    Number(number[i]);
 
-    if(useHot){
+    const maxPos =
+    Math.max(...positions[i])
+    || 1;
 
-      result +=
-      hot[
-        Math.floor(
-          Math.random()*hot.length
-        )
-      ];
+    score +=
+    (
+      positions[i][digit] /
+      maxPos
+    ) * 35;
 
-    }else{
+  }
 
-      result +=
-      Math.floor(Math.random()*10);
 
+  // OVERALL DIGIT WEIGHT
+  for(let i=0;i<4;i++){
+
+    const digit =
+    Number(number[i]);
+
+    score +=
+    (
+      overall[digit] /
+      maxOverall
+    ) * 12;
+
+  }
+
+
+  // ADJACENT PAIR WEIGHT
+  for(let i=0;i<3;i++){
+
+    const pair =
+    number[i]+number[i+1];
+
+    const pairCount =
+    pairs[pair] || 0;
+
+    score +=
+    pairCount * 4;
+
+  }
+
+
+  // DIGIT SUM BALANCE
+  const sum =
+  number
+  .split("")
+  .map(Number)
+  .reduce(
+    (a,b)=>a+b,
+    0
+  );
+
+  const avg =
+  averageDigitSum();
+
+  const distance =
+  Math.abs(sum-avg);
+
+  score +=
+  Math.max(
+    0,
+    20-distance
+  );
+
+
+  return score;
+
+}
+
+
+// ==============================
+// STATISTICAL GENERATOR
+// ==============================
+
+function statisticalPicks(count){
+
+  let candidates=[];
+
+  const candidateAmount=5000;
+
+  for(
+    let i=0;
+    i<candidateAmount;
+    i++
+  ){
+
+    const number =
+    random4D();
+
+    candidates.push({
+
+      number:number,
+      score:scoreNumber(number)
+
+    });
+
+  }
+
+
+  candidates.sort(
+    (a,b)=>b.score-a.score
+  );
+
+
+  let results=[];
+  let used=new Set();
+
+
+  for(const item of candidates){
+
+    if(!used.has(item.number)){
+
+      used.add(item.number);
+      results.push(item);
+
+    }
+
+    if(results.length>=count){
+      break;
     }
 
   }
 
-  return result;
+
+  return results;
 
 }
 
+
+// ==============================
+// GENERATE
+// ==============================
 
 function generateNumbers(){
 
-  let numbers=[];
+  let results=[];
 
-  for(let i=0;i<selectedCount;i++){
 
-    let number;
+  if(
+    selectedMode==="statistical"
+  ){
 
-    if(selectedMode==="statistical"){
+    if(numbersData.length===0){
 
-      number =
-      generateStatistical();
+      alert(
+        "Database untuk "
+        +
+        selectedMarket
+        +
+        " belum disambungkan."
+      );
 
-    }else{
-
-      number =
-      random4D();
+      return;
 
     }
 
-    if(!numbers.includes(number)){
+    results =
+    statisticalPicks(
+      selectedCount
+    );
 
-      numbers.push(number);
+  }
 
-    }else{
+  else{
 
-      i--;
+    let used=new Set();
+
+    while(
+      results.length <
+      selectedCount
+    ){
+
+      let number=random4D();
+
+      if(!used.has(number)){
+
+        used.add(number);
+
+        results.push({
+          number:number,
+          score:null
+        });
+
+      }
 
     }
 
   }
 
-  document.getElementById("mainNumber")
-  .innerText =
-  numbers[0];
 
-  displayGenerated(numbers);
+  document.getElementById(
+    "mainNumber"
+  ).innerText =
+  results[0].number;
 
-  addHistory(numbers);
+
+  displayPicks(results);
+  saveHistory(results);
 
 }
 
 
-function displayGenerated(numbers){
+// ==============================
+// DISPLAY PICKS
+// ==============================
+
+function displayPicks(results){
 
   const container =
   document.getElementById(
@@ -670,38 +1478,83 @@ function displayGenerated(numbers){
 
   container.innerHTML="";
 
-  numbers.forEach(number=>{
 
-    const div =
-    document.createElement("div");
+  results.forEach(item=>{
 
-    div.className="pick";
+    const box =
+    document.createElement(
+      "div"
+    );
 
-    div.innerText=number;
+    box.className="pick";
 
-    container.appendChild(div);
+
+    let scoreText="";
+
+    if(
+      selectedMode===
+      "statistical"
+    ){
+
+      scoreText=
+      `
+      <div class="pick-score">
+        PATTERN SCORE:
+        ${item.score.toFixed(1)}
+      </div>
+      `;
+
+    }
+
+
+    box.innerHTML=
+    `
+    <div class="pick-number">
+      ${item.number}
+    </div>
+
+    ${scoreText}
+    `;
+
+
+    container.appendChild(box);
 
   });
 
 }
 
 
-function addHistory(numbers){
+// ==============================
+// HISTORY
+// ==============================
 
-  numbers.forEach(number=>{
+function saveHistory(results){
+
+  results.forEach(item=>{
 
     historyData.unshift({
 
       market:selectedMarket,
       mode:selectedMode,
-      number:number
+      number:item.number
 
     });
 
   });
 
+
   historyData =
-  historyData.slice(0,12);
+  historyData.slice(
+    0,
+    20
+  );
+
+
+  localStorage.setItem(
+    "4dHistoryV3",
+    JSON.stringify(historyData)
+  );
+
 
   renderHistory();
 
@@ -711,31 +1564,52 @@ function addHistory(numbers){
 function renderHistory(){
 
   const container =
-  document.getElementById("history");
+  document.getElementById(
+    "history"
+  );
+
+
+  if(historyData.length===0){
+
+    container.innerHTML=
+    `
+    <div class="empty">
+      Belum ada history.
+    </div>
+    `;
+
+    return;
+
+  }
+
 
   container.innerHTML="";
+
 
   historyData.forEach(item=>{
 
     const row =
-    document.createElement("div");
+    document.createElement(
+      "div"
+    );
 
     row.className=
-    "history-item";
+    "history-row";
 
-    row.innerHTML=`
 
-      <span>
-        ${item.market}
-        •
-        ${item.mode}
-      </span>
+    row.innerHTML=
+    `
+    <span>
+      ${item.market}
+      •
+      ${item.mode}
+    </span>
 
-      <span class="history-number">
-        ${item.number}
-      </span>
-
+    <span class="history-number">
+      ${item.number}
+    </span>
     `;
+
 
     container.appendChild(row);
 
@@ -744,35 +1618,13 @@ function renderHistory(){
 }
 
 
-function calculateStatistics(){
+// ==============================
+// START APP
+// ==============================
 
-  const stats =
-  getHotColdDigits();
-
-  document.getElementById(
-    "hotDigits"
-  ).innerText =
-  stats.hot.join(" • ");
-
-  document.getElementById(
-    "coldDigits"
-  ).innerText =
-  stats.cold.join(" • ");
-
-  document.getElementById(
-    "strongPair"
-  ).innerText =
-  findStrongPair();
-
-  document.getElementById(
-    "dataSize"
-  ).innerText =
-  marketData[selectedMarket].length;
-
-}
-
-
-calculateStatistics();
+renderHistory();
+updateLabel();
+loadDatabase();
 
 </script>
 
