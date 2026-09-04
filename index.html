@@ -4746,75 +4746,81 @@ document.addEventListener("DOMContentLoaded",function(){
 </script>
 
 
+
+
+
+
+
+
+
+
 <style>
-/* V4.7.3-SAFE-FINISHING */
-#v473bar{position:sticky;top:0;z-index:9000;display:flex;gap:8px;align-items:center;justify-content:space-between;padding:7px 9px;margin-bottom:8px;border:1px solid rgba(255,193,7,.3);border-radius:12px;background:rgba(3,15,28,.94);backdrop-filter:blur(10px);font-size:11px}
-#v473bar .db{color:#9fb5c5;white-space:nowrap} #v473bar .res{color:#f6c84c;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#v473load{display:none;position:fixed;inset:0;z-index:99999;align-items:center;justify-content:center;background:rgba(0,8,18,.38);pointer-events:none}
-#v473load.on{display:flex} #v473load .box{padding:16px 20px;border-radius:16px;border:1px solid rgba(41,182,246,.45);background:rgba(3,20,35,.97);text-align:center}
-#v473load .spin{width:27px;height:27px;margin:0 auto 9px;border:3px solid rgba(41,182,246,.18);border-top-color:#29b6f6;border-radius:50%;animation:v473s .8s linear infinite}
-@keyframes v473s{to{transform:rotate(360deg)}} #v473load b{color:#e8f5ff} #v473load small{display:block;color:#8faabd;margin-top:4px}
-#v473reset{border:1px solid rgba(255,82,82,.5);background:rgba(255,82,82,.1);color:#ff7777;border-radius:9px;padding:6px 8px;font-weight:800;font-size:10px}
+/* V4.7.3.2-CLEAN-FIX */
+#v473bar{
+  position:sticky;top:0;z-index:9000;
+  display:flex;align-items:center;justify-content:space-between;
+  gap:8px;padding:7px 10px;margin-bottom:8px;
+  border:1px solid rgba(255,193,7,.30);border-radius:12px;
+  background:rgba(3,15,28,.94);backdrop-filter:blur(10px);
+  font-size:11px
+}
+#v473bar .db{color:#9fb5c5;white-space:nowrap}
+#v473bar .res{color:#f6c84c;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#v473reset{
+  border:1px solid rgba(255,82,82,.5);
+  background:rgba(255,82,82,.10);color:#ff7777;
+  border-radius:9px;padding:6px 8px;font-weight:800;font-size:10px
+}
 </style>
-<div id="v473load"><div class="box"><div class="spin"></div><b>Checking history...</b><small>Scanning market database</small></div></div>
+
 <script>
+/* V4.7.3.2-CLEAN-FIX */
 (function(){
 "use strict";
-function T(e){return(e&&e.textContent||"").replace(/\s+/g," ").trim()}
-function bar(){
- if(document.getElementById("v473bar"))return;
- var x=document.createElement("div");x.id="v473bar";
- x.innerHTML='<span class="db">DB: <b id="v473date">ready</b></span><span class="res" id="v473res">Ready</span><button id="v473reset" type="button">RESET</button>';
- var h=document.querySelector("header,.header,.app-header,.topbar");
- (h&&h.parentNode?h.parentNode:document.body).insertBefore(x,h?h.nextSibling:document.body.firstChild);
- document.getElementById("v473reset").onclick=function(){
-  if(!confirm("Kosongkan Charta dan Favourite?"))return;
-  document.querySelectorAll("input").forEach(function(i){
-   if(i.maxLength===1||i.maxLength===4){i.value="";i.dispatchEvent(new Event("input",{bubbles:true}));i.dispatchEvent(new Event("change",{bubbles:true}))}
+
+function clean(v){return (v||"").replace(/\s+/g," ").trim();}
+
+function ensureBar(){
+  if(document.getElementById("v473bar")) return;
+
+  const bar=document.createElement("div");
+  bar.id="v473bar";
+  bar.innerHTML=
+    '<span class="db">DB: <b id="v473date">loading...</b></span>'+
+    '<span class="res" id="v473res">Ready</span>'+
+    '<button id="v473reset" type="button">RESET</button>';
+
+  const app=document.querySelector(".app");
+  const header=document.querySelector(".header");
+
+  if(app && header) app.insertBefore(bar,header.nextSibling);
+  else if(app) app.insertBefore(bar,app.firstChild);
+  else document.body.insertBefore(bar,document.body.firstChild);
+
+  document.getElementById("v473reset").addEventListener("click",function(){
+    if(!confirm("Kosongkan Charta dan Favourite?")) return;
+
+    document.querySelectorAll(".chart-input,.fav-input").forEach(function(i){
+      i.value="";
+      i.dispatchEvent(new Event("input",{bubbles:true}));
+      i.dispatchEvent(new Event("change",{bubbles:true}));
+    });
+
+    const clear=[...document.querySelectorAll("button")].find(function(b){
+      return clean(b.textContent).toUpperCase()==="CLEAR";
+    });
+    if(clear) try{clear.click()}catch(e){}
   });
-  Array.from(document.querySelectorAll("button")).forEach(function(b){if(T(b).toUpperCase()==="CLEAR"&&b.id!=="v473reset")try{b.click()}catch(e){}})
- };
-}
-function update(){
- var d=document.getElementById("v473date"),r=document.getElementById("v473res");if(!d||!r)return;
- var dates=T(document.body).match(/20\d{2}[-\/]\d{2}[-\/]\d{2}/g)||[],best=null;
- dates.forEach(function(z){var m=z.match(/(20\d{2})[-\/](\d{2})[-\/](\d{2})/);if(m){var q=new Date(+m[1],+m[2]-1,+m[3]);if(!best||q>best)best=q}});
- d.textContent=best?String(best.getDate()).padStart(2,"0")+"/"+String(best.getMonth()+1).padStart(2,"0")+"/"+best.getFullYear():"ready";
- var body=T(document.body),hit=body.match(/\b(\d{4})\b[\s\S]{0,80}\b(EXACT|PUSINGAN)\b/i);
- r.textContent=hit?"★ "+hit[1]+" • "+hit[2].toUpperCase():"Ready";
- var v=document.querySelector(".version");if(v)v.textContent="V4.7.3 • STABLE FINISHING";
- document.title="4D Charta Analyzer V4.7.3";
-}
-function show(){var l=document.getElementById("v473load");if(!l)return;l.classList.add("on");clearTimeout(window.__v473);window.__v473=setTimeout(function(){l.classList.remove("on")},1000)}
-document.addEventListener("DOMContentLoaded",function(){
- bar();update();
- document.addEventListener("input",function(e){if(e.target&&e.target.tagName==="INPUT"&&e.target.maxLength===4&&e.target.value.length===4)show()},true);
- var tm,mo=new MutationObserver(function(){clearTimeout(tm);tm=setTimeout(function(){update();var l=document.getElementById("v473load");if(l)l.classList.remove("on")},120)});
- mo.observe(document.body,{childList:true,subtree:true,characterData:true});
-});
-})();
-</script>
-
-
-<script>
-/* V4.7.3.1-DB-STICKY-FIX */
-(function(){
-"use strict";
-
-function clean(v){
-  return (v || "").replace(/\s+/g," ").trim();
 }
 
-function fmtISO(v){
-  if(!v) return null;
-  const m=String(v).match(/(20\d{2})[-\/](\d{2})[-\/](\d{2})/);
-  if(!m) return null;
-  return m[3]+"/"+m[2]+"/"+m[1];
+function formatDate(raw){
+  const m=String(raw||"").match(/(20\d{2})[-\/](\d{2})[-\/](\d{2})/);
+  return m ? m[3]+"/"+m[2]+"/"+m[1] : null;
 }
 
-async function loadRealDbDate(){
-  const badge=document.getElementById("v473date");
-  if(!badge) return;
+async function updateDb(){
+  const el=document.getElementById("v473date");
+  if(!el) return;
 
   const files=[
     "data/magnum.json",
@@ -4823,130 +4829,101 @@ async function loadRealDbDate(){
     "data/cashsweep.json"
   ];
 
-  let best=null;
+  let latest="";
 
   for(const file of files){
     try{
-      const res=await fetch(file+"?v="+Date.now(),{cache:"no-store"});
-      if(!res.ok) continue;
-      const db=await res.json();
+      const r=await fetch(file,{cache:"no-store"});
+      if(!r.ok) continue;
+      const db=await r.json();
 
       const candidates=[
         db.lastUpdated,
         db.historyCoverage && db.historyCoverage.newestDate
       ].filter(Boolean);
 
-      for(const raw of candidates){
+      candidates.forEach(function(raw){
         const m=String(raw).match(/(20\d{2})[-\/](\d{2})[-\/](\d{2})/);
-        if(!m) continue;
+        if(!m) return;
         const iso=m[1]+"-"+m[2]+"-"+m[3];
-        if(!best || iso>best) best=iso;
-      }
+        if(!latest || iso>latest) latest=iso;
+      });
     }catch(e){}
   }
 
-  badge.textContent=best ? fmtISO(best) : "ready";
+  el.textContent=latest ? formatDate(latest) : "unavailable";
 }
 
-function findAnalysisContainer(){
-  const all=[...document.querySelectorAll("h1,h2,h3,h4,h5,h6,div,span,strong,b")];
-
-  const title=all.find(el=>{
-    const t=clean(el.textContent).toUpperCase();
-    return t==="CHARTA HIT ANALYSIS" || t.startsWith("CHARTA HIT ANALYSIS ");
-  });
-
-  if(!title) return null;
-
-  let box=title;
-  for(let i=0;i<6 && box;i++,box=box.parentElement){
-    const t=clean(box.textContent).toUpperCase();
-    if(
-      t.includes("CHARTA HIT ANALYSIS") &&
-      (t.includes("EXACT") || t.includes("PUSINGAN") || t.includes("NO MATCH"))
-    ){
-      return box;
-    }
+function getAnalysisCard(){
+  const cards=[...document.querySelectorAll(".analysis-card,.card")];
+  for(const card of cards){
+    const t=clean(card.textContent).toUpperCase();
+    if(t.includes("CHARTA HIT ANALYSIS")) return card;
   }
-
-  return title.parentElement;
+  return null;
 }
 
-function updateStickyFromRealAnalysis(){
-  const target=document.getElementById("v473res");
-  if(!target) return;
+function updateResult(){
+  const out=document.getElementById("v473res");
+  if(!out) return;
 
-  const box=findAnalysisContainer();
-
-  if(!box){
-    target.textContent="Ready";
+  const card=getAnalysisCard();
+  if(!card){
+    out.textContent="Ready";
     return;
   }
 
-  const t=clean(box.textContent);
-  const upper=t.toUpperCase();
+  const t=clean(card.textContent);
+  const u=t.toUpperCase();
 
-  if(upper.includes("NO MATCH")){
-    target.textContent="★ NO MATCH";
+  if(u.includes("NO MATCH")){
+    out.textContent="★ NO MATCH";
     return;
   }
 
-  const typeMatch=upper.match(/\b(EXACT|PUSINGAN)\b/);
-  if(!typeMatch){
-    target.textContent="Ready";
+  const type=(u.match(/\b(EXACT|PUSINGAN)\b/)||[])[1];
+  if(!type){
+    out.textContent="Ready";
     return;
   }
 
   let number=null;
-  const patterns=[
-    /BEST MATCH\s*[:\-]?\s*(\d{4})/i,
-    /HIT NO\.?\s*[:\-]?\s*(\d{4})/i,
-    /MATCH\s*[:\-]?\s*(\d{4})/i,
-    /\b(\d{4})\b/
-  ];
+  const best=card.querySelector(".best,.analysis-value.big");
 
-  for(const p of patterns){
-    const m=t.match(p);
-    if(m){ number=m[1]; break; }
+  if(best){
+    const m=clean(best.textContent).match(/\b\d{4}\b/);
+    if(m) number=m[0];
   }
 
   if(!number){
-    target.textContent="★ "+typeMatch[1].toUpperCase();
-    return;
+    const m=t.match(/BEST MATCH\s*[:\-]?\s*(\d{4})/i);
+    if(m) number=m[1];
   }
 
-  let pattern="";
-  const pm=upper.match(/\b(STRAIGHT|ZIGZAG|BOX\/CORNER|L-SHAPE|REPEAT DIGIT PATH|SNAKE\/PATH)\b/);
-  if(pm) pattern=" • "+pm[1];
-
-  target.textContent="★ "+number+" • "+typeMatch[1].toUpperCase()+pattern;
+  out.textContent=number ? "★ "+number+" • "+type : "★ "+type;
 }
 
 function setVersion(){
   const v=document.querySelector(".version");
-  if(v) v.textContent="V4.7.3.1 • STABLE FIX";
-  document.title="4D Charta Analyzer V4.7.3.1";
+  if(v) v.textContent="V4.7.3.2 • CLEAN FIX";
+  document.title="4D Charta Analyzer V4.7.3.2";
 }
 
 document.addEventListener("DOMContentLoaded",function(){
-  setTimeout(loadRealDbDate,100);
-  setTimeout(updateStickyFromRealAnalysis,150);
+  ensureBar();
   setVersion();
+  updateDb();
+  updateResult();
 
   let timer=null;
-  const observer=new MutationObserver(function(){
+  const mo=new MutationObserver(function(){
     clearTimeout(timer);
     timer=setTimeout(function(){
-      updateStickyFromRealAnalysis();
+      updateResult();
       setVersion();
-    },160);
+    },120);
   });
-
-  observer.observe(document.body,{
-    childList:true,
-    subtree:true,
-    characterData:true
-  });
+  mo.observe(document.body,{childList:true,subtree:true,characterData:true});
 });
 })();
 </script>
