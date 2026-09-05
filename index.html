@@ -1445,21 +1445,39 @@ body.v46-ui .pattern-panel{
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 
 
+
 <style>
-/* FULL-REPEAT-FAMILY-SCAN-V1 */
-#v5Repeat .v5FullRepeat{margin-top:7px;border:1px solid rgba(66,169,235,.30);border-radius:9px;background:rgba(6,28,45,.82);overflow:hidden}
-#v5Repeat .v5FullRepeat>summary{min-height:36px;padding:8px 9px;display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;list-style:none;color:#cfe8f8;font-size:9px;font-weight:bold}
-#v5Repeat .v5FullRepeat>summary::-webkit-details-marker,#v5Repeat .v5FamilyRow>summary::-webkit-details-marker{display:none}
-#v5Repeat .v5FullRepeat>summary b{color:#ffc62e;font-size:8px}
-#v5Repeat .v5FullRepeat[open]>summary b{font-size:0}
-#v5Repeat .v5FullRepeat[open]>summary b:after{content:"HIDE ▲";font-size:8px}
-#v5Repeat .v5FullRepeatBody{padding:0 7px 7px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
-#v5Repeat .v5FamilyRow{border:1px solid rgba(52,101,132,.48);border-radius:8px;background:#061522;overflow:hidden}
-#v5Repeat .v5FamilyRow>summary{padding:7px;cursor:pointer;list-style:none}
-#v5Repeat .v5FamilyNum{display:block;color:#ffc62e;font-size:14px;font-weight:bold}
-#v5Repeat .v5FamilyMeta{display:block;color:#8299aa;font-size:7px;margin-top:2px}
-#v5Repeat .v5FamilyPerms{display:flex;flex-wrap:wrap;gap:3px;padding:0 6px 6px}
-#v5Repeat .v5FamilyPerms span{padding:3px 4px;border-radius:5px;border:1px solid #21445b;background:#0a2232;color:#d9e8f1;font-size:7px}
+/* FULL-REPEAT-STABLE-V2 */
+#v5Repeat .v5FullRepeatStable{
+  margin-top:7px;border:1px solid rgba(66,169,235,.30);border-radius:9px;
+  background:rgba(6,28,45,.82);overflow:hidden
+}
+#v5Repeat .v5FullRepeatStable>summary{
+  min-height:36px;padding:8px 9px;display:flex;align-items:center;
+  justify-content:space-between;gap:8px;cursor:pointer;list-style:none;
+  color:#cfe8f8;font-size:9px;font-weight:bold;user-select:none
+}
+#v5Repeat .v5FullRepeatStable>summary::-webkit-details-marker{display:none}
+#v5Repeat .v5FullRepeatStable>summary b{color:#ffc62e;font-size:8px}
+#v5Repeat .v5FullRepeatStable[open]>summary b{font-size:0}
+#v5Repeat .v5FullRepeatStable[open]>summary b:after{content:"HIDE ▲";font-size:8px}
+#v5Repeat .v5FullRepeatStableBody{
+  padding:0 7px 7px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px
+}
+#v5Repeat .v5FamilyStable{
+  border:1px solid rgba(52,101,132,.48);border-radius:8px;background:#061522;
+  padding:7px;min-width:0
+}
+#v5Repeat .v5FamilyStableHead{
+  display:flex;align-items:flex-start;justify-content:space-between;gap:5px
+}
+#v5Repeat .v5FamilyStableNum{color:#ffc62e;font-size:14px;font-weight:bold}
+#v5Repeat .v5FamilyStableMeta{color:#8299aa;font-size:7px;text-align:right;line-height:1.25}
+#v5Repeat .v5FamilyStablePerms{display:flex;flex-wrap:wrap;gap:3px;margin-top:6px}
+#v5Repeat .v5FamilyStablePerms span{
+  padding:3px 4px;border-radius:5px;border:1px solid #21445b;
+  background:#0a2232;color:#d9e8f1;font-size:7px
+}
 </style>
 
 </head>
@@ -4901,7 +4919,7 @@ function updateAutoExpansion(){
   const f={};digits.forEach(d=>f[d]=(f[d]||0)+1);
   const ranked=Object.entries(f).sort((a,b)=>b[1]-a[1]||Number(a[0])-Number(b[0])).map(x=>x[0]);if(ranked.length<3)return;
   const a=ranked[0],b=ranked[1],c=ranked[2];
-  /* REVERSE-TRIPLE-INTEGRATED-V1 */
+  /* FULL-REPEAT-STABLE-V2 */
   const rows=[
     ["×12 • AABC",a+a+b+c,"1 pair sama"],
     ["×6 • AABB",a+a+b+b,"2 pair"],
@@ -4910,23 +4928,59 @@ function updateAutoExpansion(){
   if((f[b]||0)>=3){
     rows.push(["×4 • REVERSE AAAB",b+b+b+a,"3 digit sama • reverse family"]);
   }
-  /* FULL-REPEAT-FAMILY-SCAN-V1 */
-  const repeatDigits=Object.entries(f).filter(([,count])=>count>=3).sort((x,y)=>y[1]-x[1]||Number(x[0])-Number(y[0])).map(x=>x[0]);
-  const partners=Object.entries(f).filter(([,count])=>count>=2).sort((x,y)=>y[1]-x[1]||Number(x[0])-Number(y[0])).map(x=>x[0]);
+
+  const tripleDigits=Object.entries(f)
+    .filter(([,count])=>count>=3)
+    .sort((x,y)=>y[1]-x[1]||Number(x[0])-Number(y[0]))
+    .map(x=>x[0]);
+
+  const partnerDigits=Object.entries(f)
+    .filter(([,count])=>count>=2)
+    .sort((x,y)=>y[1]-x[1]||Number(x[0])-Number(y[0]))
+    .map(x=>x[0]);
+
   const families=[];
-  repeatDigits.forEach(rep=>{
-    partners.forEach(partner=>{
-      if(partner===rep)return;
+  tripleDigits.forEach(rep=>{
+    partnerDigits.forEach(partner=>{
+      if(rep===partner)return;
       const base=rep+rep+rep+partner;
       families.push({base,rep,partner,perms:getPermutations(base)});
     });
   });
+
+  const sig=digits.join("")+"|"+families.map(x=>x.base).join(",");
+
+  if(box.dataset.repeatSig===sig)return;
+
   const familyHtml=families.length
-    ? '<details class="v5FullRepeat"><summary><span>FULL REPEAT FAMILY SCAN</span><b>SHOW ▼</b></summary><div class="v5FullRepeatBody">'+
-      families.map(fam=>'<details class="v5FamilyRow"><summary><span class="v5FamilyNum">'+fam.base+'</span><span class="v5FamilyMeta">TRIPLE '+fam.rep+' + '+fam.partner+' • ×'+fam.perms.length+' ›</span></summary><div class="v5FamilyPerms">'+fam.perms.map(p=>'<span>'+p+'</span>').join("")+'</div></details>').join("")+
-      '</div></details>'
+    ? '<details class="v5FullRepeatStable">'+
+        '<summary><span>FULL REPEAT FAMILY SCAN</span><b>SHOW ▼</b></summary>'+
+        '<div class="v5FullRepeatStableBody">'+
+          families.map(fam=>
+            '<div class="v5FamilyStable">'+
+              '<div class="v5FamilyStableHead">'+
+                '<span class="v5FamilyStableNum">'+fam.base+'</span>'+
+                '<span class="v5FamilyStableMeta">TRIPLE '+fam.rep+' + '+fam.partner+' • ×'+fam.perms.length+'</span>'+
+              '</div>'+
+              '<div class="v5FamilyStablePerms">'+
+                fam.perms.map(p=>'<span>'+p+'</span>').join("")+
+              '</div>'+
+            '</div>'
+          ).join("")+
+        '</div>'+
+      '</details>'
     : '';
-  box.innerHTML='<div class="ttl">REPEAT DIGIT EXPANSION</div><div class="note">Berdasarkan digit paling kerap dalam Charta. Unique permutation, bukan probability menang.</div><div class="grid">'+rows.map(x=>'<div class="item"><small>'+x[0]+' • '+x[2]+'</small><span class="num">'+x[1]+'</span>'+badge(x[1])+'</div>').join("")+'</div>'+familyHtml;
+
+  box.innerHTML=
+    '<div class="ttl">REPEAT DIGIT EXPANSION</div>'+
+    '<div class="note">Berdasarkan digit paling kerap dalam Charta. Unique permutation, bukan probability menang.</div>'+
+    '<div class="grid">'+
+      rows.map(x=>'<div class="item"><small>'+x[0]+' • '+x[2]+'</small><span class="num">'+x[1]+'</span>'+badge(x[1])+'</div>').join("")+
+    '</div>'+
+    familyHtml;
+
+  box.dataset.repeatSig=sig;
+
 }
 
 function setupPWA(){
