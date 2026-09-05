@@ -1,0 +1,37 @@
+name: Fix History Date Sort
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix-history-sort:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Apply History Sort Fix
+        run: python scripts/fix_history_date_sort.py
+
+      - name: Save
+        run: |
+          git config user.name "4D App Updater"
+          git config user.email "actions@users.noreply.github.com"
+
+          git add index.html
+
+          if git diff --cached --quiet; then
+            echo "No changes"
+          else
+            git commit -m "Fix history date sorting"
+            git push
+          fi
