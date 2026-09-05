@@ -1,0 +1,181 @@
+name: Fix Full Repeat Glitch One File
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix-full-repeat:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Apply stable Full Repeat fix
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          index = Path("index.html")
+          sw = Path("sw.js")
+
+          if not index.exists():
+              raise SystemExit("ERROR: index.html tidak dijumpai")
+
+          s = index.read_text(encoding="utf-8")
+
+          s = re.sub(r'<style>\s*/\*\s*FULL-REPEAT-FAMILY-SCAN-V1\s*\*/.*?</style>\s*', '', s, flags=re.S)
+          s = re.sub(r'<style>\s*/\*\s*FULL-REPEAT-STABLE-V2\s*\*/.*?</style>\s*', '', s, flags=re.S)
+
+          new_block = r'''  const a=ranked[0],b=ranked[1],c=ranked[2];
+            /* FULL-REPEAT-STABLE-V2 */
+            const rows=[
+              ["×12 • AABC",a+a+b+c,"1 pair sama"],
+              ["×6 • AABB",a+a+b+b,"2 pair"],
+              ["×4 • AAAB",a+a+a+b,"3 digit sama"]
+            ];
+            if((f[b]||0)>=3){
+              rows.push(["×4 • REVERSE AAAB",b+b+b+a,"3 digit sama • reverse family"]);
+            }
+
+            const tripleDigits=Object.entries(f)
+              .filter(([,count])=>count>=3)
+              .sort((x,y)=>y[1]-x[1]||Number(x[0])-Number(y[0]))
+              .map(x=>x[0]);
+
+            const partnerDigits=Object.entries(f)
+              .filter(([,count])=>count>=2)
+              .sort((x,y)=>y[1]-x[1]||Number(x[0])-Number(y[0]))
+              .map(x=>x[0]);
+
+            const families=[];
+            tripleDigits.forEach(rep=>{
+              partnerDigits.forEach(partner=>{
+                if(rep===partner)return;
+                const base=rep+rep+rep+partner;
+                families.push({base,rep,partner,perms:getPermutations(base)});
+              });
+            });
+
+            const sig=digits.join("")+"|"+families.map(x=>x.base).join(",");
+
+            if(box.dataset.repeatSig===sig)return;
+
+            const familyHtml=families.length
+              ? '<details class="v5FullRepeatStable">'+
+                  '<summary><span>FULL REPEAT FAMILY SCAN</span><b>SHOW ▼</b></summary>'+
+                  '<div class="v5FullRepeatStableBody">'+
+                    families.map(fam=>
+                      '<div class="v5FamilyStable">'+
+                        '<div class="v5FamilyStableHead">'+
+                          '<span class="v5FamilyStableNum">'+fam.base+'</span>'+
+                          '<span class="v5FamilyStableMeta">TRIPLE '+fam.rep+' + '+fam.partner+' • ×'+fam.perms.length+'</span>'+
+                        '</div>'+
+                        '<div class="v5FamilyStablePerms">'+
+                          fam.perms.map(p=>'<span>'+p+'</span>').join("")+
+                        '</div>'+
+                      '</div>'
+                    ).join("")+
+                  '</div>'+
+                '</details>'
+              : '';
+
+            box.innerHTML=
+              '<div class="ttl">REPEAT DIGIT EXPANSION</div>'+
+              '<div class="note">Berdasarkan digit paling kerap dalam Charta. Unique permutation, bukan probability menang.</div>'+
+              '<div class="grid">'+
+                rows.map(x=>'<div class="item"><small>'+x[0]+' • '+x[2]+'</small><span class="num">'+x[1]+'</span>'+badge(x[1])+'</div>').join("")+
+              '</div>'+
+              familyHtml;
+
+            box.dataset.repeatSig=sig;
+          '''
+
+          block = re.compile(
+              r'  const a=ranked\[0\],b=ranked\[1\],c=ranked\[2\];.*?'
+              r'box\.innerHTML=.*?;\s*(?=\n\})',
+              re.S
+          )
+
+          m = block.search(s)
+          if not m:
+              raise SystemExit("ERROR: blok Repeat Digit Expansion tidak ditemui. Tiada perubahan dibuat.")
+
+          s = s[:m.start()] + new_block + s[m.end():]
+
+          css = r'''
+          <style>
+          /* FULL-REPEAT-STABLE-V2 */
+          #v5Repeat .v5FullRepeatStable{
+            margin-top:7px;border:1px solid rgba(66,169,235,.30);border-radius:9px;
+            background:rgba(6,28,45,.82);overflow:hidden
+          }
+          #v5Repeat .v5FullRepeatStable>summary{
+            min-height:36px;padding:8px 9px;display:flex;align-items:center;
+            justify-content:space-between;gap:8px;cursor:pointer;list-style:none;
+            color:#cfe8f8;font-size:9px;font-weight:bold;user-select:none
+          }
+          #v5Repeat .v5FullRepeatStable>summary::-webkit-details-marker{display:none}
+          #v5Repeat .v5FullRepeatStable>summary b{color:#ffc62e;font-size:8px}
+          #v5Repeat .v5FullRepeatStable[open]>summary b{font-size:0}
+          #v5Repeat .v5FullRepeatStable[open]>summary b:after{content:"HIDE ▲";font-size:8px}
+          #v5Repeat .v5FullRepeatStableBody{
+            padding:0 7px 7px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px
+          }
+          #v5Repeat .v5FamilyStable{
+            border:1px solid rgba(52,101,132,.48);border-radius:8px;background:#061522;
+            padding:7px;min-width:0
+          }
+          #v5Repeat .v5FamilyStableHead{
+            display:flex;align-items:flex-start;justify-content:space-between;gap:5px
+          }
+          #v5Repeat .v5FamilyStableNum{color:#ffc62e;font-size:14px;font-weight:bold}
+          #v5Repeat .v5FamilyStableMeta{color:#8299aa;font-size:7px;text-align:right;line-height:1.25}
+          #v5Repeat .v5FamilyStablePerms{display:flex;flex-wrap:wrap;gap:3px;margin-top:6px}
+          #v5Repeat .v5FamilyStablePerms span{
+            padding:3px 4px;border-radius:5px;border:1px solid #21445b;
+            background:#0a2232;color:#d9e8f1;font-size:7px
+          }
+          </style>
+          '''
+
+          if "</head>" not in s:
+              raise SystemExit("ERROR: </head> tidak dijumpai")
+
+          s = s.replace("</head>", css + "\n</head>", 1)
+          index.write_text(s, encoding="utf-8")
+
+          print("Full Repeat glitch fix installed ✓")
+          print("SHOW/HIDE state stabilized ✓")
+          print("Nested expanders removed ✓")
+          print("V5.0 STABLE unchanged ✓")
+
+          if sw.exists():
+              t = sw.read_text(encoding="utf-8")
+              t2, n = re.subn(
+                  r'const CACHE = "4d-charta-v500[^"]*";',
+                  'const CACHE = "4d-charta-v500-fullrepeat-stable2";',
+                  t,
+                  count=1
+              )
+              if n:
+                  sw.write_text(t2, encoding="utf-8")
+                  print("PWA cache bumped ✓")
+
+
+      - name: Commit repaired app
+        run: |
+          git config user.name "4D App Updater"
+          git config user.email "actions@users.noreply.github.com"
+          git add index.html sw.js
+
+          if git diff --cached --quiet; then
+            echo "No changes"
+          else
+            git commit -m "Fix Full Repeat show glitch"
+            git push
+          fi
