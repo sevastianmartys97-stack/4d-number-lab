@@ -1,9 +1,7 @@
 {
-  "lastRun": "2026-09-05T11:24:52",
-  "lookbackDays": 7,
-  "pagesChecked": 7,
-  "validPages": 3,
-  "recordsParsed": 12,
-  "recordsChanged": 0,
-  "mode": "lightweight-recent-results-only"
+  "checkedAt": "2026-09-05T12:55:56",
+  "primarySource": "4dd.co",
+  "fallbackSource": "4d-my.com",
+  "acceptedMarkets": 4,
+  "changedMarkets": 4
 }
