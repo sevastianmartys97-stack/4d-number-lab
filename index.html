@@ -4883,7 +4883,15 @@ function updateAutoExpansion(){
   const f={};digits.forEach(d=>f[d]=(f[d]||0)+1);
   const ranked=Object.entries(f).sort((a,b)=>b[1]-a[1]||Number(a[0])-Number(b[0])).map(x=>x[0]);if(ranked.length<3)return;
   const a=ranked[0],b=ranked[1],c=ranked[2];
-  const rows=[["×12 • AABC",a+a+b+c,"1 pair sama"],["×6 • AABB",a+a+b+b,"2 pair"],["×4 • AAAB",a+a+a+b,"3 digit sama"]];
+  /* REVERSE-TRIPLE-INTEGRATED-V1 */
+  const rows=[
+    ["×12 • AABC",a+a+b+c,"1 pair sama"],
+    ["×6 • AABB",a+a+b+b,"2 pair"],
+    ["×4 • AAAB",a+a+a+b,"3 digit sama"]
+  ];
+  if((f[b]||0)>=3){
+    rows.push(["×4 • REVERSE AAAB",b+b+b+a,"3 digit sama • reverse family"]);
+  }
   box.innerHTML='<div class="ttl">REPEAT DIGIT EXPANSION</div><div class="note">Berdasarkan digit paling kerap dalam Charta. Unique permutation, bukan probability menang.</div><div class="grid">'+rows.map(x=>'<div class="item"><small>'+x[0]+' • '+x[2]+'</small><span class="num">'+x[1]+'</span>'+badge(x[1])+'</div>').join("")+'</div>';
 }
 
