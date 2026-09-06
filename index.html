@@ -1495,6 +1495,14 @@ body.v46-ui .pattern-panel{
 }
 </style>
 
+
+<style>
+/* FULL-REPEAT-AABB-V4 */
+#v5Repeat .v5FamilyAabb .v5FamilyStableNum{
+  color:#8ee6a7;
+}
+</style>
+
 </head>
 
 <body>
@@ -4981,7 +4989,24 @@ function updateAutoExpansion(){
     }
   });
 
-  const sig=digits.join("")+"|AAAB:"+families.map(x=>x.base).join(",")+"|AABC:"+aabcFamilies.map(x=>x.base).join(",");
+  const aabbFamilies=[];
+  for(let i=0;i<partnerDigits.length;i++){
+    for(let j=i+1;j<partnerDigits.length;j++){
+      const d1=partnerDigits[i],d2=partnerDigits[j];
+      const base=d1+d1+d2+d2;
+      aabbFamilies.push({
+        base,
+        d1,
+        d2,
+        perms:getPermutations(base)
+      });
+    }
+  }
+
+  const sig=digits.join("")+
+    "|AAAB:"+families.map(x=>x.base).join(",")+
+    "|AABB:"+aabbFamilies.map(x=>x.base).join(",")+
+    "|AABC:"+aabcFamilies.map(x=>x.base).join(",");
 
   if(box.dataset.repeatSig===sig)return;
 
@@ -4994,6 +5019,24 @@ function updateAutoExpansion(){
             '<div class="v5FamilyStableHead">'+
               '<span class="v5FamilyStableNum">'+fam.base+'</span>'+
               '<span class="v5FamilyStableMeta">TRIPLE '+fam.rep+' + '+fam.partner+' • ×'+fam.perms.length+'</span>'+
+            '</div>'+
+            '<div class="v5FamilyStablePerms">'+
+              fam.perms.map(p=>'<span>'+p+'</span>').join("")+
+            '</div>'+
+          '</div>'
+        ).join("")+
+      '</div>'
+    : '';
+
+  /* FULL-REPEAT-AABB-V4 */
+  const aabbHtml=aabbFamilies.length
+    ? '<div class="v5RepeatSectionLabel">AABB FAMILY • ×6</div>'+
+      '<div class="v5FullRepeatStableBody">'+
+        aabbFamilies.map(fam=>
+          '<div class="v5FamilyStable v5FamilyAabb">'+
+            '<div class="v5FamilyStableHead">'+
+              '<span class="v5FamilyStableNum">'+fam.base+'</span>'+
+              '<span class="v5FamilyStableMeta">PAIR '+fam.d1+' + '+fam.d2+' • ×'+fam.perms.length+'</span>'+
             '</div>'+
             '<div class="v5FamilyStablePerms">'+
               fam.perms.map(p=>'<span>'+p+'</span>').join("")+
@@ -5020,10 +5063,11 @@ function updateAutoExpansion(){
       '</div>'
     : '';
 
-  const familyHtml=(families.length||aabcFamilies.length)
+  const familyHtml=(families.length||aabbFamilies.length||aabcFamilies.length)
     ? '<details class="v5FullRepeatStable">'+
         '<summary><span>FULL REPEAT FAMILY SCAN</span><b>SHOW ▼</b></summary>'+
         aaabHtml+
+        aabbHtml+
         aabcHtml+
       '</details>'
     : '';
