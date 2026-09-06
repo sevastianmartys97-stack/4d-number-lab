@@ -1,7 +1,7 @@
 {
-  "checkedAt": "2026-09-06T11:27:19",
+  "checkedAt": "2026-09-06T11:52:44",
   "primarySource": "4dd.co",
   "fallbackSource": "4d-my.com",
-  "acceptedMarkets": 1,
-  "changedMarkets": 1
+  "acceptedMarkets": 4,
+  "changedMarkets": 3
 }

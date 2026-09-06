@@ -1,10 +1,10 @@
 {
   "market": "Da Ma Cai",
-  "lastUpdated": "2026-09-05",
+  "lastUpdated": "2026-09-06",
   "historyCoverage": {
-    "drawCount": 897,
+    "drawCount": 898,
     "oldestDate": "2021-01-02",
-    "newestDate": "2026-09-05"
+    "newestDate": "2026-09-06"
   },
   "historyRange": {
     "from": "2021-01-01",
@@ -12,6 +12,37 @@
   },
   "historySource": "deadboy18/malaysia-4d public historical CSV + existing recent records",
   "draws": [
+    {
+      "draw": "",
+      "date": "2026-09-06",
+      "first": "0694",
+      "second": "8811",
+      "third": "4027",
+      "special": [
+        "1794",
+        "1414",
+        "5477",
+        "1049",
+        "2765",
+        "2714",
+        "9205",
+        "3381",
+        "2905",
+        "4947"
+      ],
+      "consolation": [
+        "2542",
+        "0478",
+        "5249",
+        "5686",
+        "3605",
+        "4442",
+        "7721",
+        "3675",
+        "8801",
+        "5058"
+      ]
+    },
     {
       "draw": "",
       "date": "2026-09-05",
