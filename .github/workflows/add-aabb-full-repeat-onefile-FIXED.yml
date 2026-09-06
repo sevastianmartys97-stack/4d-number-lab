@@ -1,0 +1,124 @@
+name: Add AABB To Full Repeat Family FIXED
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  add-aabb:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Add AABB family
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          index = Path("index.html")
+          sw = Path("sw.js")
+
+          if not index.exists():
+              raise SystemExit("ERROR: index.html tidak dijumpai")
+
+          s = index.read_text(encoding="utf-8")
+
+          marker = "/* FULL-REPEAT-AABB-V4 */"
+          if marker in s:
+              print("AABB V4 sudah ada. Tiada perubahan.")
+          else:
+              if "FULL-REPEAT-AABC-V3" not in s:
+                  raise SystemExit("ERROR: FULL-REPEAT-AABC-V3 tidak ditemui.")
+
+              old_sig = 'const sig=digits.join("")+"|AAAB:"+families.map(x=>x.base).join(",")+"|AABC:"+aabcFamilies.map(x=>x.base).join(",");'
+              new_sig = '''const aabbFamilies=[];
+            for(let i=0;i<partnerDigits.length;i++){
+              for(let j=i+1;j<partnerDigits.length;j++){
+                const d1=partnerDigits[i],d2=partnerDigits[j];
+                const base=d1+d1+d2+d2;
+                aabbFamilies.push({base,d1,d2,perms:getPermutations(base)});
+              }
+            }
+
+            const sig=digits.join("")+
+              "|AAAB:"+families.map(x=>x.base).join(",")+
+              "|AABB:"+aabbFamilies.map(x=>x.base).join(",")+
+              "|AABC:"+aabcFamilies.map(x=>x.base).join(",");'''
+
+              if old_sig not in s:
+                  raise SystemExit("ERROR: signature V3 tidak ditemui.")
+              s = s.replace(old_sig, new_sig, 1)
+
+              anchor = '''  const aabcHtml=aabcFamilies.length
+            ? '<div class="v5RepeatSectionLabel">AABC FAMILY • ×12</div>'+'''
+
+              insert = '''  /* FULL-REPEAT-AABB-V4 */
+            const aabbHtml=aabbFamilies.length
+              ? '<div class="v5RepeatSectionLabel">AABB FAMILY • ×6</div>'+ 
+                '<div class="v5FullRepeatStableBody">'+
+                  aabbFamilies.map(fam=>
+                    '<div class="v5FamilyStable v5FamilyAabb">'+
+                      '<div class="v5FamilyStableHead">'+
+                        '<span class="v5FamilyStableNum">'+fam.base+'</span>'+ 
+                        '<span class="v5FamilyStableMeta">PAIR '+fam.d1+' + '+fam.d2+' • ×'+fam.perms.length+'</span>'+ 
+                      '</div>'+ 
+                      '<div class="v5FamilyStablePerms">'+
+                        fam.perms.map(p=>'<span>'+p+'</span>').join("")+ 
+                      '</div>'+ 
+                    '</div>'
+                  ).join("")+ 
+                '</div>'
+              : '';
+
+            const aabcHtml=aabcFamilies.length
+              ? '<div class="v5RepeatSectionLabel">AABC FAMILY • ×12</div>'+'''
+
+              if anchor not in s:
+                  raise SystemExit("ERROR: blok AABC V3 tidak ditemui.")
+              s = s.replace(anchor, insert, 1)
+
+              old_panel = "        aaabHtml+\n        aabcHtml+\n      '</details>'"
+              new_panel = "        aaabHtml+\n        aabbHtml+\n        aabcHtml+\n      '</details>'"
+
+              if old_panel not in s:
+                  raise SystemExit("ERROR: panel SHOW/HIDE V3 tidak ditemui.")
+              s = s.replace(old_panel, new_panel, 1)
+
+              css = '''
+          <style>
+          /* FULL-REPEAT-AABB-V4 */
+          #v5Repeat .v5FamilyAabb .v5FamilyStableNum{color:#8ee6a7}
+          </style>
+          '''
+              if "</head>" not in s:
+                  raise SystemExit("ERROR: </head> tidak dijumpai.")
+              s = s.replace("</head>", css + "\n</head>", 1)
+
+              index.write_text(s, encoding="utf-8")
+              print("AABB FAMILY ×6 added ✓")
+              print("Same SHOW/HIDE panel ✓")
+              print("Order: AAAB ×4 → AABB ×6 → AABC ×12 ✓")
+
+              if sw.exists():
+                  t = sw.read_text(encoding="utf-8")
+                  t2, n = re.subn(r'const CACHE = "4d-charta-v500[^"]*";', 'const CACHE = "4d-charta-v500-fullrepeat-aabb4";', t, count=1)
+                  if n:
+                      sw.write_text(t2, encoding="utf-8")
+                      print("PWA cache bumped ✓")
+
+      - name: Commit changes
+        run: |
+          git config user.name "4D App Updater"
+          git config user.email "actions@users.noreply.github.com"
+          git add index.html sw.js
+          if git diff --cached --quiet; then
+            echo "No changes"
+          else
+            git commit -m "Add AABB family to Full Repeat scan"
+            git push
+          fi
