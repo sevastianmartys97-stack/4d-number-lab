@@ -1,10 +1,10 @@
 {
   "market": "Cash Sweep",
-  "lastUpdated": "2026-09-06",
+  "lastUpdated": "2026-09-09",
   "historyCoverage": {
-    "drawCount": 880,
+    "drawCount": 881,
     "oldestDate": "2021-02-14",
-    "newestDate": "2026-09-06"
+    "newestDate": "2026-09-09"
   },
   "historyRange": {
     "from": "2021-01-01",
@@ -12,6 +12,37 @@
   },
   "historySource": "4D2U historical Cash Sweep archive + existing records",
   "draws": [
+    {
+      "draw": "",
+      "date": "2026-09-09",
+      "first": "5488",
+      "second": "2774",
+      "third": "9948",
+      "special": [
+        "2026",
+        "5488",
+        "2774",
+        "9948",
+        "7760",
+        "6480",
+        "9025",
+        "7575",
+        "4576",
+        "7654"
+      ],
+      "consolation": [
+        "1801",
+        "4807",
+        "9960",
+        "1446",
+        "4034",
+        "1667",
+        "2884",
+        "5346",
+        "7502",
+        "1094"
+      ]
+    },
     {
       "draw": "",
       "date": "2026-09-06",
