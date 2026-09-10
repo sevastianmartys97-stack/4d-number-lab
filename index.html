@@ -1521,6 +1521,65 @@ body.v46-ui .pattern-panel{
 #mtpAutoBox .mtpMsg.warn{color:#ffd36b;border-color:rgba(255,198,46,.25)}
 </style>
 
+
+<style>
+/* V51-RESULTS-TAB-V1 */
+@media(max-width:1100px){
+  .v46-bottom-nav.v51-five-nav{grid-template-columns:repeat(5,1fr)!important}
+}
+#v51ResultsPage{
+  display:none;
+  width:100%;
+  max-width:100%;
+  box-sizing:border-box;
+  margin:0 0 84px;
+  padding:0;
+}
+#v51ResultsPage.v51-show{display:block}
+#v51ResultsPage .v51-head{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding:10px 12px;margin-bottom:9px;border:1px solid #1578b8;
+  border-radius:13px;background:#061725
+}
+#v51ResultsPage .v51-title{font-size:12px;font-weight:900;color:#e7eef5}
+#v51ResultsPage .v51-date{
+  border:1px solid #1689e8;border-radius:9px;background:#08213a;color:#bfe4ff;
+  padding:7px 8px;font-size:10px;font-weight:800;max-width:155px
+}
+#v51ResultsPage .v51-grid{display:grid;grid-template-columns:1fr;gap:9px}
+#v51ResultsPage .v51-card{
+  border-radius:15px;overflow:hidden;background:#061522;border:2px solid #31526a
+}
+#v51ResultsPage .v51-card.magnum{border-color:#e7b900;background:linear-gradient(180deg,#201b05,#071522 38%)}
+#v51ResultsPage .v51-card.toto{border-color:#ff3d45;background:linear-gradient(180deg,#2a0b10,#071522 38%)}
+#v51ResultsPage .v51-card.cashsweep{border-color:#18d875;background:linear-gradient(180deg,#062d20,#071522 38%)}
+#v51ResultsPage .v51-card.damacai{border-color:#ef4550;background:linear-gradient(180deg,#2a0d12,#071522 38%)}
+#v51ResultsPage .v51-market-head{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding:9px 11px;font-weight:900;color:#f1f5f7
+}
+#v51ResultsPage .v51-market-name{font-size:14px}
+#v51ResultsPage .v51-draw{font-size:10px;color:#c8d3da}
+#v51ResultsPage .v51-top3{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid rgba(255,255,255,.08);border-bottom:1px solid rgba(255,255,255,.08)}
+#v51ResultsPage .v51-prize{text-align:center;padding:8px 3px;border-right:1px solid rgba(255,255,255,.08)}
+#v51ResultsPage .v51-prize:last-child{border-right:0}
+#v51ResultsPage .v51-prize small{display:block;color:#e9bf46;font-size:9px;margin-bottom:2px}
+#v51ResultsPage .v51-prize b{display:block;color:#ffd65b;font-size:18px;letter-spacing:1px}
+#v51ResultsPage .v51-lists{display:grid;grid-template-columns:1fr 1fr}
+#v51ResultsPage .v51-list{padding:8px 10px;text-align:center}
+#v51ResultsPage .v51-list:first-child{border-right:1px solid rgba(255,255,255,.08)}
+#v51ResultsPage .v51-list-title{font-size:10px;color:#eef3f5;margin-bottom:5px}
+#v51ResultsPage .v51-numbers{display:grid;grid-template-columns:1fr 1fr;gap:3px 10px;font-size:10px;color:#e4edf2}
+#v51ResultsPage .v51-empty{padding:28px 12px;text-align:center;color:#839bac;border:1px solid #23455d;border-radius:13px}
+#v51ResultsPage .v51-note{padding:8px 4px 0;text-align:center;color:#647f91;font-size:8px}
+.v46-nav-btn[data-tab="results"]{color:#70c6ff}
+.v46-nav-btn[data-tab="results"].active{
+  color:#5dc0ff!important;
+  background:radial-gradient(circle at 50% 100%,rgba(31,151,255,.18),transparent 67%)!important;
+  box-shadow:inset 0 0 0 1px rgba(31,151,255,.65)
+}
+</style>
+
 </head>
 
 <body>
@@ -5367,6 +5426,160 @@ document.addEventListener("DOMContentLoaded", function(){
   }
   document.addEventListener("DOMContentLoaded",()=>setTimeout(load,250));
 })();
+</script>
+
+
+<script>
+/* V51-RESULTS-TAB-V1 */
+document.addEventListener("DOMContentLoaded",function(){
+  const wait=setInterval(function(){
+    const nav=document.querySelector(".v46-bottom-nav");
+    if(!nav)return;
+    clearInterval(wait);
+
+    nav.classList.add("v51-five-nav");
+
+    if(!nav.querySelector('[data-tab="results"]')){
+      const all=nav.querySelector('[data-tab="all"]');
+      const btn=document.createElement("button");
+      btn.className="v46-nav-btn";
+      btn.dataset.tab="results";
+      btn.innerHTML='<span class="v46-nav-icon">▥</span>Results';
+      if(all)nav.insertBefore(btn,all);else nav.appendChild(btn);
+    }
+
+    const app=document.querySelector(".app");
+    if(!app)return;
+
+    let page=document.getElementById("v51ResultsPage");
+    if(!page){
+      page=document.createElement("section");
+      page.id="v51ResultsPage";
+      page.innerHTML=
+        '<div class="v51-head">'+
+          '<div class="v51-title">▣ RESULTS • <span id="v51ResultDateText">—</span></div>'+
+          '<select id="v51ResultDate" class="v51-date"><option>LOADING...</option></select>'+
+        '</div>'+
+        '<div id="v51ResultsGrid" class="v51-grid"><div class="v51-empty">Loading results...</div></div>'+
+        '<div class="v51-note">Results dipaparkan daripada database app yang sama • tidak mengubah Charta, Favourite atau History.</div>';
+      app.appendChild(page);
+    }
+
+    const files={
+      magnum:"data/magnum.json",
+      toto:"data/toto.json",
+      cashsweep:"data/cashsweep.json",
+      damacai:"data/damacai.json"
+    };
+    const labels={
+      magnum:"🟡 Magnum 4D",
+      toto:"🔴 Toto 4D",
+      cashsweep:"🟢 Cash Sweep (Sarawak)",
+      damacai:"🔴 Damacai 4D"
+    };
+    let db={};
+
+    function isoDate(raw){
+      const x=String(raw||"").trim();
+      let m=x.match(/(20\d{2})[-\/](\d{1,2})[-\/](\d{1,2})/);
+      if(m)return m[1]+"-"+m[2].padStart(2,"0")+"-"+m[3].padStart(2,"0");
+      m=x.match(/(\d{1,2})[-\/](\d{1,2})[-\/](20\d{2})/);
+      if(m)return m[3]+"-"+m[2].padStart(2,"0")+"-"+m[1].padStart(2,"0");
+      return "";
+    }
+    function niceDate(iso){
+      const m=String(iso).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if(!m)return iso;
+      const d=new Date(iso+"T12:00:00");
+      const day=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d.getDay()];
+      return m[3]+"/"+m[2]+"/"+m[1]+" ("+day+")";
+    }
+    function n4(v){
+      const s=String(v==null?"":v).replace(/\D/g,"");
+      return s ? s.slice(-4).padStart(4,"0") : "—";
+    }
+    function arr(v){
+      return Array.isArray(v)?v.map(n4).filter(x=>x!=="—").slice(0,10):[];
+    }
+    function findDraw(key,date){
+      const draws=(db[key]&&Array.isArray(db[key].draws))?db[key].draws:[];
+      return draws.find(x=>isoDate(x.date)===date)||null;
+    }
+    function listHtml(title,nums){
+      const a=arr(nums);
+      return '<div class="v51-list"><div class="v51-list-title">'+title+'</div>'+
+        '<div class="v51-numbers">'+(a.length?a.map(x=>'<span>'+x+'</span>').join(""):'<span>—</span>')+'</div></div>';
+    }
+    function card(key,draw){
+      if(!draw)return "";
+      return '<article class="v51-card '+key+'">'+
+        '<div class="v51-market-head"><span class="v51-market-name">'+labels[key]+'</span><span class="v51-draw">#'+String(draw.draw||"—")+'</span></div>'+
+        '<div class="v51-top3">'+
+          '<div class="v51-prize"><small>1st</small><b>'+n4(draw.first)+'</b></div>'+
+          '<div class="v51-prize"><small>2nd</small><b>'+n4(draw.second)+'</b></div>'+
+          '<div class="v51-prize"><small>3rd</small><b>'+n4(draw.third)+'</b></div>'+
+        '</div>'+
+        '<div class="v51-lists">'+listHtml("Special",draw.special)+listHtml("Consolation",draw.consolation)+'</div>'+
+      '</article>';
+    }
+    function render(date){
+      const grid=document.getElementById("v51ResultsGrid");
+      const title=document.getElementById("v51ResultDateText");
+      if(title)title.textContent=niceDate(date);
+      const order=["magnum","toto","cashsweep","damacai"];
+      const html=order.map(k=>card(k,findDraw(k,date))).filter(Boolean).join("");
+      grid.innerHTML=html||'<div class="v51-empty">Tiada result dalam database untuk '+niceDate(date)+'.</div>';
+      localStorage.setItem("v51ResultsDate",date);
+    }
+    async function loadResults(){
+      for(const k of Object.keys(files)){
+        try{
+          const r=await fetch(files[k]+"?v="+Date.now(),{cache:"no-store"});
+          if(r.ok)db[k]=await r.json();
+        }catch(e){console.warn("Results DB",k,e)}
+      }
+      const dates=new Set();
+      Object.values(db).forEach(x=>{
+        ((x&&x.draws)||[]).forEach(d=>{const z=isoDate(d.date);if(z)dates.add(z)});
+      });
+      const all=[...dates].sort().reverse();
+      const sel=document.getElementById("v51ResultDate");
+      if(!all.length){
+        sel.innerHTML='<option value="">NO RESULTS</option>';
+        render("");
+        return;
+      }
+      sel.innerHTML=all.map(d=>'<option value="'+d+'">'+niceDate(d)+'</option>').join("");
+      const saved=localStorage.getItem("v51ResultsDate");
+      sel.value=all.includes(saved)?saved:all[0];
+      render(sel.value);
+      sel.onchange=()=>render(sel.value);
+    }
+
+    function showResults(){
+      page.classList.add("v51-show");
+      nav.querySelectorAll(".v46-nav-btn").forEach(b=>b.classList.toggle("active",b.dataset.tab==="results"));
+      window.scrollTo({top:0,behavior:"smooth"});
+    }
+    function hideResults(){
+      page.classList.remove("v51-show");
+    }
+
+    nav.addEventListener("click",function(e){
+      const b=e.target.closest(".v46-nav-btn");
+      if(!b)return;
+      if(b.dataset.tab==="results"){
+        setTimeout(showResults,0);
+      }else{
+        hideResults();
+      }
+    });
+
+    loadResults();
+  },80);
+
+  setTimeout(()=>clearInterval(wait),5000);
+});
 </script>
 
 </body>
