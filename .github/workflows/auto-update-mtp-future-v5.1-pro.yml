@@ -1,0 +1,199 @@
+name: Auto Update MTP Charta FIXED
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Malaysia 11:00 AM - 6:00 PM (UTC+8), every hour
+    - cron: "0 3-10 * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y tesseract-ocr
+          python3 -m pip install --upgrade pip
+          pip install requests beautifulsoup4 opencv-python-headless pytesseract numpy
+
+      - name: Patch updater to survive 429
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          candidates = [
+              Path("scripts/update_mtp_charta.py"),
+              Path("scripts/backfill_mtp_history.py"),
+          ]
+
+          target = next((p for p in candidates if p.exists()), None)
+          if not target:
+              raise SystemExit("No MTP scanner script found")
+
+          s = target.read_text(encoding="utf-8")
+
+          # Add imports if needed
+          if "import random" not in s:
+              s = s.replace("import requests", "import requests\nimport random\nimport time", 1)
+
+          # Replace a simple get() helper with a safer one.
+          pat = re.compile(
+              r"def get\(url\):\n(?:[ \t]+.*\n){1,8}?",
+              re.M
+          )
+
+          safe_get = '''def get(url, retries=4):
+              last = None
+              headers = dict(UA)
+              headers["Accept-Language"] = "en-US,en;q=0.9"
+
+              for attempt in range(retries):
+                  try:
+                      r = requests.get(
+                          url,
+                          headers=headers,
+                          timeout=35,
+                          allow_redirects=True
+                      )
+
+                      # Google/Blogspot rate limit: wait and retry.
+                      if r.status_code == 429 or "google.com/sorry" in r.url:
+                          wait = 12 + attempt * 18 + random.randint(0, 5)
+                          print(f"429/rate-limit on {url} -> wait {wait}s")
+                          time.sleep(wait)
+                          last = RuntimeError("429 Too Many Requests")
+                          continue
+
+                      r.raise_for_status()
+                      return r
+
+                  except Exception as e:
+                      last = e
+                      if attempt < retries - 1:
+                          wait = 6 + attempt * 10 + random.randint(0, 4)
+                          print(f"Request retry {attempt+1}/{retries}: {e}; wait {wait}s")
+                          time.sleep(wait)
+                      else:
+                          break
+
+              raise last or RuntimeError(f"Request failed: {url}")
+
+          '''
+
+          # More reliable replacement: find function start and next top-level def/class.
+          m = re.search(r"(?m)^def get\(url(?:,\s*retries=\d+)?\):\n", s)
+          if m:
+              start = m.start()
+              n = re.search(r"(?m)^(def |class )", s[m.end():])
+              end = (m.end() + n.start()) if n else len(s)
+              s = s[:start] + safe_get + s[end:]
+          else:
+              raise SystemExit("Could not locate get(url) helper")
+
+          # Avoid hard-failing entire scan when a post/image gets throttled.
+          s = s.replace(
+              'soup=BeautifulSoup(get(post_url).text,"html.parser")',
+              '''try:
+                  soup=BeautifulSoup(get(post_url).text,"html.parser")
+              except Exception as e:
+                  print("Post skipped due request error:", post_url, e)
+                  return []'''
+          )
+          s = s.replace(
+              'soup = BeautifulSoup(get(post_url).text, "html.parser")',
+              '''try:
+                  soup = BeautifulSoup(get(post_url).text, "html.parser")
+              except Exception as e:
+                  print("Post skipped due request error:", post_url, e)
+                  return []'''
+          )
+
+          # Archive discovery should also fail softly.
+          s = s.replace(
+              'soup=BeautifulSoup(get(ARCHIVE).text,"html.parser")',
+              '''try:
+                  soup=BeautifulSoup(get(ARCHIVE).text,"html.parser")
+              except Exception as e:
+                  print("Archive request failed:", e)
+                  return []'''
+          )
+          s = s.replace(
+              'soup = BeautifulSoup(get(ARCHIVE).text, "html.parser")',
+              '''try:
+                  soup = BeautifulSoup(get(ARCHIVE).text, "html.parser")
+              except Exception as e:
+                  print("Archive request failed:", e)
+                  return []'''
+          )
+
+          target.write_text(s, encoding="utf-8")
+          print("Patched:", target)
+          PY
+
+      - name: Run MTP scanner
+        shell: bash
+        run: |
+          set +e
+          if [ -f scripts/update_mtp_charta.py ]; then
+            python3 scripts/update_mtp_charta.py
+            code=$?
+          elif [ -f scripts/backfill_mtp_history.py ]; then
+            python3 scripts/backfill_mtp_history.py
+            code=$?
+          else
+            echo "No MTP scanner script found"
+            exit 1
+          fi
+
+          if [ "$code" -ne 0 ]; then
+            echo "Scanner had a temporary web error. Existing MTP history is kept."
+          fi
+
+          # Do not fail the workflow for temporary 429/Blogspot throttling.
+          exit 0
+
+      - name: Validate existing MTP data
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+
+          p = Path("data/mtp-charta.json")
+          assert p.exists(), "data/mtp-charta.json missing"
+
+          data = json.loads(p.read_text(encoding="utf-8"))
+          entries = data.get("entries", [])
+
+          assert entries, "No MTP history available"
+          for e in entries:
+              nums = e.get("numbers", [])
+              assert len(nums) == 16, f"Bad chart: {e.get('date')}"
+
+          print("MTP DATA OK ✓")
+          print("Current records:", len(entries))
+          print("Latest saved:", entries[0].get("date"))
+          PY
+
+      - name: Commit only if data changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add data/mtp-charta.json scripts/*.py
+
+          if git diff --cached --quiet; then
+            echo "No new MTP record"
+          else
+            git commit -m "Fix MTP auto updater rate limit handling"
+            git push
+          fi
