@@ -1,0 +1,79 @@
+name: Auto Update MTP Charta
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Malaysia 11:00 AM - 6:00 PM (UTC+8), every hour
+    - cron: "0 3-10 * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y tesseract-ocr
+          python3 -m pip install --upgrade pip
+          pip install requests beautifulsoup4 opencv-python-headless pytesseract numpy
+
+      - name: Run MTP scanner
+        run: |
+          if [ -f scripts/update_mtp_charta.py ]; then
+            python3 scripts/update_mtp_charta.py
+          elif [ -f scripts/backfill_mtp_history.py ]; then
+            python3 scripts/backfill_mtp_history.py
+          else
+            echo "No MTP scanner script found"
+            exit 1
+          fi
+
+      - name: Validate MTP data
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+
+          p=Path("data/mtp-charta.json")
+          assert p.exists(), "data/mtp-charta.json missing"
+
+          data=json.loads(p.read_text(encoding="utf-8"))
+          assert data.get("source")=="CARTAPLANBEE MTP ONLY"
+
+          entries=data.get("entries",[])
+          assert entries, "No MTP records found"
+
+          dates=set()
+          for e in entries:
+              d=e.get("date")
+              nums=e.get("numbers",[])
+              assert d and d not in dates, f"Duplicate/bad date: {d}"
+              dates.add(d)
+              assert len(nums)==16, f"Bad Charta {d}"
+              assert all(str(x).isdigit() and len(str(x))==1 for x in nums), f"Bad digits {d}"
+
+          print("VALID ✓")
+          print("Latest:", entries[0]["date"])
+          print("Total records:", len(entries))
+          PY
+
+      - name: Commit new MTP records
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add data/mtp-charta.json
+
+          if git diff --cached --quiet; then
+            echo "No new MTP Charta"
+          else
+            git commit -m "Auto update MTP Charta"
+            git push
+          fi
