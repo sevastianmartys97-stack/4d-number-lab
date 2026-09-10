@@ -1,4 +1,4 @@
-const CACHE = "4d-charta-v51-results1";
+const CACHE = "4d-charta-v51-results2";
 const CORE = [
   "./",
   "./index.html",

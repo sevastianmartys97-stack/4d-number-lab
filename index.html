@@ -1580,6 +1580,32 @@ body.v46-ui .pattern-panel{
 }
 </style>
 
+
+<style>
+/* V51-RESULTS-TAB-V2 */
+#v51ResultsPage .v51-market-head{
+  min-height:54px;
+  padding:8px 12px!important;
+}
+#v51ResultsPage .v51-market-left{
+  display:flex;align-items:center;gap:10px;min-width:0;
+}
+#v51ResultsPage .v51-logo{
+  width:54px;height:40px;display:flex;align-items:center;justify-content:center;
+  flex:0 0 auto;overflow:hidden
+}
+#v51ResultsPage .v51-logo svg{width:100%;height:100%;display:block}
+#v51ResultsPage .v51-market-name{font-size:14px!important;white-space:nowrap}
+#v51ResultsPage .v51-code{
+  margin-left:auto;white-space:nowrap;font-size:10px;font-weight:800;color:#d8e3e9
+}
+#v51ResultsPage .v51-code.empty{display:none}
+#v51ResultsPage .v51-card.magnum .v51-code{color:#f1d15c}
+#v51ResultsPage .v51-card.toto .v51-code,
+#v51ResultsPage .v51-card.damacai .v51-code{color:#ffb5b9}
+#v51ResultsPage .v51-card.cashsweep .v51-code{color:#a4f5c9}
+</style>
+
 </head>
 
 <body>
@@ -5580,6 +5606,173 @@ document.addEventListener("DOMContentLoaded",function(){
 
   setTimeout(()=>clearInterval(wait),5000);
 });
+</script>
+
+
+<script>
+/* V51-RESULTS-TAB-V2 */
+(function(){
+  function drawCode(draw){
+    const keys=[
+      "draw","drawNo","draw_no","drawNumber","draw_number",
+      "drawId","draw_id","issue","issueNo","issue_no","code","drawCode"
+    ];
+    for(const k of keys){
+      const v=draw && draw[k];
+      if(v!==undefined && v!==null && String(v).trim() && String(v).trim()!=="--"){
+        return String(v).trim().replace(/^#/,"");
+      }
+    }
+    return "";
+  }
+
+  const logos={
+    magnum:`<svg viewBox="0 0 120 72" aria-label="Magnum">
+      <defs><linearGradient id="mg" x1="0" x2="1"><stop stop-color="#ffd83d"/><stop offset="1" stop-color="#f0b900"/></linearGradient></defs>
+      <path fill="url(#mg)" d="M8 43L28 11h24L42 30h9L64 11h26L70 43H55l8-13h-9L44 43H30l8-13h-9l-8 13z"/>
+      <text x="58" y="61" text-anchor="middle" font-size="20" font-weight="900" font-style="italic" fill="#fff">magnum</text>
+    </svg>`,
+    toto:`<svg viewBox="0 0 90 90" aria-label="Toto">
+      <circle cx="45" cy="45" r="38" fill="#fff" stroke="#e43131" stroke-width="6"/>
+      <path d="M18 28Q45 7 72 28" fill="none" stroke="#e43131" stroke-width="5"/>
+      <text x="45" y="52" text-anchor="middle" font-size="24" font-weight="900" fill="#111">TOTO</text>
+      <text x="45" y="68" text-anchor="middle" font-size="10" font-weight="800" fill="#e43131">SPORTS TOTO</text>
+    </svg>`,
+    cashsweep:`<svg viewBox="0 0 90 90" aria-label="Cash Sweep">
+      <circle cx="45" cy="45" r="39" fill="#19b96b" stroke="#d7ffd8" stroke-width="4"/>
+      <circle cx="45" cy="45" r="29" fill="#11894e" stroke="#ffe25b" stroke-width="2"/>
+      <text x="45" y="40" text-anchor="middle" font-size="10" font-weight="900" fill="#fff">SPECIAL</text>
+      <text x="45" y="56" text-anchor="middle" font-size="18" font-weight="900" fill="#fff">CASH</text>
+      <text x="45" y="68" text-anchor="middle" font-size="8" font-weight="800" fill="#ffe25b">SWEEP</text>
+    </svg>`,
+    damacai:`<svg viewBox="0 0 110 76" aria-label="Damacai">
+      <rect x="4" y="4" width="102" height="68" rx="18" fill="#fff"/>
+      <path d="M24 35c15-20 33-20 52-5l-9 2 8 5-13 0c-9-9-20-10-32 1z" fill="#dc2d2d"/>
+      <path d="M55 35l-8 15h8l6-12z" fill="#dc2d2d"/>
+      <text x="55" y="63" text-anchor="middle" font-size="14" font-weight="800" fill="#1878b6">damacai</text>
+    </svg>`
+  };
+
+  function patchCardRenderer(){
+    if(typeof window.card!=="function") return false;
+
+    const old=window.card;
+    window.card=function(key,draw){
+      if(!draw)return "";
+      const n4=window.n4 || function(v){
+        const z=String(v==null?"":v).replace(/\D/g,"");
+        return z?z.slice(-4).padStart(4,"0"):"—";
+      };
+      const arr=window.arr || function(v){
+        return Array.isArray(v)?v.map(n4).filter(x=>x!=="—").slice(0,10):[];
+      };
+      const labels={
+        magnum:"Magnum 4D",
+        toto:"Toto 4D",
+        cashsweep:"Cash Sweep (Sarawak)",
+        damacai:"Damacai 4D"
+      };
+      function listHtml(title,nums){
+        const a=arr(nums);
+        return '<div class="v51-list"><div class="v51-list-title">'+title+'</div>'+
+          '<div class="v51-numbers">'+(a.length?a.map(x=>'<span>'+x+'</span>').join(""):'<span>—</span>')+'</div></div>';
+      }
+      const code=drawCode(draw);
+      return '<article class="v51-card '+key+'">'+
+        '<div class="v51-market-head">'+
+          '<div class="v51-market-left"><span class="v51-logo">'+(logos[key]||"")+'</span><span class="v51-market-name">'+labels[key]+'</span></div>'+
+          '<span class="v51-code '+(code?'':'empty')+'">'+(code?('#'+code):'')+'</span>'+
+        '</div>'+
+        '<div class="v51-top3">'+
+          '<div class="v51-prize"><small>1st</small><b>'+n4(draw.first)+'</b></div>'+
+          '<div class="v51-prize"><small>2nd</small><b>'+n4(draw.second)+'</b></div>'+
+          '<div class="v51-prize"><small>3rd</small><b>'+n4(draw.third)+'</b></div>'+
+        '</div>'+
+        '<div class="v51-lists">'+listHtml("Special",draw.special)+listHtml("Consolation",draw.consolation)+'</div>'+
+      '</article>';
+    };
+    return true;
+  }
+
+  function install(){
+    const page=document.getElementById("v51ResultsPage");
+    if(!page)return false;
+
+    // Replace old colored dot labels immediately.
+    page.querySelectorAll(".v51-market-name").forEach(el=>{
+      el.textContent=el.textContent.replace(/^[🟡🔴🟢]\s*/,"");
+    });
+
+    // Existing V1 functions are scoped, so patch rendered cards safely after every render.
+    function decorate(){
+      const cards=page.querySelectorAll(".v51-card");
+      cards.forEach(card=>{
+        const key=["magnum","toto","cashsweep","damacai"].find(k=>card.classList.contains(k));
+        if(!key)return;
+        const head=card.querySelector(".v51-market-head");
+        if(!head || head.dataset.v2==="1")return;
+
+        const name=head.querySelector(".v51-market-name");
+        if(!name)return;
+
+        name.textContent=name.textContent.replace(/^[🟡🔴🟢]\s*/,"");
+
+        const left=document.createElement("div");
+        left.className="v51-market-left";
+
+        const logo=document.createElement("span");
+        logo.className="v51-logo";
+        logo.innerHTML=logos[key]||"";
+
+        left.appendChild(logo);
+        left.appendChild(name);
+        head.insertBefore(left,head.firstChild);
+
+        const oldDraw=head.querySelector(".v51-draw");
+        let code="";
+        if(oldDraw){
+          code=(oldDraw.textContent||"").replace(/^#/,"").trim();
+          if(code==="—" || code==="-" || code==="--")code="";
+          oldDraw.remove();
+        }
+
+        // Try current loaded DB object if V1 showed no code.
+        if(!code && typeof databases==="object" && databases && typeof v51ResultDate!=="undefined"){
+          try{
+            const date=document.getElementById("v51ResultDate")?.value;
+            const draws=databases[key]?.draws||[];
+            const d=draws.find(x=>{
+              const raw=String(x.date||"");
+              const m=raw.match(/(\d{1,2})[\/-](\d{1,2})[\/-](20\d{2})/);
+              const m2=raw.match(/(20\d{2})[\/-](\d{1,2})[\/-](\d{1,2})/);
+              const iso=m?`${m[3]}-${m[2].padStart(2,"0")}-${m[1].padStart(2,"0")}`:
+                        m2?`${m2[1]}-${m2[2].padStart(2,"0")}-${m2[3].padStart(2,"0")}`:"";
+              return iso===date;
+            });
+            code=drawCode(d);
+          }catch(e){}
+        }
+
+        const c=document.createElement("span");
+        c.className="v51-code"+(code?"":" empty");
+        c.textContent=code?"#"+code:"";
+        head.appendChild(c);
+        head.dataset.v2="1";
+      });
+    }
+
+    decorate();
+    const mo=new MutationObserver(()=>setTimeout(decorate,20));
+    mo.observe(page,{childList:true,subtree:true});
+    return true;
+  }
+
+  let tries=0;
+  const t=setInterval(()=>{
+    tries++;
+    if(install() || tries>100)clearInterval(t);
+  },100);
+})();
 </script>
 
 </body>
