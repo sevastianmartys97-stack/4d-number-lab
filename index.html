@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>4D Charta Analyzer V5.0</title>
+<title>4D Charta Analyzer V5.1</title>
 
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -1503,6 +1503,24 @@ body.v46-ui .pattern-panel{
 }
 </style>
 
+
+<style>
+/* MTP-AUTO-CHARTA-V1 */
+#mtpAutoBox{margin:0 0 9px;padding:9px;border:1px solid rgba(66,169,235,.30);border-radius:10px;background:rgba(5,24,38,.88)}
+#mtpAutoBox .mtpHead{display:flex;align-items:center;justify-content:space-between;gap:7px;margin-bottom:7px}
+#mtpAutoBox .mtpTitle{color:#cfe8f8;font-size:9px;font-weight:800}
+#mtpAutoBox .mtpBadge{color:#38e77e;font-size:7px;font-weight:800;border:1px solid rgba(56,231,126,.32);border-radius:999px;padding:4px 6px;background:rgba(56,231,126,.06)}
+#mtpAutoBox .mtpControls{display:grid;grid-template-columns:minmax(0,1fr) 78px;gap:6px}
+#mtpAutoBox select,#mtpAutoBox button{width:100%;height:33px;border-radius:8px;font-size:8px;font-weight:700}
+#mtpAutoBox select{color:#dceaf3;background:#071d2b;border:1px solid #28516a;padding:0 7px;outline:none}
+#mtpAutoBox button{color:#1c1808;background:#ffc62e;border:1px solid #e0aa13;padding:0 5px}
+#mtpAutoBox .mtpMeta{display:flex;justify-content:space-between;gap:6px;margin-top:7px;color:#7f98aa;font-size:7px;line-height:1.35}
+#mtpAutoBox .mtpMeta b{color:#d7e7f0;font-weight:700}
+#mtpAutoBox .mtpMsg{margin-top:6px;padding:6px 7px;border-radius:7px;background:#061522;border:1px solid rgba(50,116,158,.28);color:#8fa7b7;font-size:7px;line-height:1.4}
+#mtpAutoBox .mtpMsg.ok{color:#79e49a;border-color:rgba(56,231,126,.25)}
+#mtpAutoBox .mtpMsg.warn{color:#ffd36b;border-color:rgba(255,198,46,.25)}
+</style>
+
 </head>
 
 <body>
@@ -1511,7 +1529,7 @@ body.v46-ui .pattern-panel{
 
   <div class="header">
     <h1>4D CHARTA ANALYZER</h1>
-    <div class="version">V5.0 • STABLE</div>
+    <div class="version">V5.1 • PRO</div>
     <div class="subtitle">
       Charta Scan + Independent History Scan • Exact + Permutation • Auto Database
     </div>
@@ -1535,6 +1553,17 @@ body.v46-ui .pattern-panel{
           <button class="small-btn" onclick="clearCharta()">
             CLEAR
           </button>
+        </div>
+
+        <!-- MTP-AUTO-CHARTA-V1 -->
+        <div id="mtpAutoBox">
+          <div class="mtpHead"><div class="mtpTitle">MTP CHARTA • AUTO DATE</div><div class="mtpBadge">MTP ONLY ✓</div></div>
+          <div class="mtpControls">
+            <select id="mtpDateSelect"><option value="">LOADING MTP...</option></select>
+            <button type="button" id="mtpLoadBtn">LOAD</button>
+          </div>
+          <div class="mtpMeta"><span>CURRENT <b id="mtpCurrentDate">—</b></span><span>CHECK <b id="mtpLastCheck">—</b></span></div>
+          <div class="mtpMsg" id="mtpAutoMsg">Mencari Charta MTP terakhir yang tersedia...</div>
         </div>
 
         <div class="charta-grid">
@@ -4866,9 +4895,9 @@ document.addEventListener("DOMContentLoaded",function(){
 /* V5.0-STABLE-CONSOLIDATED */
 (function(){
 "use strict";
-const VERSION="V5.0 • STABLE";
+const VERSION="V5.1 • PRO";
 function clean(v){return(v||"").replace(/\s+/g," ").trim()}
-function setVersion(){const v=document.querySelector(".version");if(v)v.textContent=VERSION;document.title="4D Charta Analyzer V5.0"}
+function setVersion(){const v=document.querySelector(".version");if(v)v.textContent=VERSION;document.title="4D Charta Analyzer V5.1"}
 
 function ensureTopBar(){
   if(document.getElementById("v5TopBar"))return;
@@ -5300,6 +5329,45 @@ document.addEventListener("DOMContentLoaded", function(){
 </script>
 
 
+
+
+<script>
+/* MTP-AUTO-CHARTA-JS-V1 */
+(function(){
+  const URL="data/mtp-charta.json";
+  function fmt(iso){const m=String(iso||"").match(/^(\d{4})-(\d{2})-(\d{2})$/);return m?m[3]+"/"+m[2]+"/"+m[1]:(iso||"—")}
+  function msg(t,k){const e=document.getElementById("mtpAutoMsg");if(!e)return;e.textContent=t;e.className="mtpMsg"+(k?" "+k:"")}
+  function fill(nums,date){
+    if(!Array.isArray(nums)||nums.length!==16)return false;
+    const inputs=[...document.querySelectorAll(".chart-input")];if(inputs.length<16)return false;
+    nums.forEach((n,i)=>{inputs[i].value=String(n)});
+    if(typeof saveCharta==="function")saveCharta();
+    if(typeof autoRefresh==="function")autoRefresh();
+    const c=document.getElementById("mtpCurrentDate");if(c)c.textContent=fmt(date);
+    localStorage.setItem("4dMtpSelectedDate",date||"");
+    return true;
+  }
+  async function load(){
+    const sel=document.getElementById("mtpDateSelect");if(!sel)return;
+    try{
+      const r=await fetch(URL+"?v="+Date.now(),{cache:"no-store"});if(!r.ok)throw new Error(r.status);
+      const data=await r.json();const entries=Array.isArray(data.entries)?data.entries:[];
+      entries.sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+      if(!entries.length){sel.innerHTML='<option value="">BELUM ADA MTP</option>';msg("Belum ada Charta MTP tersimpan.","warn");return}
+      sel.innerHTML=entries.map(x=>'<option value="'+x.date+'">'+fmt(x.date)+' • MTP</option>').join("");
+      const saved=localStorage.getItem("4dMtpSelectedDate");
+      const chosen=saved&&entries.some(x=>x.date===saved)?saved:entries[0].date;sel.value=chosen;
+      const check=document.getElementById("mtpLastCheck");const ts=String(data.updated_at||"");if(check)check.textContent=ts.includes("T")?ts.split("T")[1].slice(0,5):"—";
+      const inputs=[...document.querySelectorAll(".chart-input")];const empty=inputs.length>=16&&inputs.every(x=>!String(x.value||"").trim());
+      if(empty){fill(entries[0].numbers,entries[0].date);sel.value=entries[0].date;msg("Charta kosong → MTP terbaru "+fmt(entries[0].date)+" dimuatkan automatik ✓","ok")}
+      else{const cur=entries.find(x=>x.date===chosen)||entries[0];const c=document.getElementById("mtpCurrentDate");if(c)c.textContent=fmt(cur.date);msg("MTP terbaru tersedia: "+fmt(entries[0].date)+". Pilih tarikh dan tekan LOAD.","")}
+      sel.onchange=()=>{const x=entries.find(e=>e.date===sel.value);if(x){localStorage.setItem("4dMtpSelectedDate",x.date);msg("Dipilih MTP "+fmt(x.date)+". Tekan LOAD untuk guna Charta ini.","")}};
+      const btn=document.getElementById("mtpLoadBtn");if(btn)btn.onclick=()=>{const x=entries.find(e=>e.date===sel.value);if(x&&fill(x.numbers,x.date))msg("MTP "+fmt(x.date)+" berjaya dimuatkan ✓","ok")};
+    }catch(e){console.error(e);msg("MTP belum dapat diperiksa. Charta sedia ada dikekalkan.","warn")}
+  }
+  document.addEventListener("DOMContentLoaded",()=>setTimeout(load,250));
+})();
+</script>
 
 </body>
 </html>
