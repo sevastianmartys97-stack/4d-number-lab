@@ -1648,6 +1648,20 @@ body.v46-ui .pattern-panel{
 #v51GeneratorPage .g-foot{font-size:7px;color:#5f7e92;line-height:1.45;padding:2px 3px;text-align:center}
 </style>
 
+
+<style>
+/* ONE-PAGE-PER-TAB-V1 */
+@media(max-width:1100px){
+  body.v46-ui .vTabHidden{display:none!important}
+  #v51ResultsPage.vTabHidden,
+  #vPowerGeneratorPage.vTabHidden,
+  #powerGeneratorPage.vTabHidden{display:none!important}
+  #v51ResultsPage.vTabVisible,
+  #vPowerGeneratorPage.vTabVisible,
+  #powerGeneratorPage.vTabVisible{display:block!important}
+}
+</style>
+
 </head>
 
 <body>
@@ -6001,6 +6015,108 @@ document.addEventListener("DOMContentLoaded",function(){
   }
 
   let tries=0; const t=setInterval(()=>{tries++;if(install()||tries>100)clearInterval(t)},100);
+})();
+</script>
+
+
+<script>
+/* ONE-PAGE-PER-TAB-V1 */
+(function(){
+  "use strict";
+
+  function clean(v){
+    return (v||"").replace(/\s+/g," ").trim().toUpperCase();
+  }
+
+  function refs(){
+    const favBody=document.getElementById("favBody");
+    const favCard=favBody ? favBody.closest(".card") : null;
+    const cards=[...document.querySelectorAll(".app > .card")];
+
+    const inputCard=cards.find(c=>{
+      const u=clean(c.textContent);
+      return u.includes("MANUAL CHARTA") || u.includes("AUTO CHARTA") || u.includes("CHARTA LINES");
+    }) || cards[0] || null;
+
+    const analysis=document.querySelector(".app > .analysis-card");
+    const perm=document.querySelector(".app > .permutation-card");
+    const history=document.querySelector(".app > .history-card");
+    const footer=document.querySelector(".app > .footer");
+    const results=document.getElementById("v51ResultsPage");
+    const generator=document.getElementById("vPowerGeneratorPage") ||
+                    document.getElementById("powerGeneratorPage");
+
+    return {inputCard,favCard,analysis,perm,history,footer,results,generator};
+  }
+
+  function hide(el){
+    if(!el)return;
+    el.classList.add("vTabHidden");
+    el.classList.remove("vTabVisible");
+  }
+
+  function show(el){
+    if(!el)return;
+    el.classList.remove("vTabHidden");
+    el.classList.add("vTabVisible");
+  }
+
+  function showOnly(tab){
+    if(window.innerWidth>1100)return;
+
+    const r=refs();
+    const all=[r.inputCard,r.favCard,r.analysis,r.perm,r.history,r.footer,r.results,r.generator];
+    all.forEach(hide);
+
+    if(tab==="home"){
+      [r.inputCard,r.favCard].forEach(show);
+    }else if(tab==="pattern"){
+      [r.analysis,r.perm].forEach(show);
+    }else if(tab==="history"){
+      show(r.history);
+    }else if(tab==="generator"){
+      show(r.generator);
+    }else if(tab==="results"){
+      show(r.results);
+    }else if(tab==="all"){
+      all.forEach(show);
+    }
+
+    const nav=document.querySelector(".v46-bottom-nav");
+    if(nav){
+      nav.querySelectorAll(".v46-nav-btn").forEach(b=>{
+        b.classList.toggle("active",b.dataset.tab===tab);
+      });
+    }
+
+    window.scrollTo({top:0,behavior:"smooth"});
+  }
+
+  function bind(){
+    const nav=document.querySelector(".v46-bottom-nav");
+    if(!nav)return false;
+    if(nav.dataset.onePageBound==="1")return true;
+
+    nav.dataset.onePageBound="1";
+    nav.addEventListener("click",function(e){
+      const btn=e.target.closest(".v46-nav-btn");
+      if(!btn || !btn.dataset.tab)return;
+      const tab=btn.dataset.tab;
+      setTimeout(()=>showOnly(tab),20);
+    },true);
+
+    const active=nav.querySelector(".v46-nav-btn.active");
+    showOnly(active?.dataset.tab || "home");
+    return true;
+  }
+
+  document.addEventListener("DOMContentLoaded",function(){
+    let tries=0;
+    const t=setInterval(function(){
+      tries++;
+      if(bind() || tries>100)clearInterval(t);
+    },100);
+  });
 })();
 </script>
 
