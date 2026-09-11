@@ -3,6 +3,8 @@ import re, json
 from urllib.parse import urljoin
 from datetime import datetime, timezone, timedelta
 import requests
+import random
+import time
 import numpy as np
 import cv2
 import pytesseract
@@ -15,9 +17,41 @@ OUT=Path('data/mtp-charta.json')
 UA={'User-Agent':'Mozilla/5.0 Chrome/124 Safari/537.36'}
 VERIFIED={'2026-09-09':['1','9','9','7','2','5','7','8','0','4','6','8','1','9','3','1']}
 
-def get(url):
-    r=requests.get(url,headers=UA,timeout=30)
-    r.raise_for_status(); return r
+def get(url, retries=4):
+    last = None
+    headers = dict(UA)
+    headers["Accept-Language"] = "en-US,en;q=0.9"
+
+    for attempt in range(retries):
+        try:
+            r = requests.get(
+                url,
+                headers=headers,
+                timeout=35,
+                allow_redirects=True
+            )
+
+            # Google/Blogspot rate limit: wait and retry.
+            if r.status_code == 429 or "google.com/sorry" in r.url:
+                wait = 12 + attempt * 18 + random.randint(0, 5)
+                print(f"429/rate-limit on {url} -> wait {wait}s")
+                time.sleep(wait)
+                last = RuntimeError("429 Too Many Requests")
+                continue
+
+            r.raise_for_status()
+            return r
+
+        except Exception as e:
+            last = e
+            if attempt < retries - 1:
+                wait = 6 + attempt * 10 + random.randint(0, 4)
+                print(f"Request retry {attempt+1}/{retries}: {e}; wait {wait}s")
+                time.sleep(wait)
+            else:
+                break
+
+    raise last or RuntimeError(f"Request failed: {url}")
 
 def discover_posts():
     soup=BeautifulSoup(get(f'{BASE}/{YEAR}/').text,'html.parser')
