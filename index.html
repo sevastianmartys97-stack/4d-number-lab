@@ -1662,6 +1662,47 @@ body.v46-ui .pattern-panel{
 }
 </style>
 
+
+<style>
+/* V51-TOP3-TARGET-V2 */
+#v51GeneratorPage .t3-wrap{display:none}
+#v51GeneratorPage.v51-show .t3-wrap{display:block}
+#v51GeneratorPage .t3-card{background:linear-gradient(180deg,#081b2b,#061521);border:1px solid #214d69;border-radius:14px;padding:10px;margin-bottom:8px}
+#v51GeneratorPage .t3-head{display:flex;align-items:center;gap:8px}
+#v51GeneratorPage .t3-icon{font-size:22px}
+#v51GeneratorPage .t3-title{font-size:13px;font-weight:1000;color:#f1f7fb}
+#v51GeneratorPage .t3-sub{font-size:7px;color:#7e9aae;margin-top:2px}
+#v51GeneratorPage .t3-modes{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-top:9px}
+#v51GeneratorPage .t3-mode{border:1px solid #2a4d66;background:#091d2d;color:#93aaba;border-radius:9px;padding:8px 2px;font-size:7px;font-weight:900;line-height:1.2}
+#v51GeneratorPage .t3-mode.active{border-color:#ffc82f;color:#ffe47b;background:linear-gradient(180deg,rgba(255,200,47,.16),#151b18);box-shadow:0 0 10px rgba(255,194,39,.12)}
+#v51GeneratorPage .t3-mode small{display:block;font-size:5px;margin-top:3px;color:inherit;opacity:.72}
+#v51GeneratorPage .t3-info{margin-top:8px;border:1px solid #245f84;border-radius:9px;background:#082239;padding:7px;font-size:6.5px;line-height:1.45;color:#a8c5d8}
+#v51GeneratorPage .t3-controls{display:grid;grid-template-columns:1fr;gap:7px}
+#v51GeneratorPage .t3-markets{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}
+#v51GeneratorPage .t3-market{border:1px solid #294c66;background:#091c2b;color:#91a9b9;border-radius:8px;padding:8px 2px;font-size:7px;font-weight:900}
+#v51GeneratorPage .t3-market.active{border-color:#ffc82f;background:#e7ad21;color:#111}
+#v51GeneratorPage .t3-run{border:0;border-radius:10px;padding:11px 8px;background:linear-gradient(90deg,#146cff,#2c7dff);color:white;font-size:11px;font-weight:1000}
+#v51GeneratorPage .t3-source{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:7px}
+#v51GeneratorPage .t3-src{border:1px solid #21435a;background:#071824;border-radius:7px;padding:5px 2px;text-align:center}
+#v51GeneratorPage .t3-src b{display:block;font-size:7px;color:#d8e7f0}
+#v51GeneratorPage .t3-src small{font-size:5px;color:#718da0}
+#v51GeneratorPage .t3-src.on{border-color:#2ebc76}
+#v51GeneratorPage .t3-src.on b{color:#67e59e}
+#v51GeneratorPage .t3-list{display:grid;gap:5px;margin-top:7px}
+#v51GeneratorPage .t3-row{display:grid;grid-template-columns:24px 58px 1fr 45px;gap:5px;align-items:center;background:#06131f;border:1px solid #1c4058;border-radius:9px;padding:8px 6px}
+#v51GeneratorPage .t3-row:nth-child(1){border-color:#9b7920;background:linear-gradient(90deg,rgba(160,115,16,.13),#06131f)}
+#v51GeneratorPage .t3-rank{text-align:center;font-size:10px;font-weight:900;color:#d7e2e9}
+#v51GeneratorPage .t3-row:nth-child(1) .t3-rank{color:#ffd348}
+#v51GeneratorPage .t3-num{font-size:16px;letter-spacing:1px;font-weight:1000;color:#ffd95d}
+#v51GeneratorPage .t3-tags{display:flex;gap:3px;flex-wrap:wrap}
+#v51GeneratorPage .t3-tag{font-size:5.5px;padding:2px 4px;border-radius:5px;background:#0b2b40;color:#a5dcff;border:1px solid #1c5475}
+#v51GeneratorPage .t3-score{text-align:right;font-size:10px;font-weight:1000;color:#55e694}
+#v51GeneratorPage .t3-label{font-size:9px;font-weight:1000;color:#eef6fb}
+#v51GeneratorPage .t3-label span{float:right;color:#6d8b9e;font-size:6px}
+#v51GeneratorPage .t3-empty{text-align:center;padding:17px 6px;color:#7893a5;font-size:8px}
+#v51GeneratorPage .t3-foot{text-align:center;color:#607d90;font-size:6px;line-height:1.5;padding:2px 6px}
+</style>
+
 </head>
 
 <body>
@@ -6235,6 +6276,184 @@ document.addEventListener("DOMContentLoaded",function(){
       if(bind() || tries>100)clearInterval(t);
     },100);
   });
+})();
+</script>
+
+
+<script>
+/* V51-TOP3-TARGET-V2 */
+(function(){
+  "use strict";
+  const MARKETS=["magnum","toto","cashsweep","damacai"];
+  const LABELS={magnum:"Magnum",toto:"Toto",cashsweep:"Cash Sweep",damacai:"Damacai"};
+  let mode="power", market="magnum", hist={};
+
+  const n4=v=>{const m=String(v??"").match(/\d/g);return m&&m.length>=4?m.slice(0,4).join(""):""};
+  const uniq=a=>[...new Set(a.filter(x=>/^\d{4}$/.test(x)))];
+  const sig=n=>n.split("").sort().join("");
+  function perms4(n){
+    const out=new Set();
+    function go(pre,rest){
+      if(!rest.length){out.add(pre);return}
+      for(let i=0;i<rest.length;i++)go(pre+rest[i],rest.slice(0,i)+rest.slice(i+1));
+    }
+    go("",n); return [...out];
+  }
+  function chartCandidates(){
+    const vals=[...document.querySelectorAll(".chart-input")].slice(0,16).map(x=>(String(x.value||"").match(/\d/)||[""])[0]);
+    if(vals.length<16||vals.some(x=>!x))return [];
+    const m=Array.from({length:4},(_,r)=>vals.slice(r*4,r*4+4)), lines=[];
+    for(let r=0;r<4;r++)lines.push(m[r].join(""));
+    for(let c=0;c<4;c++)lines.push(m.map(r=>r[c]).join(""));
+    lines.push([0,1,2,3].map(i=>m[i][i]).join(""));
+    lines.push([0,1,2,3].map(i=>m[i][3-i]).join(""));
+    return uniq(lines.concat(lines.map(x=>x.split("").reverse().join(""))));
+  }
+  function signalNums(){
+    const out=[];
+    ["#chartaLines","#v5Repeat",".pattern-panel",".analysis-card",".permutation-card"].forEach(sel=>{
+      document.querySelectorAll(sel).forEach(el=>{
+        out.push(...((el.textContent||"").match(/\b\d{4}\b/g)||[]));
+      })
+    });
+    return uniq(out.map(n4));
+  }
+  function favs(){return uniq([...document.querySelectorAll(".fav-input")].map(x=>n4(x.value)))}
+  function repeatSet(base){
+    const out=new Set();
+    base.forEach(x=>{
+      const c={};[...x].forEach(d=>c[d]=(c[d]||0)+1);
+      const shape=Object.values(c).sort((a,b)=>b-a).join("");
+      if(["31","22","211","4"].includes(shape))perms4(x).forEach(v=>out.add(v));
+    }); return out;
+  }
+  function drawNums(d){
+    const a=[d?.first,d?.second,d?.third];
+    if(Array.isArray(d?.special))a.push(...d.special);
+    if(Array.isArray(d?.consolation))a.push(...d.consolation);
+    return a.map(n4).filter(Boolean);
+  }
+  function historyHit(n,k){
+    let exact=0,perm=0;
+    const draws=(hist[k]&&Array.isArray(hist[k].draws))?hist[k].draws.slice(0,80):[];
+    const sg=sig(n);
+    draws.forEach(d=>drawNums(d).forEach(x=>{if(x===n)exact++;else if(sig(x)===sg)perm++}));
+    return {exact,perm};
+  }
+  function sources(){
+    const ch=chartCandidates(), ex=signalNums(), fv=favs(), base=uniq(ch.concat(ex)), rp=repeatSet(base);
+    return {ch:new Set(ch),ex:new Set(ex),fv:new Set(fv),rp,pool:uniq(base.concat([...rp],fv))};
+  }
+  function scoreOne(n,src){
+    const tags=[];let score=0;
+    const a=src.ch.has(n),b=src.ex.has(n),c=src.rp.has(n),d=src.fv.has(n),h=historyHit(n,market),ih=h.exact+h.perm>0;
+    if(mode==="normal"){
+      score=45+Math.floor(Math.random()*46); tags.push("SHUFFLE");
+    }else if(mode==="smart"){
+      if(a){score+=30;tags.push("CHARTA")}
+      if(b){score+=20;tags.push("PATTERN")}
+      if(c){score+=18;tags.push("FAMILY")}
+      if(d){score+=12;tags.push("FAV")}
+      if(ih){score+=Math.min(20,h.exact*8+h.perm*3);tags.push("HISTORY")}
+    }else{
+      if(a){score+=35;tags.push("CHARTA")}
+      if(b){score+=22;tags.push("PATTERN")}
+      if(c){score+=24;tags.push("FAMILY")}
+      if(d){score+=10;tags.push("FAV")}
+      if(ih){score+=Math.min(20,h.exact*9+h.perm*3);tags.push("HISTORY")}
+      const strong=[a||b,c,d,ih].filter(Boolean).length;
+      if(strong>=3)score+=10;
+      else if(strong<2)score-=12;
+    }
+    return {n,score:Math.max(0,Math.min(100,score)),tags};
+  }
+  function render(){
+    const src=sources();
+    let list=src.pool.map(n=>scoreOne(n,src));
+    if(mode==="normal")list.sort(()=>Math.random()-.5);
+    else list.sort((a,b)=>b.score-a.score||a.n.localeCompare(b.n));
+    if(mode==="power")list=list.filter(x=>x.tags.length>=2).slice(0,10);
+    else if(mode==="top3")list=list.filter(x=>x.tags.length>=2).slice(0,5);
+    else list=list.slice(0,10);
+
+    const out=document.getElementById("t3Out");
+    if(out){
+      out.innerHTML=list.length?list.map((x,i)=>
+        '<div class="t3-row"><div class="t3-rank">'+(i<3?["🥇","🥈","🥉"][i]:(i+1))+'</div>'+
+        '<div class="t3-num">'+x.n+'</div>'+
+        '<div class="t3-tags">'+x.tags.map(t=>'<span class="t3-tag">'+t+'</span>').join("")+'</div>'+
+        '<div class="t3-score">'+x.score+'/100</div></div>'
+      ).join(""):'<div class="t3-empty">Belum cukup signal. Isi Charta atau Favourite dahulu.</div>';
+    }
+    const title=document.getElementById("t3ListTitle");
+    if(title)title.innerHTML=(mode==="top3"?"🎯 TOP 3 TARGET":"TOP CANDIDATES")+' — '+LABELS[market]+' <span>SCORE / 100</span>';
+    const c=document.getElementById("t3SrcC"),r=document.getElementById("t3SrcR"),f=document.getElementById("t3SrcF"),h=document.getElementById("t3SrcH");
+    if(c){c.classList.toggle("on",src.ch.size>0);c.querySelector("small").textContent=src.ch.size+" calon"}
+    if(r){r.classList.toggle("on",src.rp.size>0);r.querySelector("small").textContent=src.rp.size+" family"}
+    if(f){f.classList.toggle("on",src.fv.size>0);f.querySelector("small").textContent=src.fv.size+" no."}
+    if(h){h.classList.toggle("on",!!hist[market]);h.querySelector("small").textContent=hist[market]?"DB ready":"loading"}
+  }
+  async function loadHistory(){
+    await Promise.all(MARKETS.map(async k=>{try{const r=await fetch("data/"+k+".json?v="+Date.now(),{cache:"no-store"});if(r.ok)hist[k]=await r.json()}catch(e){}}));
+    render();
+  }
+  function install(){
+    const page=document.getElementById("v51GeneratorPage");
+    if(!page)return false;
+    if(page.dataset.top3v2==="1")return true;
+    page.dataset.top3v2="1";
+
+    page.innerHTML=`
+      <div class="t3-wrap">
+        <div class="t3-card">
+          <div class="t3-head"><div class="t3-icon">🎯</div><div><div class="t3-title">NUMBER GENERATOR</div><div class="t3-sub">Charta • Pattern • Repeat/Family • Favourite • History</div></div></div>
+          <div class="t3-modes">
+            <button class="t3-mode" data-m="normal">NORMAL<small>Balanced</small></button>
+            <button class="t3-mode" data-m="smart">SMART<small>Pattern + Repeat</small></button>
+            <button class="t3-mode active" data-m="power">POWER<small>High Signal</small></button>
+            <button class="t3-mode" data-m="top3">🎯 TOP 3<small>1st / 2nd / 3rd</small></button>
+          </div>
+          <div class="t3-info">🎯 <b>TOP 3 TARGET</b> menyaring hanya calon paling kuat berdasarkan beberapa signal serentak. Score ialah markah signal dalaman, bukan jaminan keputusan cabutan.</div>
+        </div>
+
+        <div class="t3-card t3-controls">
+          <div class="t3-markets">
+            <button class="t3-market active" data-k="magnum">Magnum</button>
+            <button class="t3-market" data-k="toto">Toto</button>
+            <button class="t3-market" data-k="damacai">Damacai</button>
+            <button class="t3-market" data-k="cashsweep">Cash Sweep</button>
+          </div>
+          <div class="t3-source">
+            <div class="t3-src" id="t3SrcC"><b>CHARTA</b><small>0 calon</small></div>
+            <div class="t3-src" id="t3SrcR"><b>FAMILY</b><small>0 family</small></div>
+            <div class="t3-src" id="t3SrcF"><b>FAV</b><small>0 no.</small></div>
+            <div class="t3-src" id="t3SrcH"><b>HISTORY</b><small>loading</small></div>
+          </div>
+          <button class="t3-run" id="t3Run">↻ GENERATE</button>
+        </div>
+
+        <div class="t3-card">
+          <div class="t3-label" id="t3ListTitle">TOP CANDIDATES — Magnum <span>SCORE / 100</span></div>
+          <div class="t3-list" id="t3Out"></div>
+        </div>
+        <div class="t3-foot">TOP 3 Target fokus shortlist 5 calon terbaik untuk 1st / 2nd / 3rd. Gunakan sebagai analisis data sahaja.</div>
+      </div>`;
+
+    page.querySelectorAll(".t3-mode").forEach(b=>b.onclick=()=>{
+      mode=b.dataset.m;
+      page.querySelectorAll(".t3-mode").forEach(x=>x.classList.toggle("active",x===b));
+      render();
+    });
+    page.querySelectorAll(".t3-market").forEach(b=>b.onclick=()=>{
+      market=b.dataset.k;
+      page.querySelectorAll(".t3-market").forEach(x=>x.classList.toggle("active",x===b));
+      render();
+    });
+    document.getElementById("t3Run").onclick=render;
+    loadHistory();
+    return true;
+  }
+  let tries=0;const t=setInterval(()=>{tries++;if(install()||tries>120)clearInterval(t)},100);
 })();
 </script>
 
