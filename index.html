@@ -1606,6 +1606,48 @@ body.v46-ui .pattern-panel{
 #v51ResultsPage .v51-card.cashsweep .v51-code{color:#a4f5c9}
 </style>
 
+
+<style>
+/* V51-POWER-GENERATOR-V1 */
+@media(max-width:1100px){
+  .v46-bottom-nav.v51-six-nav{grid-template-columns:repeat(6,1fr)!important}
+  .v46-bottom-nav.v51-six-nav .v46-nav-btn{font-size:7px!important;padding-left:1px!important;padding-right:1px!important}
+  .v46-bottom-nav.v51-six-nav .v46-nav-icon{font-size:18px!important;margin-bottom:4px!important}
+}
+.v51-new-badge{position:absolute;top:3px;right:4px;padding:1px 4px;border-radius:8px;background:#ff3f59;color:white;font-size:6px;font-weight:900;line-height:1.25}
+.v46-nav-btn[data-tab="generator"]{position:relative;color:#67cbff}
+.v46-nav-btn[data-tab="generator"].active{color:#5fd0ff!important;background:radial-gradient(circle at 50% 100%,rgba(31,151,255,.18),transparent 67%)!important;box-shadow:inset 0 0 0 1px rgba(31,151,255,.65)}
+
+#v51GeneratorPage{display:none;width:100%;max-width:100%;box-sizing:border-box;margin:0 0 84px;padding:0}
+#v51GeneratorPage.v51-show{display:block}
+#v51GeneratorPage *{box-sizing:border-box}
+#v51GeneratorPage .g-card{background:linear-gradient(180deg,#081b2a,#061522);border:1px solid rgba(60,157,220,.36);border-radius:13px;padding:9px;margin-bottom:8px}
+#v51GeneratorPage .g-head{display:flex;align-items:center;justify-content:space-between;gap:7px}
+#v51GeneratorPage .g-title{font-size:12px;font-weight:900;color:#e8f4fb}
+#v51GeneratorPage .g-sub{font-size:7px;color:#7894a8;margin-top:2px}
+#v51GeneratorPage .g-refresh{border:1px solid #287bb2;background:#0b2a3f;color:#bfe8ff;border-radius:8px;padding:6px 8px;font-size:8px;font-weight:800}
+#v51GeneratorPage .g-modes{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-top:8px}
+#v51GeneratorPage .g-mode{border:1px solid #294d67;background:#091e2e;color:#8fa8b8;border-radius:9px;padding:8px 3px;text-align:center;font-size:8px;font-weight:900}
+#v51GeneratorPage .g-mode.active{border-color:#ffc62e;color:#ffe27e;background:linear-gradient(180deg,rgba(255,198,46,.12),#0a1e2d)}
+#v51GeneratorPage .g-sources{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:7px}
+#v51GeneratorPage .g-src{min-width:0;border:1px solid #21445b;background:#071925;border-radius:8px;padding:6px 3px;text-align:center}
+#v51GeneratorPage .g-src b{display:block;font-size:9px;color:#dbeaf3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#v51GeneratorPage .g-src small{display:block;font-size:6px;color:#6f8da1;margin-top:2px}
+#v51GeneratorPage .g-src.on{border-color:#2fbf79}
+#v51GeneratorPage .g-src.on b{color:#67e59e}
+#v51GeneratorPage .g-run{width:100%;border:0;border-radius:10px;padding:11px 8px;background:linear-gradient(90deg,#14b866,#19d77a);color:#03140c;font-size:12px;font-weight:1000;margin-top:8px}
+#v51GeneratorPage .g-note{font-size:7px;line-height:1.45;color:#708da0;text-align:center;margin-top:6px}
+#v51GeneratorPage .g-top{display:grid;grid-template-columns:1fr;gap:5px;margin-top:7px}
+#v51GeneratorPage .g-row{display:grid;grid-template-columns:24px 58px 1fr 40px;gap:5px;align-items:center;background:#06131f;border:1px solid #193c54;border-radius:9px;padding:7px}
+#v51GeneratorPage .g-rank{font-size:8px;color:#728da0;text-align:center}
+#v51GeneratorPage .g-num{font-size:15px;letter-spacing:1px;font-weight:1000;color:#ffd85c}
+#v51GeneratorPage .g-tags{display:flex;gap:3px;flex-wrap:wrap}
+#v51GeneratorPage .g-tag{font-size:6px;padding:2px 4px;border-radius:5px;background:#0b2b40;color:#9edbff;border:1px solid #1d5374}
+#v51GeneratorPage .g-score{text-align:right;font-size:11px;font-weight:1000;color:#56e68e}
+#v51GeneratorPage .g-empty{padding:18px 8px;text-align:center;color:#718da0;font-size:9px}
+#v51GeneratorPage .g-foot{font-size:7px;color:#5f7e92;line-height:1.45;padding:2px 3px;text-align:center}
+</style>
+
 </head>
 
 <body>
@@ -5772,6 +5814,193 @@ document.addEventListener("DOMContentLoaded",function(){
     tries++;
     if(install() || tries>100)clearInterval(t);
   },100);
+})();
+</script>
+
+
+<script>
+/* V51-POWER-GENERATOR-V1 */
+(function(){
+  "use strict";
+  const MARKETS=["magnum","toto","cashsweep","damacai"];
+  let mode="power", hist={};
+
+  function digitsOnly(v){return String(v||"").replace(/\D/g,"")}
+  function n4(v){const x=digitsOnly(v);return x.length===4?x:""}
+  function uniq(a){return [...new Set(a.filter(Boolean))]}
+  function perms4(n){
+    if(!/^\d{4}$/.test(n))return [];
+    const out=new Set();
+    function go(pre,rest){if(!rest.length){out.add(pre);return}for(let i=0;i<rest.length;i++)go(pre+rest[i],rest.slice(0,i)+rest.slice(i+1))}
+    go("",n); return [...out];
+  }
+  function sig(n){return n.split("").sort().join("")}
+
+  function chartaMatrix(){
+    const vals=[...document.querySelectorAll(".chart-input")].slice(0,16).map(x=>digitsOnly(x.value).slice(0,1));
+    if(vals.length<16||vals.some(x=>!x))return null;
+    return Array.from({length:4},(_,r)=>vals.slice(r*4,r*4+4));
+  }
+  function chartaCandidates(){
+    const m=chartaMatrix(); if(!m)return [];
+    const lines=[];
+    for(let r=0;r<4;r++) lines.push(m[r].join(""));
+    for(let c=0;c<4;c++) lines.push(m.map(r=>r[c]).join(""));
+    lines.push([0,1,2,3].map(i=>m[i][i]).join(""));
+    lines.push([0,1,2,3].map(i=>m[i][3-i]).join(""));
+    const rev=lines.map(x=>x.split("").reverse().join(""));
+    return uniq(lines.concat(rev));
+  }
+  function existingSignalNumbers(){
+    const selectors=["#chartaLines","#v5Repeat",".pattern-panel",".analysis-card",".permutation-card"];
+    const out=[];
+    selectors.forEach(sel=>document.querySelectorAll(sel).forEach(el=>{
+      const ms=(el.textContent||"").match(/\b\d{4}\b/g)||[]; out.push(...ms);
+    }));
+    return uniq(out.map(n4));
+  }
+  function favourites(){return uniq([...document.querySelectorAll(".fav-input")].map(x=>n4(x.value)))}
+
+  function repeatFamilySet(base){
+    const out=new Set();
+    base.forEach(x=>{
+      const c={}; x.split("").forEach(d=>c[d]=(c[d]||0)+1);
+      const counts=Object.values(c).sort((a,b)=>b-a).join("");
+      if(["31","22","211","4"].includes(counts)) perms4(x).forEach(p=>out.add(p));
+    });
+    return out;
+  }
+
+  function drawNums(d){
+    if(!d)return [];
+    const a=[d.first,d.second,d.third];
+    if(Array.isArray(d.special))a.push(...d.special);
+    if(Array.isArray(d.consolation))a.push(...d.consolation);
+    return a.map(n4).filter(Boolean);
+  }
+  function historyHits(candidate){
+    const cs=sig(candidate); let exact=0,perm=0,total=0;
+    MARKETS.forEach(k=>{
+      const draws=(hist[k]&&Array.isArray(hist[k].draws))?hist[k].draws.slice(0,60):[];
+      draws.forEach(d=>drawNums(d).forEach(x=>{total++; if(x===candidate)exact++; else if(sig(x)===cs)perm++;}));
+    });
+    return {exact,perm,total};
+  }
+
+  function build(){
+    const chart=chartaCandidates();
+    const extra=existingSignalNumbers();
+    const fav=favourites();
+    const base=uniq(chart.concat(extra));
+    const repeat=repeatFamilySet(base);
+    const pool=uniq(base.concat([...repeat],fav));
+    return {chart:new Set(chart),extra:new Set(extra),fav:new Set(fav),repeat,pool};
+  }
+
+  function scoreOne(n,src){
+    const tags=[]; let score=0;
+    const inChart=src.chart.has(n), inExtra=src.extra.has(n), inRepeat=src.repeat.has(n), inFav=src.fav.has(n);
+    const hh=historyHits(n), inHist=(hh.exact+hh.perm)>0;
+
+    if(mode==="normal"){
+      score=50+Math.floor(Math.random()*41);
+    }else if(mode==="smart"){
+      if(inChart){score+=32;tags.push("CHARTA")}
+      if(inExtra){score+=18;tags.push("PATTERN")}
+      if(inRepeat){score+=18;tags.push("FAMILY")}
+      if(inFav){score+=12;tags.push("FAV")}
+      if(inHist){score+=Math.min(20,hh.exact*8+hh.perm*3);tags.push("HISTORY")}
+    }else{
+      if(inChart){score+=35;tags.push("CHARTA")}
+      if(inExtra){score+=20;tags.push("PATTERN")}
+      if(inRepeat){score+=25;tags.push("FAMILY")}
+      if(inFav){score+=10;tags.push("FAV")}
+      if(inHist){score+=Math.min(20,hh.exact*9+hh.perm*3);tags.push("HISTORY")}
+      const strong=[inChart||inExtra,inRepeat,inFav,inHist].filter(Boolean).length;
+      if(strong>=3)score+=10; else if(strong<2)score-=12;
+    }
+    score=Math.max(0,Math.min(100,score));
+    return {n,score,tags,hh};
+  }
+
+  function render(){
+    const src=build();
+    const list=src.pool.map(n=>scoreOne(n,src));
+    if(mode==="normal") list.sort(()=>Math.random()-.5); else list.sort((a,b)=>b.score-a.score||a.n.localeCompare(b.n));
+    let top=list.slice(0,10);
+    if(mode==="power") top=top.filter(x=>x.tags.length>=2).slice(0,10);
+
+    const out=document.getElementById("v51GenOut");
+    if(!out)return;
+    if(!top.length){
+      out.innerHTML='<div class="g-empty">Belum cukup signal. Isi Charta atau Favourite dahulu.</div>';
+    }else{
+      out.innerHTML=top.map((x,i)=>'<div class="g-row"><div class="g-rank">'+(i+1)+'</div><div class="g-num">'+x.n+'</div><div class="g-tags">'+(x.tags.length?x.tags.map(t=>'<span class="g-tag">'+t+'</span>').join(''):'<span class="g-tag">SHUFFLE</span>')+'</div><div class="g-score">'+x.score+'</div></div>').join('');
+    }
+    const c=document.getElementById("gSrcCharta"),r=document.getElementById("gSrcRepeat"),f=document.getElementById("gSrcFav"),h=document.getElementById("gSrcHist");
+    if(c){c.classList.toggle("on",src.chart.size>0);c.querySelector("small").textContent=src.chart.size+" calon"}
+    if(r){r.classList.toggle("on",src.repeat.size>0);r.querySelector("small").textContent=src.repeat.size+" family"}
+    if(f){f.classList.toggle("on",src.fav.size>0);f.querySelector("small").textContent=src.fav.size+" no."}
+    if(h){h.classList.toggle("on",Object.keys(hist).length>0);h.querySelector("small").textContent=Object.keys(hist).length+" DB"}
+  }
+
+  async function loadHistory(){
+    await Promise.all(MARKETS.map(async k=>{try{const r=await fetch("data/"+k+".json?v="+Date.now(),{cache:"no-store"});if(r.ok)hist[k]=await r.json()}catch(e){}}));
+    render();
+  }
+
+  function install(){
+    const nav=document.querySelector(".v46-bottom-nav");
+    const app=document.querySelector(".app");
+    if(!nav||!app)return false;
+    nav.classList.add("v51-six-nav");
+    nav.classList.remove("v51-five-nav");
+
+    if(!nav.querySelector('[data-tab="generator"]')){
+      const results=nav.querySelector('[data-tab="results"]');
+      const all=nav.querySelector('[data-tab="all"]');
+      const btn=document.createElement("button");
+      btn.className="v46-nav-btn"; btn.dataset.tab="generator";
+      btn.innerHTML='<span class="v51-new-badge">NEW</span><span class="v46-nav-icon">⇄</span>Generator';
+      if(results)nav.insertBefore(btn,results); else if(all)nav.insertBefore(btn,all); else nav.appendChild(btn);
+    }
+
+    let page=document.getElementById("v51GeneratorPage");
+    if(!page){
+      page=document.createElement("section"); page.id="v51GeneratorPage";
+      page.innerHTML='\
+        <div class="g-card">\
+          <div class="g-head"><div><div class="g-title">⚡ SMART / POWER GENERATOR</div><div class="g-sub">Calon datang daripada Charta + Pattern/Repeat + Favourite + History</div></div><button class="g-refresh" id="gRefresh">REFRESH</button></div>\
+          <div class="g-modes"><button class="g-mode" data-mode="normal">NORMAL</button><button class="g-mode" data-mode="smart">SMART</button><button class="g-mode active" data-mode="power">POWER</button></div>\
+          <div class="g-sources"><div class="g-src" id="gSrcCharta"><b>CHARTA</b><small>0 calon</small></div><div class="g-src" id="gSrcRepeat"><b>FAMILY</b><small>0 family</small></div><div class="g-src" id="gSrcFav"><b>FAV</b><small>0 no.</small></div><div class="g-src" id="gSrcHist"><b>HISTORY</b><small>0 DB</small></div></div>\
+          <button class="g-run" id="gRun">⇄ SHUFFLE NOW</button>\
+          <div class="g-note">SMART = seimbang semua signal • POWER = utamakan calon yang kena beberapa signal serentak</div>\
+        </div>\
+        <div class="g-card"><div class="g-title">TOP CANDIDATES <span style="float:right;color:#6e8da1;font-size:7px">SCORE / 100</span></div><div id="v51GenOut" class="g-top"></div></div>\
+        <div class="g-foot">Score ialah markah signal dalaman, bukan peratus peluang menang. Generator tidak mencipta nombor rawak di luar pool kecuali mode NORMAL.</div>';
+      app.appendChild(page);
+    }
+
+    function show(){
+      page.classList.add("v51-show");
+      nav.querySelectorAll(".v46-nav-btn").forEach(b=>b.classList.toggle("active",b.dataset.tab==="generator"));
+      const rp=document.getElementById("v51ResultsPage"); if(rp)rp.classList.remove("v51-show");
+      render(); window.scrollTo({top:0,behavior:"smooth"});
+    }
+    function hide(){page.classList.remove("v51-show")}
+
+    nav.addEventListener("click",e=>{
+      const b=e.target.closest(".v46-nav-btn"); if(!b)return;
+      if(b.dataset.tab==="generator")setTimeout(show,0); else hide();
+    });
+    page.querySelectorAll(".g-mode").forEach(b=>b.onclick=()=>{mode=b.dataset.mode;page.querySelectorAll(".g-mode").forEach(x=>x.classList.toggle("active",x===b));render()});
+    document.getElementById("gRun").onclick=render;
+    document.getElementById("gRefresh").onclick=()=>{loadHistory()};
+    loadHistory();
+    return true;
+  }
+
+  let tries=0; const t=setInterval(()=>{tries++;if(install()||tries>100)clearInterval(t)},100);
 })();
 </script>
 
