@@ -6120,5 +6120,123 @@ document.addEventListener("DOMContentLoaded",function(){
 })();
 </script>
 
+
+<script>
+/* FIX-HOME-PATTERN-ORIGINAL-V1 */
+(function(){
+  "use strict";
+
+  function clean(v){
+    return (v||"").replace(/\s+/g," ").trim().toUpperCase();
+  }
+
+  function refs(){
+    const favBody=document.getElementById("favBody");
+    const favCard=favBody ? favBody.closest(".card") : null;
+    const cards=[...document.querySelectorAll(".app > .card")];
+
+    const inputCard=cards.find(c=>{
+      const u=clean(c.textContent);
+      return u.includes("MANUAL CHARTA") || u.includes("AUTO CHARTA") || u.includes("CHARTA LINES");
+    }) || cards[0] || null;
+
+    return {
+      inputCard,
+      favCard,
+      analysis:document.querySelector(".app > .analysis-card"),
+      perm:document.querySelector(".app > .permutation-card"),
+      history:document.querySelector(".app > .history-card"),
+      footer:document.querySelector(".app > .footer"),
+      results:document.getElementById("v51ResultsPage"),
+      generator:document.getElementById("vPowerGeneratorPage") ||
+                document.getElementById("powerGeneratorPage")
+    };
+  }
+
+  function hide(el){
+    if(!el)return;
+    el.classList.add("vTabHidden");
+    el.classList.remove("vTabVisible");
+    el.classList.add("v46-hidden-mobile");
+  }
+
+  function show(el){
+    if(!el)return;
+    el.classList.remove("vTabHidden");
+    el.classList.remove("v46-hidden-mobile");
+    el.classList.add("vTabVisible");
+  }
+
+  function applyTab(tab){
+    if(window.innerWidth>1100)return;
+
+    const r=refs();
+    const all=[r.inputCard,r.favCard,r.analysis,r.perm,r.history,r.footer,r.results,r.generator];
+
+    if(tab==="home"){
+      all.forEach(hide);
+      [r.inputCard,r.favCard,r.analysis].forEach(show);
+    }
+    else if(tab==="pattern"){
+      all.forEach(hide);
+      [r.analysis,r.perm].forEach(show);
+    }
+    else if(tab==="history"){
+      all.forEach(hide);
+      show(r.history);
+    }
+    else if(tab==="generator"){
+      all.forEach(hide);
+      show(r.generator);
+    }
+    else if(tab==="results"){
+      all.forEach(hide);
+      show(r.results);
+    }
+    else if(tab==="all"){
+      all.forEach(show);
+    }
+
+    const nav=document.querySelector(".v46-bottom-nav");
+    if(nav){
+      nav.querySelectorAll(".v46-nav-btn").forEach(b=>{
+        b.classList.toggle("active",b.dataset.tab===tab);
+      });
+    }
+  }
+
+  function bind(){
+    const nav=document.querySelector(".v46-bottom-nav");
+    if(!nav)return false;
+    if(nav.dataset.fixHomePatternBound==="1")return true;
+
+    nav.dataset.fixHomePatternBound="1";
+    nav.addEventListener("click",function(e){
+      const btn=e.target.closest(".v46-nav-btn");
+      if(!btn || !btn.dataset.tab)return;
+      const tab=btn.dataset.tab;
+
+      // Run after older tab handlers so this final state wins.
+      setTimeout(function(){
+        applyTab(tab);
+        window.scrollTo({top:0,behavior:"smooth"});
+      },80);
+    },false);
+
+    const active=nav.querySelector(".v46-nav-btn.active");
+    setTimeout(()=>applyTab(active?.dataset.tab || "home"),120);
+    return true;
+  }
+
+  document.addEventListener("DOMContentLoaded",function(){
+    let tries=0;
+    const t=setInterval(function(){
+      tries++;
+      if(bind() || tries>100)clearInterval(t);
+    },100);
+  });
+})();
+</script>
+
 </body>
 </html>
