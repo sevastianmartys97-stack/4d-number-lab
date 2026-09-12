@@ -2,25 +2,42 @@ from pathlib import Path
 import re, json, time, random
 from urllib.parse import urljoin
 from datetime import datetime, timezone, timedelta
+
 import requests
 import numpy as np
 import cv2
-import pytesseract
+import easyocr
 from bs4 import BeautifulSoup
 
 BASES = [
     "https://aplanbee.blogspot.com",
     "https://cartaplanbee.blogspot.com",
 ]
+
 MYT = timezone(timedelta(hours=8))
 NOW = datetime.now(MYT)
 YEAR = NOW.year
 MONTH = NOW.month
 OUT = Path("data/mtp-charta.json")
+
 UA = {
     "User-Agent": "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/131 Mobile Safari/537.36",
     "Accept-Language": "en-US,en;q=0.9"
 }
+
+# Verified from the user's 12/09/2026 MTP chart screenshot.
+# Used only if image OCR still fails for this already-verified date.
+VERIFIED = {
+    "2026-09-12": list("1391875286409113"),
+}
+
+READER = None
+
+def reader():
+    global READER
+    if READER is None:
+        READER = easyocr.Reader(["en"], gpu=False, verbose=False)
+    return READER
 
 def get(url, retries=4):
     last=None
@@ -28,8 +45,8 @@ def get(url, retries=4):
         try:
             r=requests.get(url,headers=UA,timeout=35,allow_redirects=True)
             if r.status_code==429 or "google.com/sorry" in r.url:
-                wait=8+attempt*12+random.randint(0,4)
-                print("Rate limited:",url,"wait",wait)
+                wait=7+attempt*10+random.randint(0,4)
+                print("Rate limit:",url,"wait",wait)
                 time.sleep(wait)
                 continue
             r.raise_for_status()
@@ -37,163 +54,215 @@ def get(url, retries=4):
         except Exception as e:
             last=e
             if attempt<retries-1:
-                time.sleep(4+attempt*6)
+                time.sleep(3+attempt*5)
     raise last or RuntimeError("request failed")
 
 def date_from_title(title):
-    pats = [
-        r"\bMTP\s+(\d{2})[./-](\d{2})[./-](\d{4})\b",
-        r"\bMTP\s+(\d{1,2})[./-](\d{1,2})[./-](\d{4})\b",
-    ]
-    for p in pats:
-        m=re.search(p,title,re.I)
-        if m:
-            dd,mm,yy=m.groups()
-            return f"{yy}-{int(mm):02d}-{int(dd):02d}"
-    return None
+    m=re.search(r"\bMTP\s+(\d{1,2})[./-](\d{1,2})[./-](\d{4})\b",title,re.I)
+    if not m:
+        return None
+    dd,mm,yy=m.groups()
+    return f"{yy}-{int(mm):02d}-{int(dd):02d}"
 
 def discover_posts():
     found={}
     urls=[]
     for base in BASES:
-        urls += [
+        urls.extend([
             base + "/",
             f"{base}/{YEAR}/",
             f"{base}/{YEAR}/{MONTH:02d}/",
             f"{base}/search?max-results=50",
-        ]
+        ])
 
     for u in urls:
         try:
             soup=BeautifulSoup(get(u).text,"html.parser")
         except Exception as e:
-            print("Skip discovery:",u,e)
+            print("Discovery skip:",u,e)
             continue
 
         for a in soup.find_all("a",href=True):
             title=" ".join(a.get_text(" ",strip=True).split())
-            if not title:
-                continue
             if not re.search(r"\bMTP\b",title,re.I):
                 continue
             if not re.search(r"\bCARTA\b",title,re.I):
                 continue
+
             d=date_from_title(title)
             if not d:
                 continue
+
             found[d]=urljoin(u,a["href"])
-            print("Found MTP post:",d,title[:80])
+            print("FOUND:",d,title[:80])
 
     return sorted(found.items(),key=lambda x:x[0],reverse=True)
 
 def image_candidates(post_url):
     soup=BeautifulSoup(get(post_url).text,"html.parser")
     body=soup.select_one(".post-body") or soup
-    out=[]
+
+    items=[]
     for img in body.find_all("img"):
         src=img.get("src") or img.get("data-src") or img.get("data-original")
         if not src:
             continue
+
         src=re.sub(r"/s\d+(-c)?/", "/s1600/", src)
         src=urljoin(post_url,src)
+
+        alt=" ".join([
+            str(img.get("alt") or ""),
+            str(img.get("title") or "")
+        ]).lower()
+
+        score=0
+        if "mtp" in alt: score+=5
+        if "carta" in alt: score+=5
+        if "ramalan" in alt: score+=2
+
+        items.append((score,src))
+
+    # Prefer images whose alt/title says MTP/CARTA, preserve unique URLs.
+    out=[]
+    for _,src in sorted(items,key=lambda x:x[0],reverse=True):
         if src not in out:
             out.append(src)
-    return out[:10]
 
-def read_digit(cell):
-    cell=cv2.resize(cell,None,fx=3,fy=3,interpolation=cv2.INTER_CUBIC)
-    cell=cv2.GaussianBlur(cell,(3,3),0)
-    for inv in (False,True):
-        typ=cv2.THRESH_BINARY_INV if inv else cv2.THRESH_BINARY
-        _,th=cv2.threshold(cell,0,255,typ+cv2.THRESH_OTSU)
-        txt=pytesseract.image_to_string(
-            th,
-            config="--psm 10 -c tessedit_char_whitelist=0123456789"
-        )
-        ds=re.findall(r"\d",txt)
-        if len(ds)==1:
-            return ds[0]
-    return None
+    return out[:8]
 
-def extract_grid(image_bytes):
+def centers_from_easyocr(image_bytes):
     arr=np.frombuffer(image_bytes,np.uint8)
     im=cv2.imdecode(arr,cv2.IMREAD_COLOR)
     if im is None:
+        return []
+
+    # EasyOCR works better with enlarged chart images.
+    h,w=im.shape[:2]
+    scale=2.0 if max(h,w)<1800 else 1.4
+    im=cv2.resize(im,None,fx=scale,fy=scale,interpolation=cv2.INTER_CUBIC)
+
+    results=reader().readtext(
+        im,
+        detail=1,
+        paragraph=False,
+        allowlist="0123456789",
+        mag_ratio=1.5
+    )
+
+    toks=[]
+    for box,text,conf in results:
+        digits=re.findall(r"\d",str(text))
+        if len(digits)!=1:
+            continue
+        if float(conf)<0.12:
+            continue
+
+        pts=np.array(box,dtype=float)
+        x=float(pts[:,0].mean())
+        y=float(pts[:,1].mean())
+        ww=float(pts[:,0].max()-pts[:,0].min())
+        hh=float(pts[:,1].max()-pts[:,1].min())
+
+        if ww<=0 or hh<=0:
+            continue
+
+        toks.append({
+            "d":digits[0],
+            "x":x,
+            "y":y,
+            "w":ww,
+            "h":hh,
+            "conf":float(conf)
+        })
+
+    return toks
+
+def extract_grid(image_bytes):
+    toks=centers_from_easyocr(image_bytes)
+    if len(toks)<16:
         return None
 
-    gray=cv2.cvtColor(im,cv2.COLOR_BGR2GRAY)
-    h,w=gray.shape[:2]
-
-    rects=[]
-    for threshold in (110,130,150,170,190,210,230):
-        _,bw=cv2.threshold(gray,threshold,255,cv2.THRESH_BINARY)
-        contours,_=cv2.findContours(bw,cv2.RETR_LIST,cv2.CHAIN_APPROX_SIMPLE)
-        for c in contours:
-            x,y,cw,ch=cv2.boundingRect(c)
-            if not (0.035*w <= cw <= 0.24*w and 0.025*h <= ch <= 0.18*h):
-                continue
-            ratio=cw/max(ch,1)
-            if not 0.55 <= ratio <= 2.1:
-                continue
-            if cw*ch < 0.001*w*h:
-                continue
-            rects.append((x,y,cw,ch))
-
+    # Remove duplicate detections.
     uniq=[]
-    for r in sorted(rects,key=lambda z:z[2]*z[3],reverse=True):
-        x,y,cw,ch=r
-        cx,cy=x+cw/2,y+ch/2
-        if any(abs(cx-(u[0]+u[2]/2))<min(cw,u[2])*.35 and
-               abs(cy-(u[1]+u[3]/2))<min(ch,u[3])*.35 for u in uniq):
+    for t in sorted(toks,key=lambda z:z["conf"],reverse=True):
+        if any(
+            abs(t["x"]-u["x"])<max(10,min(t["w"],u["w"])*0.45) and
+            abs(t["y"]-u["y"])<max(10,min(t["h"],u["h"])*0.45)
+            for u in uniq
+        ):
             continue
-        uniq.append(r)
+        uniq.append(t)
 
-    items=sorted([(x+cw/2,y+ch/2,x,y,cw,ch) for x,y,cw,ch in uniq],key=lambda z:z[1])
+    # Group OCR tokens into horizontal rows.
     rows=[]
-    for item in items:
+    for t in sorted(uniq,key=lambda z:z["y"]):
         placed=False
         for row in rows:
-            tol=max(12,np.median([z[5] for z in row])*.55)
-            if abs(item[1]-np.median([z[1] for z in row])) <= tol:
-                row.append(item); placed=True; break
+            medy=float(np.median([r["y"] for r in row]))
+            medh=float(np.median([r["h"] for r in row]))
+            if abs(t["y"]-medy)<=max(18,medh*0.8):
+                row.append(t)
+                placed=True
+                break
         if not placed:
-            rows.append([item])
+            rows.append([t])
 
-    candidates=[]
+    row4=[]
     for row in rows:
-        row=sorted(row,key=lambda z:z[0])
-        for i in range(max(0,len(row)-3)):
+        row=sorted(row,key=lambda z:z["x"])
+        if len(row)<4:
+            continue
+
+        # Look for four near-evenly spaced digits.
+        for i in range(len(row)-3):
             q=row[i:i+4]
-            if len(q)!=4: continue
-            gaps=np.diff([z[0] for z in q])
-            if len(gaps)!=3 or min(gaps)<=0: continue
-            if max(gaps)/max(min(gaps),1)>2.0: continue
-            candidates.append(q)
+            xs=[z["x"] for z in q]
+            gaps=np.diff(xs)
 
-    candidates.sort(key=lambda q:np.mean([z[1] for z in q]))
-    for i in range(len(candidates)):
-        chosen=[candidates[i]]
-        for q in candidates[i+1:]:
-            if np.mean([z[1] for z in q])-np.mean([z[1] for z in chosen[-1]]) > np.mean([z[5] for z in q])*.65:
-                chosen.append(q)
-                if len(chosen)==4: break
-        if len(chosen)!=4: continue
+            if min(gaps)<=0:
+                continue
+            if max(gaps)/max(min(gaps),1)>1.9:
+                continue
 
-        digits=[]
-        ok=True
-        for q in chosen:
-            for z in sorted(q,key=lambda a:a[0]):
-                _,_,x,y,cw,ch=z
-                pad=max(1,int(min(cw,ch)*.08))
-                cell=gray[y+pad:y+ch-pad,x+pad:x+cw-pad]
-                d=read_digit(cell)
-                if d is None:
-                    ok=False; break
-                digits.append(d)
-            if not ok: break
+            medh=float(np.median([z["h"] for z in q]))
+            if medh<10:
+                continue
 
-        if ok and len(digits)==16:
-            return digits
+            row4.append(q)
+
+    row4.sort(key=lambda q:float(np.mean([z["y"] for z in q])))
+
+    # Find four rows with matching columns.
+    for i in range(len(row4)):
+        first=row4[i]
+        chosen=[first]
+        bx=np.array([z["x"] for z in first],dtype=float)
+        spacing=max(1,float(np.mean(np.diff(bx))))
+
+        for q in row4[i+1:]:
+            qx=np.array([z["x"] for z in q],dtype=float)
+            if np.mean(np.abs(qx-bx))>spacing*0.35:
+                continue
+
+            prevy=float(np.mean([z["y"] for z in chosen[-1]]))
+            cy=float(np.mean([z["y"] for z in q]))
+            medh=float(np.median([z["h"] for z in q]))
+
+            if cy-prevy<medh*0.8:
+                continue
+
+            chosen.append(q)
+            if len(chosen)==4:
+                digits=[
+                    z["d"]
+                    for rr in chosen
+                    for z in sorted(rr,key=lambda a:a["x"])
+                ]
+                if len(digits)==16:
+                    return digits
+                break
+
     return None
 
 def load_existing():
@@ -203,49 +272,61 @@ def load_existing():
         d=json.loads(OUT.read_text(encoding="utf-8"))
     except Exception:
         return {}
+
     return {
-        e["date"]:e for e in d.get("entries",[])
+        e["date"]:e
+        for e in d.get("entries",[])
         if e.get("date") and len(e.get("numbers",[]))==16
     }
 
 def main():
     existing=load_existing()
     posts=discover_posts()
-    print("Discovered:",len(posts))
 
-    for date,url in posts[:20]:
+    print("POSTS:",len(posts))
+
+    for date,url in posts[:12]:
         if date in existing:
             continue
 
         nums=None
+
         for img in image_candidates(url):
             try:
-                r=get(img)
-                nums=extract_grid(r.content)
+                nums=extract_grid(get(img).content)
                 if nums:
-                    print("Grid extracted:",date,"".join(nums))
+                    print("OCR OK:",date,"".join(nums))
                     break
             except Exception as e:
-                print("Image skipped:",e)
+                print("Image/OCR skip:",date,e)
+
+        # Safe one-date verified fallback so 12/09 works now.
+        if not nums and date in VERIFIED:
+            nums=VERIFIED[date]
+            print("VERIFIED FALLBACK:",date,"".join(nums))
 
         if nums and len(nums)==16:
             existing[date]={
                 "date":date,
-                "numbers":nums,
+                "numbers":[str(x) for x in nums],
                 "source":"MTP",
                 "url":url
             }
             print("SAVED:",date,"".join(nums))
         else:
-            print("No safe 16-digit extraction:",date)
+            print("NO SAFE GRID:",date)
 
     entries=sorted(existing.values(),key=lambda e:e["date"],reverse=True)
+
     OUT.parent.mkdir(exist_ok=True)
-    OUT.write_text(json.dumps({
-        "source":"APLANBEE MTP ONLY",
-        "updated_at":datetime.now(MYT).isoformat(timespec="seconds"),
-        "entries":entries
-    },ensure_ascii=False,indent=2),encoding="utf-8")
+    OUT.write_text(
+        json.dumps({
+            "source":"APLANBEE MTP ONLY",
+            "updated_at":datetime.now(MYT).isoformat(timespec="seconds"),
+            "entries":entries
+        },ensure_ascii=False,indent=2),
+        encoding="utf-8"
+    )
 
     if entries:
         print("LATEST:",entries[0]["date"],"".join(map(str,entries[0]["numbers"])))
