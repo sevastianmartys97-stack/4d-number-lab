@@ -6457,5 +6457,94 @@ document.addEventListener("DOMContentLoaded",function(){
 })();
 </script>
 
+
+<script>
+/* MTP-LIVE-AUTOLOAD-V2 */
+(function(){
+  const URL="data/mtp-charta.json";
+  let seen=localStorage.getItem("mtpLiveLatestSeen")||"";
+  let busy=false;
+
+  const nice=d=>{
+    const m=String(d||"").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    return m?`${m[3]}/${m[2]}/${m[1]}`:d;
+  };
+
+  function inputs(){
+    return [...document.querySelectorAll(".chart-input")].slice(0,16);
+  }
+
+  function select(){
+    return document.getElementById("mtpDateSelect");
+  }
+
+  function fill(e){
+    const ins=inputs();
+    if(!e||!Array.isArray(e.numbers)||e.numbers.length!==16||ins.length<16)return false;
+
+    e.numbers.forEach((n,i)=>{
+      ins[i].value=String(n);
+      ins[i].dispatchEvent(new Event("input",{bubbles:true}));
+      ins[i].dispatchEvent(new Event("change",{bubbles:true}));
+    });
+
+    const s=select();
+    if(s){
+      if(![...s.options].some(o=>o.value===e.date)){
+        const o=document.createElement("option");
+        o.value=e.date;
+        o.textContent=nice(e.date)+" • MTP";
+        s.prepend(o);
+      }
+      s.value=e.date;
+    }
+
+    seen=e.date;
+    localStorage.setItem("mtpLiveLatestSeen",e.date);
+    localStorage.setItem("4dMtpSelectedDate",e.date);
+    console.log("MTP AUTO LOAD",e.date,e.numbers.join(""));
+    return true;
+  }
+
+  async function check(force=false){
+    if(busy)return;
+    busy=true;
+    try{
+      const r=await fetch(URL+"?v="+Date.now(),{cache:"no-store"});
+      if(!r.ok)throw new Error("HTTP "+r.status);
+      const d=await r.json();
+      let es=Array.isArray(d.entries)?d.entries.slice():[];
+      es=es.filter(e=>e?.date&&Array.isArray(e.numbers)&&e.numbers.length===16)
+           .sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+      if(!es.length)return;
+
+      const s=select();
+      if(s){
+        const current=s.value;
+        s.innerHTML=es.map(e=>`<option value="${e.date}">${nice(e.date)} • MTP</option>`).join("");
+        if(es.some(e=>e.date===current))s.value=current;
+      }
+
+      const newest=es[0];
+      if(force||!seen||newest.date>seen)fill(newest);
+    }catch(e){
+      console.warn("MTP auto check",e);
+    }finally{
+      busy=false;
+    }
+  }
+
+  function start(){
+    setTimeout(()=>check(true),1200);
+    setInterval(()=>check(false),5*60*1000);
+    document.addEventListener("visibilitychange",()=>{if(!document.hidden)check(false)});
+    window.addEventListener("focus",()=>check(false));
+  }
+
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",start);
+  else start();
+})();
+</script>
+
 </body>
 </html>
