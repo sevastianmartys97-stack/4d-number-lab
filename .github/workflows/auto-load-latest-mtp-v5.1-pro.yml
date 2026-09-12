@@ -1,0 +1,180 @@
+name: Auto Load Latest MTP V5.1 PRO
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/15 3-10 * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  auto-mtp:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y tesseract-ocr
+          python3 -m pip install requests beautifulsoup4 opencv-python-headless pytesseract numpy
+
+      - name: Run MTP scanner
+        shell: bash
+        run: |
+          set +e
+          if [ -f scripts/update_mtp_charta.py ]; then
+            python3 scripts/update_mtp_charta.py
+          elif [ -f scripts/backfill_mtp_history.py ]; then
+            python3 scripts/backfill_mtp_history.py
+          else
+            echo "No MTP scanner found"
+            exit 1
+          fi
+          exit 0
+
+      - name: Add live auto-load to app
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("index.html")
+          s=p.read_text(encoding="utf-8")
+          mark="MTP-LIVE-AUTOLOAD-V2"
+          if mark not in s:
+              js=r'''
+          <script>
+          /* MTP-LIVE-AUTOLOAD-V2 */
+          (function(){
+            const URL="data/mtp-charta.json";
+            let seen=localStorage.getItem("mtpLiveLatestSeen")||"";
+            let busy=false;
+
+            const nice=d=>{
+              const m=String(d||"").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+              return m?`${m[3]}/${m[2]}/${m[1]}`:d;
+            };
+
+            function inputs(){
+              return [...document.querySelectorAll(".chart-input")].slice(0,16);
+            }
+
+            function select(){
+              return document.getElementById("mtpDateSelect");
+            }
+
+            function fill(e){
+              const ins=inputs();
+              if(!e||!Array.isArray(e.numbers)||e.numbers.length!==16||ins.length<16)return false;
+
+              e.numbers.forEach((n,i)=>{
+                ins[i].value=String(n);
+                ins[i].dispatchEvent(new Event("input",{bubbles:true}));
+                ins[i].dispatchEvent(new Event("change",{bubbles:true}));
+              });
+
+              const s=select();
+              if(s){
+                if(![...s.options].some(o=>o.value===e.date)){
+                  const o=document.createElement("option");
+                  o.value=e.date;
+                  o.textContent=nice(e.date)+" • MTP";
+                  s.prepend(o);
+                }
+                s.value=e.date;
+              }
+
+              seen=e.date;
+              localStorage.setItem("mtpLiveLatestSeen",e.date);
+              localStorage.setItem("4dMtpSelectedDate",e.date);
+              console.log("MTP AUTO LOAD",e.date,e.numbers.join(""));
+              return true;
+            }
+
+            async function check(force=false){
+              if(busy)return;
+              busy=true;
+              try{
+                const r=await fetch(URL+"?v="+Date.now(),{cache:"no-store"});
+                if(!r.ok)throw new Error("HTTP "+r.status);
+                const d=await r.json();
+                let es=Array.isArray(d.entries)?d.entries.slice():[];
+                es=es.filter(e=>e?.date&&Array.isArray(e.numbers)&&e.numbers.length===16)
+                     .sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+                if(!es.length)return;
+
+                const s=select();
+                if(s){
+                  const current=s.value;
+                  s.innerHTML=es.map(e=>`<option value="${e.date}">${nice(e.date)} • MTP</option>`).join("");
+                  if(es.some(e=>e.date===current))s.value=current;
+                }
+
+                const newest=es[0];
+                if(force||!seen||newest.date>seen)fill(newest);
+              }catch(e){
+                console.warn("MTP auto check",e);
+              }finally{
+                busy=false;
+              }
+            }
+
+            function start(){
+              setTimeout(()=>check(true),1200);
+              setInterval(()=>check(false),5*60*1000);
+              document.addEventListener("visibilitychange",()=>{if(!document.hidden)check(false)});
+              window.addEventListener("focus",()=>check(false));
+            }
+
+            if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",start);
+            else start();
+          })();
+          </script>
+          '''
+              s=s.replace("</body>",js+"\n</body>",1)
+              p.write_text(s,encoding="utf-8")
+              print("Live auto-load installed")
+          else:
+              print("Live auto-load already installed")
+          PY
+
+      - name: Validate
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          h=Path("index.html").read_text(encoding="utf-8")
+          assert "MTP-LIVE-AUTOLOAD-V2" in h
+          d=json.loads(Path("data/mtp-charta.json").read_text(encoding="utf-8"))
+          e=d.get("entries",[])
+          assert e
+          assert all(len(x.get("numbers",[]))==16 for x in e)
+          e=sorted(e,key=lambda x:x["date"],reverse=True)
+          print("Latest:",e[0]["date"],"".join(map(str,e[0]["numbers"])))
+          PY
+
+      - name: Bump cache
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path("sw.js")
+          if p.exists():
+              s=p.read_text(encoding="utf-8")
+              s2=re.sub(r'4d-charta-v[^"\']+','4d-charta-v51-mtp-live2',s,count=1)
+              if s2!=s:p.write_text(s2,encoding="utf-8")
+          PY
+
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html data/mtp-charta.json
+          [ -f sw.js ] && git add sw.js || true
+          if git diff --cached --quiet; then
+            echo "No changes"
+          else
+            git commit -m "Auto load latest MTP Charta"
+            git push
+          fi
