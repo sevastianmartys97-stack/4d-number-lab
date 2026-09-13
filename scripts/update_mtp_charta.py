@@ -1,5 +1,5 @@
 from pathlib import Path
-import re, json, io, html as htmlmod
+import re, json, io, html as htmlmod, statistics
 from datetime import datetime, timezone, timedelta
 from urllib.parse import urljoin
 
@@ -7,7 +7,6 @@ import requests
 from bs4 import BeautifulSoup
 import numpy as np
 import cv2
-from PIL import Image
 import pytesseract
 
 MYT = timezone(timedelta(hours=8))
@@ -60,7 +59,7 @@ def save(existing):
     if entries:
         print("LATEST SAVED:", entries[0]["date"], "".join(map(str, entries[0]["numbers"])))
 
-def large_blogger_image(url):
+def large_image(url):
     url = htmlmod.unescape(url)
     url = re.sub(r"/s\d+(-c)?/", "/s1600/", url)
     url = re.sub(r"=w\d+(-h\d+)?(-no)?$", "=s1600", url)
@@ -73,18 +72,16 @@ def images_from_html(raw_html, base):
         src = img.get("data-original") or img.get("data-src") or img.get("src")
         if not src:
             continue
-
-        src = large_blogger_image(urljoin(base, src))
+        src = large_image(urljoin(base, src))
         meta = " ".join([
             str(img.get("alt") or ""),
             str(img.get("title") or ""),
             str(img.get("class") or "")
         ]).lower()
-
         score = 0
-        if "mtp" in meta: score += 12
-        if "carta" in meta: score += 12
-        if "ramalan" in meta: score += 4
+        if "mtp" in meta: score += 20
+        if "carta" in meta: score += 20
+        if "ramalan" in meta: score += 5
         scored.append((score, src))
 
     out = []
@@ -93,13 +90,12 @@ def images_from_html(raw_html, base):
             out.append(src)
     return out
 
-def discover_feed_direct():
+def discover_feed():
     for base in BASES:
-        feeds = [
+        for feed_url in (
             base + "/feeds/posts/default?alt=json&max-results=10",
             base + "/feeds/posts/default/-/MTP?alt=json&max-results=10",
-        ]
-        for feed_url in feeds:
+        ):
             try:
                 data = req(feed_url).json()
             except Exception as e:
@@ -122,265 +118,315 @@ def discover_feed_direct():
                         post_url = l.get("href") or ""
                         break
 
-                chunks = []
+                imgs = []
                 for key in ("content", "summary"):
                     obj = e.get(key, {})
                     if isinstance(obj, dict):
-                        chunks.append(obj.get("$t", "") or "")
-
-                imgs = []
-                for chunk in chunks:
-                    imgs.extend(images_from_html(chunk, post_url or base))
+                        imgs.extend(images_from_html(obj.get("$t", "") or "", post_url or base))
 
                 media = e.get("media$thumbnail", {})
                 if isinstance(media, dict) and media.get("url"):
-                    imgs.append(large_blogger_image(media["url"]))
+                    imgs.append(large_image(media["url"]))
 
-                unique = []
+                uniq = []
                 for u in imgs:
-                    if u and u not in unique:
-                        unique.append(u)
+                    if u and u not in uniq:
+                        uniq.append(u)
 
-                found.append((date, post_url, unique))
+                found.append((date, post_url, uniq))
 
             if found:
                 date, post_url, imgs = sorted(found, key=lambda x:x[0], reverse=True)[0]
                 print("FEED DIRECT FOUND:", date)
-                print("FEED IMAGE CANDIDATES:", len(imgs))
+                print("IMAGE CANDIDATES:", len(imgs))
                 return date, post_url, imgs[:4]
 
     return None, None, []
 
-def pil_to_cv(raw):
-    arr = np.frombuffer(raw, dtype=np.uint8)
+def decode(raw):
+    arr = np.frombuffer(raw, np.uint8)
     img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
     if img is None:
-        raise ValueError("image decode failed")
+        raise ValueError("decode failed")
     return img
 
-def candidate_crops(img):
-    h, w = img.shape[:2]
-    out = []
-
-    # Full image and central crops first.
-    out.append(("full", img))
-    out.append(("center90", img[int(h*.05):int(h*.95), int(w*.05):int(w*.95)]))
-    out.append(("center80", img[int(h*.10):int(h*.90), int(w*.10):int(w*.90)]))
-
+def preprocess_variants(img):
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    blur = cv2.GaussianBlur(gray, (5,5), 0)
+    scale = 1.0
+    if max(gray.shape[:2]) < 1800:
+        scale = 1800 / max(gray.shape[:2])
+        gray = cv2.resize(gray, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
 
-    for mode, thr in [("otsu", None), ("t150", 150), ("t180", 180)]:
-        if thr is None:
-            _, bw = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    gray = cv2.equalizeHist(gray)
+    variants = [("gray", gray)]
+    _, otsu = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    variants.append(("otsu", otsu))
+    adap = cv2.adaptiveThreshold(gray,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                                 cv2.THRESH_BINARY,41,11)
+    variants.append(("adaptive", adap))
+    return variants
+
+def ocr_tokens(img, psm):
+    data = pytesseract.image_to_data(
+        img,
+        config=f"--psm {psm} -c tessedit_char_whitelist=0123456789",
+        output_type=pytesseract.Output.DICT
+    )
+    out=[]
+    for i,txt in enumerate(data.get("text",[])):
+        ds=re.findall(r"\d",str(txt))
+        if len(ds)!=1:
+            continue
+        try:
+            conf=float(data["conf"][i])
+        except:
+            conf=-1
+        if conf < 5:
+            continue
+        x=int(data["left"][i]); y=int(data["top"][i])
+        w=int(data["width"][i]); h=int(data["height"][i])
+        if w<4 or h<8:
+            continue
+        out.append({
+            "d":ds[0],"x":x+w/2,"y":y+h/2,"w":w,"h":h,"c":conf
+        })
+    return out
+
+def cluster_rows(tokens):
+    if len(tokens) < 16:
+        return []
+
+    medh = statistics.median([t["h"] for t in tokens])
+    rows=[]
+    for t in sorted(tokens,key=lambda z:z["y"]):
+        best=None
+        bestdy=1e9
+        for row in rows:
+            ry=sum(z["y"] for z in row)/len(row)
+            dy=abs(t["y"]-ry)
+            if dy < bestdy and dy <= max(18, medh*0.8):
+                best=row; bestdy=dy
+        if best is None:
+            rows.append([t])
         else:
-            _, bw = cv2.threshold(blur, thr, 255, cv2.THRESH_BINARY_INV)
+            best.append(t)
 
-        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5,5))
-        bw = cv2.morphologyEx(bw, cv2.MORPH_CLOSE, kernel, iterations=2)
+    candidates=[]
+    for row in rows:
+        row=sorted(row,key=lambda z:z["x"])
+        if len(row) < 4:
+            continue
+        for i in range(len(row)-3):
+            q=row[i:i+4]
+            xs=[z["x"] for z in q]
+            gaps=[xs[j+1]-xs[j] for j in range(3)]
+            if min(gaps)<=0:
+                continue
+            if max(gaps)/max(min(gaps),1) > 2.0:
+                continue
+            candidates.append(q)
+    return candidates
 
-        cnts, _ = cv2.findContours(bw, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        boxes = []
-        for c in cnts:
-            x,y,cw,ch = cv2.boundingRect(c)
-            area = cw*ch
-            if area < (w*h)*0.05 or area > (w*h)*0.95:
+def find_4x4(tokens):
+    rows=cluster_rows(tokens)
+    if len(rows)<4:
+        return []
+
+    rows=sorted(rows,key=lambda r:sum(z["y"] for z in r)/4)
+    results=[]
+
+    for i in range(len(rows)):
+        base=rows[i]
+        bx=[z["x"] for z in base]
+        gap=statistics.median([bx[j+1]-bx[j] for j in range(3)])
+        chosen=[base]
+
+        for q in rows[i+1:]:
+            qx=[z["x"] for z in q]
+            align=sum(abs(qx[j]-bx[j]) for j in range(4))/4
+            if align > max(22,gap*0.35):
                 continue
-            ratio = cw/max(ch,1)
-            if not (0.55 <= ratio <= 1.8):
+
+            lasty=sum(z["y"] for z in chosen[-1])/4
+            qy=sum(z["y"] for z in q)/4
+            if qy-lasty < 15:
                 continue
+
+            chosen.append(q)
+            if len(chosen)==4:
+                digits="".join(z["d"] for rr in chosen for z in sorted(rr,key=lambda z:z["x"]))
+                confs=[z["c"] for rr in chosen for z in rr]
+                av=sum(confs)/16
+                low=sum(1 for c in confs if c<20)
+
+                ys=[sum(z["y"] for z in rr)/4 for rr in chosen]
+                ygaps=[ys[j+1]-ys[j] for j in range(3)]
+                uniform=max(ygaps)/max(min(ygaps),1) if min(ygaps)>0 else 99
+
+                if len(digits)==16 and uniform<2.1:
+                    score=av-low*2
+                    results.append((score,av,low,digits))
+                break
+    return results
+
+def line_grid(img):
+    gray=cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+    if max(gray.shape[:2])<1800:
+        s=1800/max(gray.shape[:2])
+        gray=cv2.resize(gray,None,fx=s,fy=s,interpolation=cv2.INTER_CUBIC)
+
+    inv=cv2.adaptiveThreshold(gray,255,cv2.ADAPTIVE_THRESH_MEAN_C,
+                              cv2.THRESH_BINARY_INV,31,9)
+
+    h,w=inv.shape
+    horiz=cv2.morphologyEx(
+        inv,cv2.MORPH_OPEN,
+        cv2.getStructuringElement(cv2.MORPH_RECT,(max(30,w//18),1))
+    )
+    vert=cv2.morphologyEx(
+        inv,cv2.MORPH_OPEN,
+        cv2.getStructuringElement(cv2.MORPH_RECT,(1,max(30,h//18)))
+    )
+
+    mask=cv2.bitwise_or(horiz,vert)
+    cnts,_=cv2.findContours(mask,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
+    boxes=[]
+    for c in cnts:
+        x,y,cw,ch=cv2.boundingRect(c)
+        area=cw*ch
+        if area < w*h*0.03:
+            continue
+        ratio=cw/max(ch,1)
+        if 0.45 <= ratio <= 2.2 and cw>120 and ch>120:
             boxes.append((area,x,y,cw,ch))
 
-        for idx, (_,x,y,cw,ch) in enumerate(sorted(boxes, reverse=True)[:6]):
-            pad = int(min(cw,ch)*0.03)
-            x0=max(0,x-pad); y0=max(0,y-pad)
-            x1=min(w,x+cw+pad); y1=min(h,y+ch+pad)
-            crop = img[y0:y1, x0:x1]
-            if crop.size:
-                out.append((f"{mode}_box{idx}", crop))
-
-    # Remove near-duplicate crops by size.
-    unique = []
-    seen = set()
-    for name,crop in out:
-        key = (crop.shape[1]//20, crop.shape[0]//20)
-        if key in seen:
-            continue
-        seen.add(key)
-        unique.append((name,crop))
-    return unique[:12]
-
-def ocr_single_cell(cell):
-    if cell.size == 0:
-        return None, -1
-
-    gray = cv2.cvtColor(cell, cv2.COLOR_BGR2GRAY) if len(cell.shape)==3 else cell
-
-    # Remove cell borders.
-    h,w = gray.shape[:2]
-    mx = max(2, int(w*.13))
-    my = max(2, int(h*.13))
-    core = gray[my:h-my, mx:w-mx] if h>2*my and w>2*mx else gray
-
-    scale = max(2.0, 180/max(core.shape[:2]))
-    core = cv2.resize(core, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
-    core = cv2.GaussianBlur(core, (3,3), 0)
-
-    variants = []
-    variants.append(core)
-    _, a = cv2.threshold(core, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    variants.append(a)
-    _, b = cv2.threshold(core, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-    variants.append(b)
-
-    best_digit = None
-    best_conf = -1
-
-    for v in variants:
-        data = pytesseract.image_to_data(
-            v,
-            config="--psm 10 -c tessedit_char_whitelist=0123456789",
-            output_type=pytesseract.Output.DICT
-        )
-        for i, txt in enumerate(data.get("text", [])):
-            ds = re.findall(r"\d", str(txt))
-            if len(ds) != 1:
-                continue
-            try:
-                conf = float(data["conf"][i])
-            except Exception:
-                conf = -1
-            if conf > best_conf:
-                best_conf = conf
-                best_digit = ds[0]
-
-    return best_digit, best_conf
-
-def read_equal_grid(crop):
-    h,w = crop.shape[:2]
-    if min(h,w) < 180:
-        return None
-
-    # Try slight trims because outer poster decoration may surround grid.
-    trim_sets = [0.00, 0.03, 0.06, 0.10]
-    best = None
-
-    for trim in trim_sets:
-        x0=int(w*trim); x1=int(w*(1-trim))
-        y0=int(h*trim); y1=int(h*(1-trim))
-        g = crop[y0:y1, x0:x1]
-        gh,gw = g.shape[:2]
-        if min(gh,gw) < 160:
-            continue
-
+    results=[]
+    for _,x,y,cw,ch in sorted(boxes,reverse=True)[:8]:
+        crop=gray[y:y+ch,x:x+cw]
         digits=[]
         confs=[]
         ok=True
-
         for r in range(4):
             for c in range(4):
-                cy0=round(r*gh/4); cy1=round((r+1)*gh/4)
-                cx0=round(c*gw/4); cx1=round((c+1)*gw/4)
-                cell=g[cy0:cy1, cx0:cx1]
-                d,conf=ocr_single_cell(cell)
-                if d is None:
-                    ok=False
-                    break
-                digits.append(d)
-                confs.append(conf)
+                y0=round(r*ch/4); y1=round((r+1)*ch/4)
+                x0=round(c*cw/4); x1=round((c+1)*cw/4)
+                cell=crop[y0:y1,x0:x1]
+                mh=max(2,int(cell.shape[0]*.12))
+                mw=max(2,int(cell.shape[1]*.12))
+                cell=cell[mh:-mh,mw:-mw] if cell.shape[0]>2*mh and cell.shape[1]>2*mw else cell
+                cell=cv2.resize(cell,None,fx=3,fy=3,interpolation=cv2.INTER_CUBIC)
+                data=pytesseract.image_to_data(
+                    cell,
+                    config="--psm 10 -c tessedit_char_whitelist=0123456789",
+                    output_type=pytesseract.Output.DICT
+                )
+                best=None
+                for i,txt in enumerate(data.get("text",[])):
+                    ds=re.findall(r"\d",str(txt))
+                    if len(ds)!=1:
+                        continue
+                    try: cf=float(data["conf"][i])
+                    except: cf=-1
+                    if best is None or cf>best[1]:
+                        best=(ds[0],cf)
+                if best is None:
+                    ok=False; break
+                digits.append(best[0]); confs.append(best[1])
             if not ok:
                 break
-
         if ok and len(digits)==16:
-            avg=sum(confs)/16
-            low=sum(1 for x in confs if x < 20)
-            score=avg - low*3
-            candidate=("".join(digits), avg, low, trim, score)
-            if best is None or candidate[4] > best[4]:
-                best=candidate
+            av=sum(confs)/16
+            low=sum(1 for c in confs if c<20)
+            results.append((av-low*2,av,low,"".join(digits)))
+    return results
 
-    return best
+def smart_read(raw):
+    img=decode(raw)
+    all_results=[]
 
-def read_grid(raw):
-    img = pil_to_cv(raw)
-    results = []
+    for name,v in preprocess_variants(img):
+        for psm in (6,11,12):
+            toks=ocr_tokens(v,psm)
+            rs=find_4x4(toks)
+            for r in rs:
+                print(f"TOKEN GRID {name}/psm{psm}: {r[3]} avg={r[1]:.1f} low={r[2]}")
+                all_results.append(r)
 
-    for name,crop in candidate_crops(img):
-        res = read_equal_grid(crop)
-        if res:
-            digits, avg, low, trim, score = res
-            print(f"GRID CANDIDATE {name} trim={trim:.2f} avg={avg:.1f} low={low}: {digits}")
-            results.append((score, avg, low, digits, name))
+    for r in line_grid(img):
+        print(f"LINE GRID: {r[3]} avg={r[1]:.1f} low={r[2]}")
+        all_results.append(r)
 
-    if not results:
+    if not all_results:
         return None
 
-    results.sort(reverse=True)
-    best = results[0]
-    score, avg, low, digits, name = best
+    all_results.sort(reverse=True)
+    best=all_results[0]
 
-    # Conservative acceptance: all 16 cells read, decent overall confidence,
-    # and not too many weak cells.
-    if avg >= 35 and low <= 5:
-        print(f"GRID ACCEPTED {name}: {digits} avg={avg:.1f}")
-        return list(digits)
+    # Strong single result
+    if best[1] >= 45 and best[2] <= 4:
+        print("ACCEPT STRONG:", best[3])
+        return list(best[3])
 
-    # Agreement fallback: same 16 digits independently from >=2 crop hypotheses.
-    counts = {}
-    for _,avg2,low2,dig2,name2 in results:
-        if avg2 >= 20:
-            counts.setdefault(dig2, []).append((avg2,low2,name2))
-    agreed = sorted(counts.items(), key=lambda kv: len(kv[1]), reverse=True)
-    if agreed and len(agreed[0][1]) >= 2:
-        dig = agreed[0][0]
-        print("GRID ACCEPTED BY AGREEMENT:", dig, "votes=", len(agreed[0][1]))
-        return list(dig)
+    # Agreement across independent attempts
+    votes={}
+    for r in all_results:
+        if r[1] >= 20:
+            votes[r[3]]=votes.get(r[3],0)+1
+    if votes:
+        dig,count=max(votes.items(),key=lambda kv:kv[1])
+        if count>=2:
+            print("ACCEPT AGREEMENT:",dig,"votes=",count)
+            return list(dig)
 
-    print("GRID REJECTED: confidence/agreement not enough")
+    print("REJECT: no reliable 16-digit agreement")
     return None
 
 def main():
-    existing = load_existing()
-    date, post_url, images = discover_feed_direct()
+    existing=load_existing()
+    date,post_url,images=discover_feed()
 
     if not date:
-        print("NO FEED DISCOVERY; KEEP EXISTING DB")
+        print("NO FEED DISCOVERY")
         save(existing)
         return
 
     if date in existing:
-        print("ALREADY SAVED:", date)
+        print("ALREADY SAVED:",date)
         save(existing)
         return
 
-    print("NEW MTP:", date)
+    print("NEW MTP:",date)
+    nums=None
 
-    nums = None
-    for idx, image_url in enumerate(images, 1):
+    # Try likely chart images in reverse too because feed order can place promo first.
+    ordered=list(images)
+    if len(ordered)>1:
+        ordered=[ordered[1],ordered[0]]+ordered[2:]
+
+    for idx,image_url in enumerate(ordered,1):
         try:
-            print("IMAGE TRY:", idx, image_url)
-            raw = req(image_url).content
-            nums = read_grid(raw)
+            print("SMART IMAGE TRY:",idx)
+            nums=smart_read(req(image_url).content)
             if nums:
                 print("OCR GRID:", "".join(nums))
                 break
         except Exception as e:
-            print("IMAGE FAILED:", idx, e)
+            print("IMAGE FAILED:",idx,e)
 
-    if nums and len(nums) == 16:
-        existing[date] = {
-            "date": date,
-            "numbers": [str(x) for x in nums],
-            "source": "MTP-GRID-OCR-V6.2",
-            "url": post_url,
-            "auto": True
+    if nums and len(nums)==16:
+        existing[date]={
+            "date":date,
+            "numbers":[str(x) for x in nums],
+            "source":"MTP-SMART-GRID-V6.3",
+            "url":post_url,
+            "auto":True
         }
-        print("AUTO SAVED:", date, "".join(nums))
+        print("AUTO SAVED:",date,"".join(nums))
     else:
-        print("OCR NOT CONFIDENT:", date)
-        print("NO FALLBACK / NO WRONG DATA INSERTED")
+        print("OCR NOT CONFIDENT:",date)
+        print("CLEAN DATA KEPT - NO FALLBACK")
 
     save(existing)
 
-if __name__ == "__main__":
+if __name__=="__main__":
     main()
