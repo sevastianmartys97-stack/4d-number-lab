@@ -1,0 +1,85 @@
+name: Inject MTP 13-09-2026 To App
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  inject-mtp:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Insert verified MTP 13-09-2026
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          from datetime import datetime, timezone, timedelta
+
+          OUT = Path("data/mtp-charta.json")
+          MYT = timezone(timedelta(hours=8))
+
+          if OUT.exists():
+              try:
+                  data = json.loads(OUT.read_text(encoding="utf-8"))
+              except Exception:
+                  data = {}
+          else:
+              data = {}
+
+          entries = data.get("entries", [])
+          by_date = {e.get("date"): e for e in entries if e.get("date")}
+
+          by_date["2026-09-13"] = {
+              "date": "2026-09-13",
+              "numbers": list("9674291035836497"),
+              "source": "MTP-VERIFIED-IMAGE",
+              "auto": False,
+              "verified": True
+          }
+
+          new_entries = sorted(by_date.values(), key=lambda e: e["date"], reverse=True)
+
+          OUT.parent.mkdir(parents=True, exist_ok=True)
+          OUT.write_text(json.dumps({
+              "source": "APLANBEE MTP ONLY",
+              "updated_at": datetime.now(MYT).isoformat(timespec="seconds"),
+              "entries": new_entries
+          }, ensure_ascii=False, indent=2), encoding="utf-8")
+
+          print("SAVED: 2026-09-13 9674291035836497")
+          print("LATEST:", new_entries[0]["date"], "".join(new_entries[0]["numbers"]))
+          PY
+
+      - name: Commit safely
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add data/mtp-charta.json
+
+          if git diff --cached --quiet; then
+            echo "No changes"
+            exit 0
+          fi
+
+          git commit -m "Add verified MTP 13-09-2026"
+
+          for n in 1 2 3; do
+            git fetch origin main
+            if git rebase origin/main && git push origin HEAD:main; then
+              echo "Push successful"
+              exit 0
+            fi
+            git rebase --abort 2>/dev/null || true
+            sleep 3
+          done
+
+          exit 1
