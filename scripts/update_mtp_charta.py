@@ -1,30 +1,36 @@
 from pathlib import Path
-import re, json, io
-from urllib.parse import urljoin, quote
+import re, json, io, html as htmlmod
 from datetime import datetime, timezone, timedelta
+from urllib.parse import urljoin
 import requests
 from bs4 import BeautifulSoup
 from PIL import Image, ImageOps, ImageEnhance, ImageFilter
 import pytesseract
 
 MYT = timezone(timedelta(hours=8))
-NOW = datetime.now(MYT)
 OUT = Path("data/mtp-charta.json")
-
-PRIMARY = "https://aplanbee.blogspot.com"
-SECONDARY = "https://cartaplanbee.blogspot.com"
-
+BASES = [
+    "https://aplanbee.blogspot.com",
+    "https://cartaplanbee.blogspot.com",
+]
 UA = {
     "User-Agent": "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/131 Mobile Safari/537.36",
     "Accept-Language": "en-US,en;q=0.9"
 }
 
-def req(url, timeout=20):
+def req(url, timeout=25):
     r = requests.get(url, headers=UA, timeout=timeout, allow_redirects=True)
     if r.status_code == 429 or "google.com/sorry" in r.url:
         raise RuntimeError("rate limited")
     r.raise_for_status()
     return r
+
+def parse_date(text):
+    m = re.search(r"\bMTP\s+(\d{1,2})[./-](\d{1,2})[./-](\d{4})\b", text, re.I)
+    if not m:
+        return None
+    dd, mm, yy = m.groups()
+    return f"{yy}-{int(mm):02d}-{int(dd):02d}"
 
 def load_existing():
     if not OUT.exists():
@@ -39,7 +45,7 @@ def load_existing():
     }
 
 def save(existing):
-    entries = sorted(existing.values(), key=lambda e: e["date"], reverse=True)
+    entries = sorted(existing.values(), key=lambda e:e["date"], reverse=True)
     OUT.parent.mkdir(exist_ok=True)
     OUT.write_text(json.dumps({
         "source": "APLANBEE MTP ONLY",
@@ -49,123 +55,101 @@ def save(existing):
     if entries:
         print("LATEST SAVED:", entries[0]["date"], "".join(map(str, entries[0]["numbers"])))
 
-def parse_date(text):
-    m = re.search(r"\bMTP\s+(\d{1,2})[./-](\d{1,2})[./-](\d{4})\b", text, re.I)
-    if not m:
-        return None
-    dd, mm, yy = m.groups()
-    return f"{yy}-{int(mm):02d}-{int(dd):02d}"
+def large_blogger_image(url):
+    url = htmlmod.unescape(url)
+    url = re.sub(r"/s\d+(-c)?/", "/s1600/", url)
+    url = re.sub(r"=w\d+(-h\d+)?(-no)?$", "=s1600", url)
+    return url
 
-def extract_posts(html, base):
-    soup = BeautifulSoup(html, "html.parser")
-    found = {}
-    for a in soup.find_all("a", href=True):
-        title = " ".join(a.get_text(" ", strip=True).split())
-        if "MTP" not in title.upper() or "CARTA" not in title.upper():
-            continue
-        d = parse_date(title)
-        if d:
-            found[d] = urljoin(base, a["href"])
-    return found
-
-def discover_home(base, label):
-    try:
-        posts = extract_posts(req(base + "/").text, base)
-        if posts:
-            d, u = sorted(posts.items(), reverse=True)[0]
-            print(f"DISCOVERY {label}:", d, u)
-            return d, u
-    except Exception as e:
-        print(f"{label} FAILED:", e)
-    return None, None
-
-def discover_feed():
-    for base in (PRIMARY, SECONDARY):
-        url = base + "/feeds/posts/default?alt=json&max-results=8"
-        try:
-            data = req(url).json()
-            found = {}
-            for e in data.get("feed", {}).get("entry", []):
-                title = e.get("title", {}).get("$t", "")
-                if "MTP" not in title.upper() or "CARTA" not in title.upper():
-                    continue
-                d = parse_date(title)
-                if not d:
-                    continue
-                post_url = None
-                for l in e.get("link", []):
-                    if l.get("rel") == "alternate":
-                        post_url = l.get("href")
-                        break
-                if post_url:
-                    found[d] = post_url
-            if found:
-                d, u = sorted(found.items(), reverse=True)[0]
-                print("DISCOVERY FEED:", d, u)
-                return d, u
-        except Exception as e:
-            print("FEED FAILED:", base, e)
-    return None, None
-
-def discover_search():
-    q = quote("MTP CARTA")
-    for base in (PRIMARY, SECONDARY):
-        try:
-            posts = extract_posts(req(f"{base}/search?q={q}").text, base)
-            if posts:
-                d, u = sorted(posts.items(), reverse=True)[0]
-                print("DISCOVERY SEARCH:", d, u)
-                return d, u
-        except Exception as e:
-            print("SEARCH FAILED:", base, e)
-    return None, None
-
-def discover_latest():
-    for fn in (
-        lambda: discover_home(PRIMARY, "PRIMARY"),
-        discover_feed,
-        lambda: discover_home(SECONDARY, "SECONDARY"),
-        discover_search,
-    ):
-        d, u = fn()
-        if d and u:
-            return d, u
-    return None, None
-
-def image_candidates(post_url):
-    soup = BeautifulSoup(req(post_url).text, "html.parser")
-    body = soup.select_one(".post-body") or soup
+def images_from_html(raw_html, base):
+    soup = BeautifulSoup(raw_html or "", "html.parser")
     scored = []
-    for img in body.find_all("img"):
+    for img in soup.find_all("img"):
         src = img.get("data-original") or img.get("data-src") or img.get("src")
         if not src:
             continue
-        src = urljoin(post_url, src)
-        src = re.sub(r"/s\d+(-c)?/", "/s1600/", src)
-        src = re.sub(r"=w\d+(-h\d+)?(-no)?$", "=s1600", src)
+        src = large_blogger_image(urljoin(base, src))
         meta = " ".join([
             str(img.get("alt") or ""),
             str(img.get("title") or ""),
             str(img.get("class") or "")
         ]).lower()
         score = 0
-        if "mtp" in meta: score += 10
-        if "carta" in meta: score += 10
-        if "ramalan" in meta: score += 3
+        if "mtp" in meta: score += 12
+        if "carta" in meta: score += 12
+        if "ramalan" in meta: score += 4
         scored.append((score, src))
+
     out = []
-    for _, src in sorted(scored, key=lambda x: x[0], reverse=True):
+    for _, src in sorted(scored, key=lambda x:x[0], reverse=True):
         if src not in out:
             out.append(src)
-    return out[:2]
+    return out
+
+def discover_feed_direct():
+    for base in BASES:
+        feed_urls = [
+            base + "/feeds/posts/default?alt=json&max-results=10",
+            base + "/feeds/posts/default/-/MTP?alt=json&max-results=10",
+        ]
+        for feed_url in feed_urls:
+            try:
+                data = req(feed_url).json()
+            except Exception as e:
+                print("FEED SKIP:", feed_url, e)
+                continue
+
+            found = []
+            for e in data.get("feed", {}).get("entry", []):
+                title = e.get("title", {}).get("$t", "")
+                if "MTP" not in title.upper() or "CARTA" not in title.upper():
+                    continue
+                date = parse_date(title)
+                if not date:
+                    continue
+
+                post_url = ""
+                for l in e.get("link", []):
+                    if l.get("rel") == "alternate":
+                        post_url = l.get("href") or ""
+                        break
+
+                chunks = []
+                for key in ("content", "summary"):
+                    val = e.get(key, {})
+                    if isinstance(val, dict):
+                        chunks.append(val.get("$t", "") or "")
+
+                imgs = []
+                for chunk in chunks:
+                    imgs.extend(images_from_html(chunk, post_url or base))
+
+                media = e.get("media$thumbnail", {})
+                if isinstance(media, dict) and media.get("url"):
+                    imgs.append(large_blogger_image(media["url"]))
+
+                unique = []
+                for u in imgs:
+                    if u and u not in unique:
+                        unique.append(u)
+
+                found.append((date, post_url, unique))
+
+            if found:
+                date, post_url, imgs = sorted(found, key=lambda x:x[0], reverse=True)[0]
+                print("FEED DIRECT FOUND:", date)
+                print("FEED IMAGE CANDIDATES:", len(imgs))
+                return date, post_url, imgs[:4]
+
+    return None, None, []
 
 def normalize(img):
     img = ImageOps.exif_transpose(img).convert("L")
     if max(img.size) < 1800:
         scale = 1800 / max(img.size)
-        img = img.resize((int(img.width * scale), int(img.height * scale)))
+        img = img.resize((int(img.width*scale), int(img.height*scale)))
     img = ImageOps.autocontrast(img)
-    img = ImageEnhance.Contrast(img).enhance(1.8)
+    img = ImageEnhance.Contrast(img).enhance(1.9)
     img = img.filter(ImageFilter.SHARPEN)
     return img
 
@@ -179,7 +163,7 @@ def tokens_to_grid(data):
             conf = float(data["conf"][i])
         except Exception:
             conf = -1
-        if conf < 10:
+        if conf < 8:
             continue
         x = int(data["left"][i]); y = int(data["top"][i])
         w = int(data["width"][i]); h = int(data["height"][i])
@@ -188,42 +172,40 @@ def tokens_to_grid(data):
         tokens.append((ds[0], x+w/2, y+h/2, w, h))
 
     rows = []
-    for t in sorted(tokens, key=lambda z: z[2]):
+    for t in sorted(tokens, key=lambda z:z[2]):
         placed = False
         for row in rows:
-            ry = sum(z[2] for z in row) / len(row)
-            rh = sum(z[4] for z in row) / len(row)
-            if abs(t[2] - ry) <= max(18, rh * 0.8):
-                row.append(t)
-                placed = True
-                break
+            ry = sum(z[2] for z in row)/len(row)
+            rh = sum(z[4] for z in row)/len(row)
+            if abs(t[2]-ry) <= max(18, rh*.85):
+                row.append(t); placed = True; break
         if not placed:
             rows.append([t])
 
     good = []
     for row in rows:
-        row = sorted(row, key=lambda z: z[1])
+        row = sorted(row, key=lambda z:z[1])
         if len(row) < 4:
             continue
         for i in range(len(row)-3):
             q = row[i:i+4]
             xs = [z[1] for z in q]
             gaps = [xs[j+1]-xs[j] for j in range(3)]
-            if min(gaps) > 0 and max(gaps)/max(min(gaps),1) < 2.0:
+            if min(gaps) > 0 and max(gaps)/max(min(gaps),1) < 2.1:
                 good.append(q)
 
-    good.sort(key=lambda q: sum(z[2] for z in q)/4)
+    good.sort(key=lambda q:sum(z[2] for z in q)/4)
     for i in range(len(good)):
         block = [good[i]]
-        base_x = [z[1] for z in good[i]]
-        spacing = max(1, sum(base_x[j+1]-base_x[j] for j in range(3))/3)
+        bx = [z[1] for z in good[i]]
+        spacing = max(1, sum(bx[j+1]-bx[j] for j in range(3))/3)
         for q in good[i+1:]:
             qx = [z[1] for z in q]
-            if sum(abs(qx[j]-base_x[j]) for j in range(4))/4 > spacing*0.4:
+            if sum(abs(qx[j]-bx[j]) for j in range(4))/4 > spacing*.42:
                 continue
             block.append(q)
             if len(block) == 4:
-                digits = [z[0] for rr in block for z in sorted(rr, key=lambda a: a[1])]
+                digits = [z[0] for rr in block for z in sorted(rr,key=lambda a:a[1])]
                 if len(digits) == 16:
                     return digits
                 break
@@ -233,8 +215,9 @@ def extract_grid(raw):
     img = normalize(Image.open(io.BytesIO(raw)))
     variants = [
         img,
-        img.point(lambda p: 255 if p > 150 else 0),
-        img.point(lambda p: 255 if p > 180 else 0),
+        img.point(lambda p:255 if p>140 else 0),
+        img.point(lambda p:255 if p>170 else 0),
+        ImageOps.invert(img).point(lambda p:255 if p>120 else 0),
     ]
     for variant in variants:
         for psm in (6, 11, 12):
@@ -250,10 +233,10 @@ def extract_grid(raw):
 
 def main():
     existing = load_existing()
-    date, url = discover_latest()
+    date, post_url, images = discover_feed_direct()
 
     if not date:
-        print("NO NEW DISCOVERY; KEEP EXISTING DB")
+        print("NO FEED DISCOVERY; KEEP EXISTING DB")
         save(existing)
         return
 
@@ -262,39 +245,36 @@ def main():
         save(existing)
         return
 
-    print("NEW MTP DETECTED:", date, url)
-
-    try:
-        images = image_candidates(url)
-    except Exception as e:
-        print("POST FETCH FAILED:", e)
+    print("NEW MTP:", date)
+    if not images:
+        print("FEED HAS NO IMAGE; NO POST FETCH USED")
         save(existing)
         return
 
-    print("IMAGE CANDIDATES:", len(images))
     nums = None
-
-    for idx, img_url in enumerate(images, 1):
+    for idx, image_url in enumerate(images, 1):
         try:
-            print("OCR IMAGE:", idx)
-            nums = extract_grid(req(img_url).content)
+            print("DIRECT IMAGE TRY:", idx, image_url)
+            raw = req(image_url).content
+            nums = extract_grid(raw)
             if nums:
+                print("OCR GRID:", "".join(nums))
                 break
         except Exception as e:
-            print("IMAGE ERROR:", e)
+            print("DIRECT IMAGE FAILED:", idx, e)
 
     if nums and len(nums) == 16:
         existing[date] = {
             "date": date,
             "numbers": [str(x) for x in nums],
-            "source": "MTP",
-            "url": url,
+            "source": "MTP-FEED-DIRECT",
+            "url": post_url,
             "auto": True
         }
         print("AUTO SAVED:", date, "".join(nums))
     else:
         print("OCR NOT CONFIDENT:", date)
-        print("No fallback inserted.")
+        print("NO FALLBACK / NO WRONG DATA INSERTED")
 
     save(existing)
 
