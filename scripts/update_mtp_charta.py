@@ -1,8 +1,7 @@
 from pathlib import Path
-import re, json, io, html as htmlmod, statistics
+import re, json, html as htmlmod, statistics
 from datetime import datetime, timezone, timedelta
 from urllib.parse import urljoin
-
 import requests
 from bs4 import BeautifulSoup
 import numpy as np
@@ -11,10 +10,8 @@ import pytesseract
 
 MYT = timezone(timedelta(hours=8))
 OUT = Path("data/mtp-charta.json")
-BASES = [
-    "https://aplanbee.blogspot.com",
-    "https://cartaplanbee.blogspot.com",
-]
+BASE = "https://cartaplanbee.blogspot.com"
+FEED = BASE + "/feeds/posts/default?alt=json&max-results=10"
 UA = {
     "User-Agent": "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/131 Mobile Safari/537.36",
     "Accept-Language": "en-US,en;q=0.9"
@@ -27,323 +24,257 @@ def req(url, timeout=25):
     r.raise_for_status()
     return r
 
-def parse_date(text):
-    m = re.search(r"\bMTP\s+(\d{1,2})[./-](\d{1,2})[./-](\d{4})\b", text, re.I)
+def parse_date(title):
+    m = re.search(r"\bMTP\s+(\d{1,2})[./-](\d{1,2})[./-](\d{4})\b", title, re.I)
     if not m:
         return None
-    dd, mm, yy = m.groups()
-    return f"{yy}-{int(mm):02d}-{int(dd):02d}"
+    d,mn,y = m.groups()
+    return f"{y}-{int(mn):02d}-{int(d):02d}"
 
-def load_existing():
-    if not OUT.exists():
-        return {}
-    try:
-        d = json.loads(OUT.read_text(encoding="utf-8"))
-    except Exception:
-        return {}
-    return {
-        e["date"]: e for e in d.get("entries", [])
-        if e.get("date") and len(e.get("numbers", [])) == 16
-    }
-
-def save(existing):
-    entries = sorted(existing.values(), key=lambda e:e["date"], reverse=True)
-    OUT.parent.mkdir(exist_ok=True)
-    OUT.write_text(json.dumps({
-        "source": "APLANBEE MTP ONLY",
-        "updated_at": datetime.now(MYT).isoformat(timespec="seconds"),
-        "entries": entries
-    }, ensure_ascii=False, indent=2), encoding="utf-8")
-    if entries:
-        print("LATEST SAVED:", entries[0]["date"], "".join(map(str, entries[0]["numbers"])))
-
-def large_image(url):
+def big_img(url):
     url = htmlmod.unescape(url)
     url = re.sub(r"/s\d+(-c)?/", "/s1600/", url)
     url = re.sub(r"=w\d+(-h\d+)?(-no)?$", "=s1600", url)
     return url
 
-def images_from_html(raw_html, base):
-    soup = BeautifulSoup(raw_html or "", "html.parser")
-    out = []
-    for img in soup.find_all("img"):
-        src = img.get("data-original") or img.get("data-src") or img.get("src")
+def load_db():
+    if not OUT.exists():
+        return {}
+    try:
+        d=json.loads(OUT.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    return {e["date"]:e for e in d.get("entries",[])
+            if e.get("date") and len(e.get("numbers",[]))==16}
+
+def save_db(db):
+    entries=sorted(db.values(),key=lambda e:e["date"],reverse=True)
+    OUT.parent.mkdir(exist_ok=True)
+    OUT.write_text(json.dumps({
+        "source":"APLANBEE MTP ONLY",
+        "updated_at":datetime.now(MYT).isoformat(timespec="seconds"),
+        "entries":entries
+    },ensure_ascii=False,indent=2),encoding="utf-8")
+    if entries:
+        print("LATEST SAVED:",entries[0]["date"],
+              "".join(map(str,entries[0]["numbers"])))
+
+def latest_post_and_one_carta():
+    data=req(FEED).json()
+    posts=[]
+    for e in data.get("feed",{}).get("entry",[]):
+        title=e.get("title",{}).get("$t","")
+        if "MTP" not in title.upper() or "CARTA" not in title.upper():
+            continue
+        date=parse_date(title)
+        if not date:
+            continue
+        post_url=""
+        for l in e.get("link",[]):
+            if l.get("rel")=="alternate":
+                post_url=l.get("href") or ""
+                break
+        content=e.get("content",{}).get("$t","") or e.get("summary",{}).get("$t","")
+        posts.append((date,title,post_url,content))
+
+    if not posts:
+        raise RuntimeError("No MTP post in feed")
+
+    date,title,post_url,content=sorted(posts,key=lambda x:x[0],reverse=True)[0]
+    soup=BeautifulSoup(content,"html.parser")
+
+    candidates=[]
+    for order,img in enumerate(soup.find_all("img")):
+        src=img.get("data-original") or img.get("data-src") or img.get("src")
         if not src:
             continue
-        src = large_image(urljoin(base, src))
-        if src not in out:
-            out.append(src)
-    return out
+        src=big_img(urljoin(post_url or BASE,src))
+        meta=(" ".join([
+            str(img.get("alt") or ""),
+            str(img.get("title") or ""),
+            str(img.get("class") or "")
+        ])).lower()
 
-def discover_feed():
-    for base in BASES:
-        for feed_url in (
-            base + "/feeds/posts/default?alt=json&max-results=10",
-            base + "/feeds/posts/default/-/MTP?alt=json&max-results=10",
-        ):
-            try:
-                data = req(feed_url).json()
-            except Exception as e:
-                print("FEED SKIP:", feed_url, e)
-                continue
+        # Select exactly ONE carta image. Prefer MTP/CARTA metadata,
+        # then the first substantial post image. Never loop OCR over images.
+        score=0
+        if "mtp" in meta: score+=100
+        if "carta" in meta: score+=100
+        if "ramalan" in meta: score+=20
+        score-=order
+        candidates.append((score,order,src))
 
-            found = []
-            for e in data.get("feed", {}).get("entry", []):
-                title = e.get("title", {}).get("$t", "")
-                if "MTP" not in title.upper() or "CARTA" not in title.upper():
-                    continue
-                date = parse_date(title)
-                if not date:
-                    continue
+    if not candidates:
+        media=None
+        for e in data.get("feed",{}).get("entry",[]):
+            if parse_date(e.get("title",{}).get("$t",""))==date:
+                media=e.get("media$thumbnail",{}).get("url")
+                break
+        if media:
+            candidates=[(0,0,big_img(media))]
 
-                post_url = ""
-                for l in e.get("link", []):
-                    if l.get("rel") == "alternate":
-                        post_url = l.get("href") or ""
-                        break
+    if not candidates:
+        raise RuntimeError("No carta image found in latest MTP feed")
 
-                imgs = []
-                for key in ("content", "summary"):
-                    obj = e.get(key, {})
-                    if isinstance(obj, dict):
-                        imgs.extend(images_from_html(obj.get("$t", "") or "", post_url or base))
+    candidates.sort(key=lambda x:(x[0],-x[1]),reverse=True)
+    chosen=candidates[0][2]
 
-                media = e.get("media$thumbnail", {})
-                if isinstance(media, dict) and media.get("url"):
-                    imgs.append(large_image(media["url"]))
-
-                uniq = []
-                for u in imgs:
-                    if u and u not in uniq:
-                        uniq.append(u)
-
-                found.append((date, post_url, uniq))
-
-            if found:
-                date, post_url, imgs = sorted(found, key=lambda x:x[0], reverse=True)[0]
-                print("FEED DIRECT FOUND:", date)
-                print("IMAGE CANDIDATES:", len(imgs))
-                return date, post_url, imgs[:6]
-
-    return None, None, []
+    print("LATEST MTP:",date,title)
+    print("ONE CARTA IMAGE:",chosen)
+    return date,post_url,chosen
 
 def decode(raw):
-    arr = np.frombuffer(raw, np.uint8)
-    img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+    arr=np.frombuffer(raw,np.uint8)
+    img=cv2.imdecode(arr,cv2.IMREAD_COLOR)
     if img is None:
-        raise ValueError("decode failed")
+        raise RuntimeError("Image decode failed")
     return img
 
-def prep_variants(img):
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    if max(gray.shape[:2]) < 1800:
-        s = 1800 / max(gray.shape[:2])
-        gray = cv2.resize(gray, None, fx=s, fy=s, interpolation=cv2.INTER_CUBIC)
-
-    h,w = gray.shape[:2]
-    crops = {
-        "full": gray,
-        "left75": gray[:, :int(w*0.75)],
-        "left65": gray[:, :int(w*0.65)],
-        "midleft": gray[int(h*0.25):int(h*0.88), :int(w*0.70)],
-    }
-
-    out = []
-    for cname,crop in crops.items():
-        eq = cv2.equalizeHist(crop)
-        out.append((cname+"-gray", eq))
-        _,otsu = cv2.threshold(eq,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
-        out.append((cname+"-otsu", otsu))
-        adap = cv2.adaptiveThreshold(eq,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-                                     cv2.THRESH_BINARY,41,9)
-        out.append((cname+"-adapt", adap))
-    return out
-
-def digit_tokens(img, psm):
-    data = pytesseract.image_to_data(
+def tokens(img, psm):
+    data=pytesseract.image_to_data(
         img,
         config=f"--psm {psm} -c tessedit_char_whitelist=0123456789",
         output_type=pytesseract.Output.DICT
     )
-    toks=[]
-    for i,txt in enumerate(data.get("text",[])):
-        ds = re.findall(r"\d", str(txt))
-        if len(ds) != 1:
+    out=[]
+    for i,t in enumerate(data.get("text",[])):
+        ds=re.findall(r"\d",str(t))
+        if len(ds)!=1:
             continue
-        try:
-            conf=float(data["conf"][i])
-        except:
-            conf=-1
-        if conf < 8:
-            continue
+        try: conf=float(data["conf"][i])
+        except: conf=-1
+        if conf<5: continue
         x=int(data["left"][i]); y=int(data["top"][i])
         w=int(data["width"][i]); h=int(data["height"][i])
-        if h < 18 or w < 8:
-            continue
-        toks.append({"d":ds[0],"x":x+w/2,"y":y+h/2,"w":w,"h":h,"c":conf})
-    return toks
+        if h<18 or w<8: continue
+        out.append({"d":ds[0],"x":x+w/2,"y":y+h/2,
+                    "w":w,"h":h,"c":conf})
+    return out
 
-def cluster_rows(tokens):
-    if len(tokens) < 16:
+def find_staggered_4x4(ts):
+    if len(ts)<16:
         return []
-
-    medh = statistics.median([t["h"] for t in tokens])
+    medh=statistics.median([t["h"] for t in ts])
     rows=[]
-    for t in sorted(tokens,key=lambda z:z["y"]):
+    for t in sorted(ts,key=lambda z:z["y"]):
+        hit=None
+        for r in rows:
+            ry=sum(z["y"] for z in r)/len(r)
+            if abs(t["y"]-ry)<=max(22,medh*.85):
+                hit=r; break
+        if hit is None: rows.append([t])
+        else: hit.append(t)
+
+    row4=[]
+    for r in rows:
+        r=sorted(r,key=lambda z:z["x"])
+        if len(r)<4: continue
         best=None
-        bestdy=999999
-        for row in rows:
-            ry=sum(z["y"] for z in row)/len(row)
-            dy=abs(t["y"]-ry)
-            if dy < bestdy and dy <= max(22, medh*0.9):
-                best=row; bestdy=dy
-        if best is None:
-            rows.append([t])
-        else:
-            best.append(t)
+        for i in range(len(r)-3):
+            q=r[i:i+4]
+            xs=[z["x"] for z in q]
+            gaps=[xs[j+1]-xs[j] for j in range(3)]
+            if min(gaps)<=0: continue
+            if max(gaps)/max(min(gaps),1)>2.2: continue
+            hs=[z["h"] for z in q]
+            if max(hs)/max(min(hs),1)>1.8: continue
+            sc=sum(z["c"] for z in q)/4
+            if best is None or sc>best[0]: best=(sc,q)
+        if best: row4.append(best[1])
 
-    cleaned=[]
-    for row in rows:
-        row=sorted(row,key=lambda z:z["x"])
-
-        # Prefer four large, similarly-sized digits on a row.
-        if len(row) >= 4:
-            heights=[z["h"] for z in row]
-            mh=statistics.median(heights)
-            filt=[z for z in row if z["h"] >= mh*0.65]
-
-            if len(filt) >= 4:
-                # Search every 4-token window and score spacing/size.
-                best=None
-                for i in range(len(filt)-3):
-                    q=filt[i:i+4]
-                    xs=[z["x"] for z in q]
-                    gaps=[xs[j+1]-xs[j] for j in range(3)]
-                    if min(gaps) <= 0:
-                        continue
-                    gap_ratio=max(gaps)/max(min(gaps),1)
-                    hs=[z["h"] for z in q]
-                    size_ratio=max(hs)/max(min(hs),1)
-                    if gap_ratio > 2.2 or size_ratio > 1.8:
-                        continue
-                    score=sum(z["c"] for z in q)/4 - abs(gap_ratio-1)*8 - abs(size_ratio-1)*8
-                    if best is None or score > best[0]:
-                        best=(score,q)
-                if best:
-                    cleaned.append(best[1])
-
-    return cleaned
-
-def staggered_grid(tokens):
-    rows=cluster_rows(tokens)
-    if len(rows) < 4:
-        return []
-
-    rows=sorted(rows,key=lambda r:sum(z["y"] for z in r)/4)
+    row4=sorted(row4,key=lambda r:sum(z["y"] for z in r)/4)
     results=[]
-
-    # No x alignment requirement: rows may be staggered left/right.
-    for i in range(len(rows)-3):
-        block=rows[i:i+4]
-        ys=[sum(z["y"] for z in r)/4 for r in block]
-        yg=[ys[j+1]-ys[j] for j in range(3)]
-        if min(yg) <= 0:
+    for i in range(len(row4)-3):
+        b=row4[i:i+4]
+        ys=[sum(z["y"] for z in r)/4 for r in b]
+        gaps=[ys[j+1]-ys[j] for j in range(3)]
+        if min(gaps)<=0 or max(gaps)/max(min(gaps),1)>1.9:
             continue
-        if max(yg)/max(min(yg),1) > 1.8:
-            continue
-
-        digits="".join(z["d"] for r in block for z in sorted(r,key=lambda z:z["x"]))
-        confs=[z["c"] for r in block for z in r]
-        heights=[z["h"] for r in block for z in r]
-
-        if len(digits) != 16:
-            continue
-
-        avg=sum(confs)/16
-        low=sum(1 for c in confs if c<20)
-        hratio=max(heights)/max(min(heights),1)
-        score=avg-low*2-(hratio-1)*8
-
-        results.append((score,avg,low,digits))
-
+        dig="".join(z["d"] for r in b for z in sorted(r,key=lambda z:z["x"]))
+        cf=[z["c"] for r in b for z in r]
+        if len(dig)==16:
+            results.append((sum(cf)/16,sum(c<20 for c in cf),dig))
     return results
 
-def read_image(raw):
+def read_one_carta(raw):
     img=decode(raw)
-    allres=[]
+    gray=cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+    if max(gray.shape[:2])<1800:
+        s=1800/max(gray.shape[:2])
+        gray=cv2.resize(gray,None,fx=s,fy=s,interpolation=cv2.INTER_CUBIC)
 
-    for name,v in prep_variants(img):
-        for psm in (6,11,12):
-            toks=digit_tokens(v,psm)
-            for r in staggered_grid(toks):
-                print(f"STAGGER GRID {name}/psm{psm}: {r[3]} avg={r[1]:.1f} low={r[2]}")
-                allres.append(r)
+    h,w=gray.shape
+    # Actual MTP layout: carta is on left/centre; date text is on right.
+    regions=[
+        ("left72",gray[:, :int(w*.72)]),
+        ("left65",gray[:, :int(w*.65)]),
+        ("carta-zone",gray[int(h*.28):int(h*.90), :int(w*.72)]),
+    ]
+    allres=[]
+    for rn,r in regions:
+        eq=cv2.equalizeHist(r)
+        variants=[("gray",eq)]
+        _,bw=cv2.threshold(eq,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+        variants.append(("otsu",bw))
+        for vn,v in variants:
+            for psm in (6,11,12):
+                for av,low,dig in find_staggered_4x4(tokens(v,psm)):
+                    print(f"CARTA GRID {rn}/{vn}/psm{psm}: {dig} avg={av:.1f} low={low}")
+                    allres.append((av,low,dig))
 
     if not allres:
         return None
 
-    allres.sort(reverse=True)
-
-    # Strong high-confidence result.
-    best=allres[0]
-    if best[1] >= 45 and best[2] <= 4:
-        print("ACCEPT STRONG:",best[3])
-        return list(best[3])
-
-    # Agreement between independent OCR/crop variants.
     votes={}
-    for r in allres:
-        if r[1] >= 20:
-            votes[r[3]]=votes.get(r[3],0)+1
+    for av,low,dig in allres:
+        if av>=18:
+            votes.setdefault(dig,[]).append((av,low))
+
     if votes:
-        dig,count=max(votes.items(),key=lambda kv:kv[1])
-        if count >= 2:
-            print("ACCEPT AGREEMENT:",dig,"votes=",count)
+        dig,vals=max(votes.items(),key=lambda kv:(len(kv[1]),max(v[0] for v in kv[1])))
+        best=max(v[0] for v in vals)
+        low=min(v[1] for v in vals)
+        if len(vals)>=2 or (best>=45 and low<=4):
+            print("CARTA ACCEPTED:",dig,"votes=",len(vals))
             return list(dig)
 
     return None
 
 def main():
-    existing=load_existing()
-    date,post_url,images=discover_feed()
-
-    if not date:
-        print("NO FEED DISCOVERY")
-        save(existing)
+    db=load_db()
+    try:
+        date,post_url,image_url=latest_post_and_one_carta()
+    except Exception as e:
+        print("DISCOVERY FAILED:",e)
+        save_db(db)
         return
 
-    if date in existing:
+    if date in db:
         print("ALREADY SAVED:",date)
-        save(existing)
+        save_db(db)
         return
 
-    print("NEW MTP:",date)
-    nums=None
-
-    for idx,image_url in enumerate(images,1):
-        try:
-            print("IMAGE TRY:",idx)
-            nums=read_image(req(image_url).content)
-            if nums:
-                print("OCR GRID:", "".join(nums))
-                break
-        except Exception as e:
-            print("IMAGE FAILED:",idx,e)
+    try:
+        print("OCR ONE CARTA IMAGE")
+        nums=read_one_carta(req(image_url).content)
+    except Exception as e:
+        print("CARTA OCR FAILED:",e)
+        nums=None
 
     if nums and len(nums)==16:
-        existing[date]={
+        db[date]={
             "date":date,
             "numbers":[str(x) for x in nums],
-            "source":"MTP-STAGGERED-GRID-V6.4",
+            "source":"MTP-SINGLE-CARTA-V6.5",
             "url":post_url,
             "auto":True
         }
         print("AUTO SAVED:",date,"".join(nums))
     else:
         print("OCR NOT CONFIDENT:",date)
-        print("NO FALLBACK / CLEAN DATA KEPT")
+        print("NO MANUAL FALLBACK / CLEAN DB KEPT")
 
-    save(existing)
+    save_db(db)
 
 if __name__=="__main__":
     main()
