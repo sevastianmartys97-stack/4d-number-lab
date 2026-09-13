@@ -1,0 +1,454 @@
+name: Auto MTP Staggered Grid V6.4.1 Push Safe
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/15 3-10 * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: auto-mtp-staggered-grid-v641
+  cancel-in-progress: true
+
+jobs:
+  auto-mtp:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install OCR dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y tesseract-ocr
+          python3 -m pip install --upgrade pip
+          pip install requests beautifulsoup4 pillow pytesseract opencv-python-headless numpy
+
+      - name: Install V6.4 staggered-grid scanner
+        run: |
+          mkdir -p scripts
+          cat > scripts/update_mtp_charta.py <<'PY'
+          from pathlib import Path
+          import re, json, io, html as htmlmod, statistics
+          from datetime import datetime, timezone, timedelta
+          from urllib.parse import urljoin
+
+          import requests
+          from bs4 import BeautifulSoup
+          import numpy as np
+          import cv2
+          import pytesseract
+
+          MYT = timezone(timedelta(hours=8))
+          OUT = Path("data/mtp-charta.json")
+          BASES = [
+              "https://aplanbee.blogspot.com",
+              "https://cartaplanbee.blogspot.com",
+          ]
+          UA = {
+              "User-Agent": "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/131 Mobile Safari/537.36",
+              "Accept-Language": "en-US,en;q=0.9"
+          }
+
+          def req(url, timeout=25):
+              r = requests.get(url, headers=UA, timeout=timeout, allow_redirects=True)
+              if r.status_code == 429 or "google.com/sorry" in r.url:
+                  raise RuntimeError("rate limited")
+              r.raise_for_status()
+              return r
+
+          def parse_date(text):
+              m = re.search(r"\bMTP\s+(\d{1,2})[./-](\d{1,2})[./-](\d{4})\b", text, re.I)
+              if not m:
+                  return None
+              dd, mm, yy = m.groups()
+              return f"{yy}-{int(mm):02d}-{int(dd):02d}"
+
+          def load_existing():
+              if not OUT.exists():
+                  return {}
+              try:
+                  d = json.loads(OUT.read_text(encoding="utf-8"))
+              except Exception:
+                  return {}
+              return {
+                  e["date"]: e for e in d.get("entries", [])
+                  if e.get("date") and len(e.get("numbers", [])) == 16
+              }
+
+          def save(existing):
+              entries = sorted(existing.values(), key=lambda e:e["date"], reverse=True)
+              OUT.parent.mkdir(exist_ok=True)
+              OUT.write_text(json.dumps({
+                  "source": "APLANBEE MTP ONLY",
+                  "updated_at": datetime.now(MYT).isoformat(timespec="seconds"),
+                  "entries": entries
+              }, ensure_ascii=False, indent=2), encoding="utf-8")
+              if entries:
+                  print("LATEST SAVED:", entries[0]["date"], "".join(map(str, entries[0]["numbers"])))
+
+          def large_image(url):
+              url = htmlmod.unescape(url)
+              url = re.sub(r"/s\d+(-c)?/", "/s1600/", url)
+              url = re.sub(r"=w\d+(-h\d+)?(-no)?$", "=s1600", url)
+              return url
+
+          def images_from_html(raw_html, base):
+              soup = BeautifulSoup(raw_html or "", "html.parser")
+              out = []
+              for img in soup.find_all("img"):
+                  src = img.get("data-original") or img.get("data-src") or img.get("src")
+                  if not src:
+                      continue
+                  src = large_image(urljoin(base, src))
+                  if src not in out:
+                      out.append(src)
+              return out
+
+          def discover_feed():
+              for base in BASES:
+                  for feed_url in (
+                      base + "/feeds/posts/default?alt=json&max-results=10",
+                      base + "/feeds/posts/default/-/MTP?alt=json&max-results=10",
+                  ):
+                      try:
+                          data = req(feed_url).json()
+                      except Exception as e:
+                          print("FEED SKIP:", feed_url, e)
+                          continue
+
+                      found = []
+                      for e in data.get("feed", {}).get("entry", []):
+                          title = e.get("title", {}).get("$t", "")
+                          if "MTP" not in title.upper() or "CARTA" not in title.upper():
+                              continue
+                          date = parse_date(title)
+                          if not date:
+                              continue
+
+                          post_url = ""
+                          for l in e.get("link", []):
+                              if l.get("rel") == "alternate":
+                                  post_url = l.get("href") or ""
+                                  break
+
+                          imgs = []
+                          for key in ("content", "summary"):
+                              obj = e.get(key, {})
+                              if isinstance(obj, dict):
+                                  imgs.extend(images_from_html(obj.get("$t", "") or "", post_url or base))
+
+                          media = e.get("media$thumbnail", {})
+                          if isinstance(media, dict) and media.get("url"):
+                              imgs.append(large_image(media["url"]))
+
+                          uniq = []
+                          for u in imgs:
+                              if u and u not in uniq:
+                                  uniq.append(u)
+
+                          found.append((date, post_url, uniq))
+
+                      if found:
+                          date, post_url, imgs = sorted(found, key=lambda x:x[0], reverse=True)[0]
+                          print("FEED DIRECT FOUND:", date)
+                          print("IMAGE CANDIDATES:", len(imgs))
+                          return date, post_url, imgs[:6]
+
+              return None, None, []
+
+          def decode(raw):
+              arr = np.frombuffer(raw, np.uint8)
+              img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+              if img is None:
+                  raise ValueError("decode failed")
+              return img
+
+          def prep_variants(img):
+              gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+              if max(gray.shape[:2]) < 1800:
+                  s = 1800 / max(gray.shape[:2])
+                  gray = cv2.resize(gray, None, fx=s, fy=s, interpolation=cv2.INTER_CUBIC)
+
+              h,w = gray.shape[:2]
+              crops = {
+                  "full": gray,
+                  "left75": gray[:, :int(w*0.75)],
+                  "left65": gray[:, :int(w*0.65)],
+                  "midleft": gray[int(h*0.25):int(h*0.88), :int(w*0.70)],
+              }
+
+              out = []
+              for cname,crop in crops.items():
+                  eq = cv2.equalizeHist(crop)
+                  out.append((cname+"-gray", eq))
+                  _,otsu = cv2.threshold(eq,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+                  out.append((cname+"-otsu", otsu))
+                  adap = cv2.adaptiveThreshold(eq,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                                               cv2.THRESH_BINARY,41,9)
+                  out.append((cname+"-adapt", adap))
+              return out
+
+          def digit_tokens(img, psm):
+              data = pytesseract.image_to_data(
+                  img,
+                  config=f"--psm {psm} -c tessedit_char_whitelist=0123456789",
+                  output_type=pytesseract.Output.DICT
+              )
+              toks=[]
+              for i,txt in enumerate(data.get("text",[])):
+                  ds = re.findall(r"\d", str(txt))
+                  if len(ds) != 1:
+                      continue
+                  try:
+                      conf=float(data["conf"][i])
+                  except:
+                      conf=-1
+                  if conf < 8:
+                      continue
+                  x=int(data["left"][i]); y=int(data["top"][i])
+                  w=int(data["width"][i]); h=int(data["height"][i])
+                  if h < 18 or w < 8:
+                      continue
+                  toks.append({"d":ds[0],"x":x+w/2,"y":y+h/2,"w":w,"h":h,"c":conf})
+              return toks
+
+          def cluster_rows(tokens):
+              if len(tokens) < 16:
+                  return []
+
+              medh = statistics.median([t["h"] for t in tokens])
+              rows=[]
+              for t in sorted(tokens,key=lambda z:z["y"]):
+                  best=None
+                  bestdy=999999
+                  for row in rows:
+                      ry=sum(z["y"] for z in row)/len(row)
+                      dy=abs(t["y"]-ry)
+                      if dy < bestdy and dy <= max(22, medh*0.9):
+                          best=row; bestdy=dy
+                  if best is None:
+                      rows.append([t])
+                  else:
+                      best.append(t)
+
+              cleaned=[]
+              for row in rows:
+                  row=sorted(row,key=lambda z:z["x"])
+
+                  # Prefer four large, similarly-sized digits on a row.
+                  if len(row) >= 4:
+                      heights=[z["h"] for z in row]
+                      mh=statistics.median(heights)
+                      filt=[z for z in row if z["h"] >= mh*0.65]
+
+                      if len(filt) >= 4:
+                          # Search every 4-token window and score spacing/size.
+                          best=None
+                          for i in range(len(filt)-3):
+                              q=filt[i:i+4]
+                              xs=[z["x"] for z in q]
+                              gaps=[xs[j+1]-xs[j] for j in range(3)]
+                              if min(gaps) <= 0:
+                                  continue
+                              gap_ratio=max(gaps)/max(min(gaps),1)
+                              hs=[z["h"] for z in q]
+                              size_ratio=max(hs)/max(min(hs),1)
+                              if gap_ratio > 2.2 or size_ratio > 1.8:
+                                  continue
+                              score=sum(z["c"] for z in q)/4 - abs(gap_ratio-1)*8 - abs(size_ratio-1)*8
+                              if best is None or score > best[0]:
+                                  best=(score,q)
+                          if best:
+                              cleaned.append(best[1])
+
+              return cleaned
+
+          def staggered_grid(tokens):
+              rows=cluster_rows(tokens)
+              if len(rows) < 4:
+                  return []
+
+              rows=sorted(rows,key=lambda r:sum(z["y"] for z in r)/4)
+              results=[]
+
+              # No x alignment requirement: rows may be staggered left/right.
+              for i in range(len(rows)-3):
+                  block=rows[i:i+4]
+                  ys=[sum(z["y"] for z in r)/4 for r in block]
+                  yg=[ys[j+1]-ys[j] for j in range(3)]
+                  if min(yg) <= 0:
+                      continue
+                  if max(yg)/max(min(yg),1) > 1.8:
+                      continue
+
+                  digits="".join(z["d"] for r in block for z in sorted(r,key=lambda z:z["x"]))
+                  confs=[z["c"] for r in block for z in r]
+                  heights=[z["h"] for r in block for z in r]
+
+                  if len(digits) != 16:
+                      continue
+
+                  avg=sum(confs)/16
+                  low=sum(1 for c in confs if c<20)
+                  hratio=max(heights)/max(min(heights),1)
+                  score=avg-low*2-(hratio-1)*8
+
+                  results.append((score,avg,low,digits))
+
+              return results
+
+          def read_image(raw):
+              img=decode(raw)
+              allres=[]
+
+              for name,v in prep_variants(img):
+                  for psm in (6,11,12):
+                      toks=digit_tokens(v,psm)
+                      for r in staggered_grid(toks):
+                          print(f"STAGGER GRID {name}/psm{psm}: {r[3]} avg={r[1]:.1f} low={r[2]}")
+                          allres.append(r)
+
+              if not allres:
+                  return None
+
+              allres.sort(reverse=True)
+
+              # Strong high-confidence result.
+              best=allres[0]
+              if best[1] >= 45 and best[2] <= 4:
+                  print("ACCEPT STRONG:",best[3])
+                  return list(best[3])
+
+              # Agreement between independent OCR/crop variants.
+              votes={}
+              for r in allres:
+                  if r[1] >= 20:
+                      votes[r[3]]=votes.get(r[3],0)+1
+              if votes:
+                  dig,count=max(votes.items(),key=lambda kv:kv[1])
+                  if count >= 2:
+                      print("ACCEPT AGREEMENT:",dig,"votes=",count)
+                      return list(dig)
+
+              return None
+
+          def main():
+              existing=load_existing()
+              date,post_url,images=discover_feed()
+
+              if not date:
+                  print("NO FEED DISCOVERY")
+                  save(existing)
+                  return
+
+              if date in existing:
+                  print("ALREADY SAVED:",date)
+                  save(existing)
+                  return
+
+              print("NEW MTP:",date)
+              nums=None
+
+              for idx,image_url in enumerate(images,1):
+                  try:
+                      print("IMAGE TRY:",idx)
+                      nums=read_image(req(image_url).content)
+                      if nums:
+                          print("OCR GRID:", "".join(nums))
+                          break
+                  except Exception as e:
+                      print("IMAGE FAILED:",idx,e)
+
+              if nums and len(nums)==16:
+                  existing[date]={
+                      "date":date,
+                      "numbers":[str(x) for x in nums],
+                      "source":"MTP-STAGGERED-GRID-V6.4",
+                      "url":post_url,
+                      "auto":True
+                  }
+                  print("AUTO SAVED:",date,"".join(nums))
+              else:
+                  print("OCR NOT CONFIDENT:",date)
+                  print("NO FALLBACK / CLEAN DATA KEPT")
+
+              save(existing)
+
+          if __name__=="__main__":
+              main()
+          PY
+
+      - name: Run V6.4 staggered-grid scanner
+        run: |
+          python3 scripts/update_mtp_charta.py
+
+      - name: Validate database
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path("data/mtp-charta.json")
+          assert p.exists()
+          d=json.loads(p.read_text(encoding="utf-8"))
+          entries=sorted(d.get("entries",[]),key=lambda e:e["date"],reverse=True)
+          assert entries
+          assert all(len(e.get("numbers",[]))==16 for e in entries)
+          print("LATEST SAVED:",entries[0]["date"],"".join(map(str,entries[0]["numbers"])))
+          PY
+
+      - name: Commit safely
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add scripts/update_mtp_charta.py data/mtp-charta.json
+
+          if git diff --cached --quiet; then
+            echo "No changes"
+            exit 0
+          fi
+
+          git commit -m "Install Auto MTP Staggered Grid V6.4.1"
+
+          echo "Sync latest remote changes before push..."
+          git fetch origin main
+
+          if ! git rebase origin/main; then
+            echo "Rebase conflict detected. Prefer generated MTP files from this run."
+            git checkout --theirs scripts/update_mtp_charta.py data/mtp-charta.json || true
+            git add scripts/update_mtp_charta.py data/mtp-charta.json
+            GIT_EDITOR=true git rebase --continue || {
+              git rebase --abort
+              echo "Rebase failed safely."
+              exit 1
+            }
+          fi
+
+          for n in 1 2 3; do
+            if git push origin HEAD:main; then
+              echo "Push successful"
+              exit 0
+            fi
+
+            echo "Push attempt $n failed; syncing and retrying..."
+            git fetch origin main
+
+            if ! git rebase origin/main; then
+              git checkout --theirs scripts/update_mtp_charta.py data/mtp-charta.json || true
+              git add scripts/update_mtp_charta.py data/mtp-charta.json
+              GIT_EDITOR=true git rebase --continue || {
+                git rebase --abort
+                exit 1
+              }
+            fi
+
+            sleep 3
+          done
+
+          echo "Push failed after retries"
+          exit 1
