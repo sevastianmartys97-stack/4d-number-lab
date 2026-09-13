@@ -4,8 +4,6 @@ from urllib.parse import urljoin
 from datetime import datetime, timezone, timedelta
 
 import requests
-import random
-import time
 from bs4 import BeautifulSoup
 from PIL import Image, ImageOps, ImageEnhance, ImageFilter
 import pytesseract
@@ -25,41 +23,21 @@ UA = {
     "Accept-Language": "en-US,en;q=0.9"
 }
 
-def get(url, retries=4):
-    last = None
-    headers = dict(UA)
-    headers["Accept-Language"] = "en-US,en;q=0.9"
-
-    for attempt in range(retries):
+def get(url, retries=2):
+    last=None
+    for n in range(retries):
         try:
-            r = requests.get(
-                url,
-                headers=headers,
-                timeout=35,
-                allow_redirects=True
-            )
-
-            # Google/Blogspot rate limit: wait and retry.
+            r=requests.get(url,headers=UA,timeout=20,allow_redirects=True)
             if r.status_code == 429 or "google.com/sorry" in r.url:
-                wait = 12 + attempt * 18 + random.randint(0, 5)
-                print(f"429/rate-limit on {url} -> wait {wait}s")
-                time.sleep(wait)
-                last = RuntimeError("429 Too Many Requests")
-                continue
-
+                raise RuntimeError("rate limited")
             r.raise_for_status()
             return r
-
         except Exception as e:
-            last = e
-            if attempt < retries - 1:
-                wait = 6 + attempt * 10 + random.randint(0, 4)
-                print(f"Request retry {attempt+1}/{retries}: {e}; wait {wait}s")
-                time.sleep(wait)
-            else:
-                break
-
-    raise last or RuntimeError(f"Request failed: {url}")
+            last=e
+            print("REQUEST RETRY:",url,e)
+            if n+1 < retries:
+                time.sleep(3)
+    raise last
 
 def date_from_title(title):
     m=re.search(r"\bMTP\s+(\d{1,2})[./-](\d{1,2})[./-](\d{4})\b",title,re.I)
@@ -125,11 +103,7 @@ def save(existing):
         print("LATEST SAVED:",entries[0]["date"],"".join(map(str,entries[0]["numbers"])))
 
 def image_candidates(post_url):
-    try:
-        soup=BeautifulSoup(get(post_url).text,"html.parser")
-    except Exception as e:
-        print("Post skipped due request error:", post_url, e)
-        return []
+    soup=BeautifulSoup(get(post_url).text,"html.parser")
     body=soup.select_one(".post-body") or soup
     scored=[]
 
