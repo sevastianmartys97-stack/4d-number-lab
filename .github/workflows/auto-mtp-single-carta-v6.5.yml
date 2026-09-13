@@ -1,0 +1,359 @@
+name: Auto MTP Single Carta V6.5
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/15 3-10 * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: auto-mtp-single-carta-v65
+  cancel-in-progress: true
+
+jobs:
+  auto-mtp:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install OCR
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y tesseract-ocr
+          python3 -m pip install --upgrade pip
+          pip install requests beautifulsoup4 pillow pytesseract opencv-python-headless numpy
+
+      - name: Install V6.5 single-carta scanner
+        run: |
+          mkdir -p scripts
+          cat > scripts/update_mtp_charta.py <<'PY'
+          from pathlib import Path
+          import re, json, html as htmlmod, statistics
+          from datetime import datetime, timezone, timedelta
+          from urllib.parse import urljoin
+          import requests
+          from bs4 import BeautifulSoup
+          import numpy as np
+          import cv2
+          import pytesseract
+
+          MYT = timezone(timedelta(hours=8))
+          OUT = Path("data/mtp-charta.json")
+          BASE = "https://cartaplanbee.blogspot.com"
+          FEED = BASE + "/feeds/posts/default?alt=json&max-results=10"
+          UA = {
+              "User-Agent": "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/131 Mobile Safari/537.36",
+              "Accept-Language": "en-US,en;q=0.9"
+          }
+
+          def req(url, timeout=25):
+              r = requests.get(url, headers=UA, timeout=timeout, allow_redirects=True)
+              if r.status_code == 429 or "google.com/sorry" in r.url:
+                  raise RuntimeError("rate limited")
+              r.raise_for_status()
+              return r
+
+          def parse_date(title):
+              m = re.search(r"\bMTP\s+(\d{1,2})[./-](\d{1,2})[./-](\d{4})\b", title, re.I)
+              if not m:
+                  return None
+              d,mn,y = m.groups()
+              return f"{y}-{int(mn):02d}-{int(d):02d}"
+
+          def big_img(url):
+              url = htmlmod.unescape(url)
+              url = re.sub(r"/s\d+(-c)?/", "/s1600/", url)
+              url = re.sub(r"=w\d+(-h\d+)?(-no)?$", "=s1600", url)
+              return url
+
+          def load_db():
+              if not OUT.exists():
+                  return {}
+              try:
+                  d=json.loads(OUT.read_text(encoding="utf-8"))
+              except Exception:
+                  return {}
+              return {e["date"]:e for e in d.get("entries",[])
+                      if e.get("date") and len(e.get("numbers",[]))==16}
+
+          def save_db(db):
+              entries=sorted(db.values(),key=lambda e:e["date"],reverse=True)
+              OUT.parent.mkdir(exist_ok=True)
+              OUT.write_text(json.dumps({
+                  "source":"APLANBEE MTP ONLY",
+                  "updated_at":datetime.now(MYT).isoformat(timespec="seconds"),
+                  "entries":entries
+              },ensure_ascii=False,indent=2),encoding="utf-8")
+              if entries:
+                  print("LATEST SAVED:",entries[0]["date"],
+                        "".join(map(str,entries[0]["numbers"])))
+
+          def latest_post_and_one_carta():
+              data=req(FEED).json()
+              posts=[]
+              for e in data.get("feed",{}).get("entry",[]):
+                  title=e.get("title",{}).get("$t","")
+                  if "MTP" not in title.upper() or "CARTA" not in title.upper():
+                      continue
+                  date=parse_date(title)
+                  if not date:
+                      continue
+                  post_url=""
+                  for l in e.get("link",[]):
+                      if l.get("rel")=="alternate":
+                          post_url=l.get("href") or ""
+                          break
+                  content=e.get("content",{}).get("$t","") or e.get("summary",{}).get("$t","")
+                  posts.append((date,title,post_url,content))
+
+              if not posts:
+                  raise RuntimeError("No MTP post in feed")
+
+              date,title,post_url,content=sorted(posts,key=lambda x:x[0],reverse=True)[0]
+              soup=BeautifulSoup(content,"html.parser")
+
+              candidates=[]
+              for order,img in enumerate(soup.find_all("img")):
+                  src=img.get("data-original") or img.get("data-src") or img.get("src")
+                  if not src:
+                      continue
+                  src=big_img(urljoin(post_url or BASE,src))
+                  meta=(" ".join([
+                      str(img.get("alt") or ""),
+                      str(img.get("title") or ""),
+                      str(img.get("class") or "")
+                  ])).lower()
+
+                  # Select exactly ONE carta image. Prefer MTP/CARTA metadata,
+                  # then the first substantial post image. Never loop OCR over images.
+                  score=0
+                  if "mtp" in meta: score+=100
+                  if "carta" in meta: score+=100
+                  if "ramalan" in meta: score+=20
+                  score-=order
+                  candidates.append((score,order,src))
+
+              if not candidates:
+                  media=None
+                  for e in data.get("feed",{}).get("entry",[]):
+                      if parse_date(e.get("title",{}).get("$t",""))==date:
+                          media=e.get("media$thumbnail",{}).get("url")
+                          break
+                  if media:
+                      candidates=[(0,0,big_img(media))]
+
+              if not candidates:
+                  raise RuntimeError("No carta image found in latest MTP feed")
+
+              candidates.sort(key=lambda x:(x[0],-x[1]),reverse=True)
+              chosen=candidates[0][2]
+
+              print("LATEST MTP:",date,title)
+              print("ONE CARTA IMAGE:",chosen)
+              return date,post_url,chosen
+
+          def decode(raw):
+              arr=np.frombuffer(raw,np.uint8)
+              img=cv2.imdecode(arr,cv2.IMREAD_COLOR)
+              if img is None:
+                  raise RuntimeError("Image decode failed")
+              return img
+
+          def tokens(img, psm):
+              data=pytesseract.image_to_data(
+                  img,
+                  config=f"--psm {psm} -c tessedit_char_whitelist=0123456789",
+                  output_type=pytesseract.Output.DICT
+              )
+              out=[]
+              for i,t in enumerate(data.get("text",[])):
+                  ds=re.findall(r"\d",str(t))
+                  if len(ds)!=1:
+                      continue
+                  try: conf=float(data["conf"][i])
+                  except: conf=-1
+                  if conf<5: continue
+                  x=int(data["left"][i]); y=int(data["top"][i])
+                  w=int(data["width"][i]); h=int(data["height"][i])
+                  if h<18 or w<8: continue
+                  out.append({"d":ds[0],"x":x+w/2,"y":y+h/2,
+                              "w":w,"h":h,"c":conf})
+              return out
+
+          def find_staggered_4x4(ts):
+              if len(ts)<16:
+                  return []
+              medh=statistics.median([t["h"] for t in ts])
+              rows=[]
+              for t in sorted(ts,key=lambda z:z["y"]):
+                  hit=None
+                  for r in rows:
+                      ry=sum(z["y"] for z in r)/len(r)
+                      if abs(t["y"]-ry)<=max(22,medh*.85):
+                          hit=r; break
+                  if hit is None: rows.append([t])
+                  else: hit.append(t)
+
+              row4=[]
+              for r in rows:
+                  r=sorted(r,key=lambda z:z["x"])
+                  if len(r)<4: continue
+                  best=None
+                  for i in range(len(r)-3):
+                      q=r[i:i+4]
+                      xs=[z["x"] for z in q]
+                      gaps=[xs[j+1]-xs[j] for j in range(3)]
+                      if min(gaps)<=0: continue
+                      if max(gaps)/max(min(gaps),1)>2.2: continue
+                      hs=[z["h"] for z in q]
+                      if max(hs)/max(min(hs),1)>1.8: continue
+                      sc=sum(z["c"] for z in q)/4
+                      if best is None or sc>best[0]: best=(sc,q)
+                  if best: row4.append(best[1])
+
+              row4=sorted(row4,key=lambda r:sum(z["y"] for z in r)/4)
+              results=[]
+              for i in range(len(row4)-3):
+                  b=row4[i:i+4]
+                  ys=[sum(z["y"] for z in r)/4 for r in b]
+                  gaps=[ys[j+1]-ys[j] for j in range(3)]
+                  if min(gaps)<=0 or max(gaps)/max(min(gaps),1)>1.9:
+                      continue
+                  dig="".join(z["d"] for r in b for z in sorted(r,key=lambda z:z["x"]))
+                  cf=[z["c"] for r in b for z in r]
+                  if len(dig)==16:
+                      results.append((sum(cf)/16,sum(c<20 for c in cf),dig))
+              return results
+
+          def read_one_carta(raw):
+              img=decode(raw)
+              gray=cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+              if max(gray.shape[:2])<1800:
+                  s=1800/max(gray.shape[:2])
+                  gray=cv2.resize(gray,None,fx=s,fy=s,interpolation=cv2.INTER_CUBIC)
+
+              h,w=gray.shape
+              # Actual MTP layout: carta is on left/centre; date text is on right.
+              regions=[
+                  ("left72",gray[:, :int(w*.72)]),
+                  ("left65",gray[:, :int(w*.65)]),
+                  ("carta-zone",gray[int(h*.28):int(h*.90), :int(w*.72)]),
+              ]
+              allres=[]
+              for rn,r in regions:
+                  eq=cv2.equalizeHist(r)
+                  variants=[("gray",eq)]
+                  _,bw=cv2.threshold(eq,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+                  variants.append(("otsu",bw))
+                  for vn,v in variants:
+                      for psm in (6,11,12):
+                          for av,low,dig in find_staggered_4x4(tokens(v,psm)):
+                              print(f"CARTA GRID {rn}/{vn}/psm{psm}: {dig} avg={av:.1f} low={low}")
+                              allres.append((av,low,dig))
+
+              if not allres:
+                  return None
+
+              votes={}
+              for av,low,dig in allres:
+                  if av>=18:
+                      votes.setdefault(dig,[]).append((av,low))
+
+              if votes:
+                  dig,vals=max(votes.items(),key=lambda kv:(len(kv[1]),max(v[0] for v in kv[1])))
+                  best=max(v[0] for v in vals)
+                  low=min(v[1] for v in vals)
+                  if len(vals)>=2 or (best>=45 and low<=4):
+                      print("CARTA ACCEPTED:",dig,"votes=",len(vals))
+                      return list(dig)
+
+              return None
+
+          def main():
+              db=load_db()
+              try:
+                  date,post_url,image_url=latest_post_and_one_carta()
+              except Exception as e:
+                  print("DISCOVERY FAILED:",e)
+                  save_db(db)
+                  return
+
+              if date in db:
+                  print("ALREADY SAVED:",date)
+                  save_db(db)
+                  return
+
+              try:
+                  print("OCR ONE CARTA IMAGE")
+                  nums=read_one_carta(req(image_url).content)
+              except Exception as e:
+                  print("CARTA OCR FAILED:",e)
+                  nums=None
+
+              if nums and len(nums)==16:
+                  db[date]={
+                      "date":date,
+                      "numbers":[str(x) for x in nums],
+                      "source":"MTP-SINGLE-CARTA-V6.5",
+                      "url":post_url,
+                      "auto":True
+                  }
+                  print("AUTO SAVED:",date,"".join(nums))
+              else:
+                  print("OCR NOT CONFIDENT:",date)
+                  print("NO MANUAL FALLBACK / CLEAN DB KEPT")
+
+              save_db(db)
+
+          if __name__=="__main__":
+              main()
+          PY
+
+      - name: Run V6.5 single-carta scanner
+        run: python3 scripts/update_mtp_charta.py
+
+      - name: Validate
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path("data/mtp-charta.json")
+          assert p.exists()
+          d=json.loads(p.read_text(encoding="utf-8"))
+          e=sorted(d.get("entries",[]),key=lambda x:x["date"],reverse=True)
+          assert e and all(len(x.get("numbers",[]))==16 for x in e)
+          print("LATEST SAVED:",e[0]["date"],"".join(map(str,e[0]["numbers"])))
+          PY
+
+      - name: Commit safely
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/update_mtp_charta.py data/mtp-charta.json
+
+          if git diff --cached --quiet; then
+            echo "No changes"
+            exit 0
+          fi
+
+          git commit -m "Install Auto MTP Single Carta V6.5"
+
+          for n in 1 2 3; do
+            git fetch origin main
+            if git rebase origin/main && git push origin HEAD:main; then
+              echo "Push successful"
+              exit 0
+            fi
+            git rebase --abort 2>/dev/null || true
+            sleep 3
+          done
+
+          echo "Push failed after retries"
+          exit 1
