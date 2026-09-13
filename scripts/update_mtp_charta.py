@@ -11,12 +11,10 @@ import pytesseract
 
 MYT = timezone(timedelta(hours=8))
 OUT = Path("data/mtp-charta.json")
-
 BASES = [
     "https://aplanbee.blogspot.com",
     "https://cartaplanbee.blogspot.com",
 ]
-
 UA = {
     "User-Agent": "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/131 Mobile Safari/537.36",
     "Accept-Language": "en-US,en;q=0.9"
@@ -67,25 +65,12 @@ def large_image(url):
 
 def images_from_html(raw_html, base):
     soup = BeautifulSoup(raw_html or "", "html.parser")
-    scored = []
+    out = []
     for img in soup.find_all("img"):
         src = img.get("data-original") or img.get("data-src") or img.get("src")
         if not src:
             continue
         src = large_image(urljoin(base, src))
-        meta = " ".join([
-            str(img.get("alt") or ""),
-            str(img.get("title") or ""),
-            str(img.get("class") or "")
-        ]).lower()
-        score = 0
-        if "mtp" in meta: score += 20
-        if "carta" in meta: score += 20
-        if "ramalan" in meta: score += 5
-        scored.append((score, src))
-
-    out = []
-    for _, src in sorted(scored, key=lambda x:x[0], reverse=True):
         if src not in out:
             out.append(src)
     return out
@@ -107,7 +92,6 @@ def discover_feed():
                 title = e.get("title", {}).get("$t", "")
                 if "MTP" not in title.upper() or "CARTA" not in title.upper():
                     continue
-
                 date = parse_date(title)
                 if not date:
                     continue
@@ -139,7 +123,7 @@ def discover_feed():
                 date, post_url, imgs = sorted(found, key=lambda x:x[0], reverse=True)[0]
                 print("FEED DIRECT FOUND:", date)
                 print("IMAGE CANDIDATES:", len(imgs))
-                return date, post_url, imgs[:4]
+                return date, post_url, imgs[:6]
 
     return None, None, []
 
@@ -150,47 +134,54 @@ def decode(raw):
         raise ValueError("decode failed")
     return img
 
-def preprocess_variants(img):
+def prep_variants(img):
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    scale = 1.0
     if max(gray.shape[:2]) < 1800:
-        scale = 1800 / max(gray.shape[:2])
-        gray = cv2.resize(gray, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
+        s = 1800 / max(gray.shape[:2])
+        gray = cv2.resize(gray, None, fx=s, fy=s, interpolation=cv2.INTER_CUBIC)
 
-    gray = cv2.equalizeHist(gray)
-    variants = [("gray", gray)]
-    _, otsu = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    variants.append(("otsu", otsu))
-    adap = cv2.adaptiveThreshold(gray,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-                                 cv2.THRESH_BINARY,41,11)
-    variants.append(("adaptive", adap))
-    return variants
+    h,w = gray.shape[:2]
+    crops = {
+        "full": gray,
+        "left75": gray[:, :int(w*0.75)],
+        "left65": gray[:, :int(w*0.65)],
+        "midleft": gray[int(h*0.25):int(h*0.88), :int(w*0.70)],
+    }
 
-def ocr_tokens(img, psm):
+    out = []
+    for cname,crop in crops.items():
+        eq = cv2.equalizeHist(crop)
+        out.append((cname+"-gray", eq))
+        _,otsu = cv2.threshold(eq,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+        out.append((cname+"-otsu", otsu))
+        adap = cv2.adaptiveThreshold(eq,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                                     cv2.THRESH_BINARY,41,9)
+        out.append((cname+"-adapt", adap))
+    return out
+
+def digit_tokens(img, psm):
     data = pytesseract.image_to_data(
         img,
         config=f"--psm {psm} -c tessedit_char_whitelist=0123456789",
         output_type=pytesseract.Output.DICT
     )
-    out=[]
+    toks=[]
     for i,txt in enumerate(data.get("text",[])):
-        ds=re.findall(r"\d",str(txt))
-        if len(ds)!=1:
+        ds = re.findall(r"\d", str(txt))
+        if len(ds) != 1:
             continue
         try:
             conf=float(data["conf"][i])
         except:
             conf=-1
-        if conf < 5:
+        if conf < 8:
             continue
         x=int(data["left"][i]); y=int(data["top"][i])
         w=int(data["width"][i]); h=int(data["height"][i])
-        if w<4 or h<8:
+        if h < 18 or w < 8:
             continue
-        out.append({
-            "d":ds[0],"x":x+w/2,"y":y+h/2,"w":w,"h":h,"c":conf
-        })
-    return out
+        toks.append({"d":ds[0],"x":x+w/2,"y":y+h/2,"w":w,"h":h,"c":conf})
+    return toks
 
 def cluster_rows(tokens):
     if len(tokens) < 16:
@@ -200,185 +191,116 @@ def cluster_rows(tokens):
     rows=[]
     for t in sorted(tokens,key=lambda z:z["y"]):
         best=None
-        bestdy=1e9
+        bestdy=999999
         for row in rows:
             ry=sum(z["y"] for z in row)/len(row)
             dy=abs(t["y"]-ry)
-            if dy < bestdy and dy <= max(18, medh*0.8):
+            if dy < bestdy and dy <= max(22, medh*0.9):
                 best=row; bestdy=dy
         if best is None:
             rows.append([t])
         else:
             best.append(t)
 
-    candidates=[]
+    cleaned=[]
     for row in rows:
         row=sorted(row,key=lambda z:z["x"])
-        if len(row) < 4:
-            continue
-        for i in range(len(row)-3):
-            q=row[i:i+4]
-            xs=[z["x"] for z in q]
-            gaps=[xs[j+1]-xs[j] for j in range(3)]
-            if min(gaps)<=0:
-                continue
-            if max(gaps)/max(min(gaps),1) > 2.0:
-                continue
-            candidates.append(q)
-    return candidates
 
-def find_4x4(tokens):
+        # Prefer four large, similarly-sized digits on a row.
+        if len(row) >= 4:
+            heights=[z["h"] for z in row]
+            mh=statistics.median(heights)
+            filt=[z for z in row if z["h"] >= mh*0.65]
+
+            if len(filt) >= 4:
+                # Search every 4-token window and score spacing/size.
+                best=None
+                for i in range(len(filt)-3):
+                    q=filt[i:i+4]
+                    xs=[z["x"] for z in q]
+                    gaps=[xs[j+1]-xs[j] for j in range(3)]
+                    if min(gaps) <= 0:
+                        continue
+                    gap_ratio=max(gaps)/max(min(gaps),1)
+                    hs=[z["h"] for z in q]
+                    size_ratio=max(hs)/max(min(hs),1)
+                    if gap_ratio > 2.2 or size_ratio > 1.8:
+                        continue
+                    score=sum(z["c"] for z in q)/4 - abs(gap_ratio-1)*8 - abs(size_ratio-1)*8
+                    if best is None or score > best[0]:
+                        best=(score,q)
+                if best:
+                    cleaned.append(best[1])
+
+    return cleaned
+
+def staggered_grid(tokens):
     rows=cluster_rows(tokens)
-    if len(rows)<4:
+    if len(rows) < 4:
         return []
 
     rows=sorted(rows,key=lambda r:sum(z["y"] for z in r)/4)
     results=[]
 
-    for i in range(len(rows)):
-        base=rows[i]
-        bx=[z["x"] for z in base]
-        gap=statistics.median([bx[j+1]-bx[j] for j in range(3)])
-        chosen=[base]
-
-        for q in rows[i+1:]:
-            qx=[z["x"] for z in q]
-            align=sum(abs(qx[j]-bx[j]) for j in range(4))/4
-            if align > max(22,gap*0.35):
-                continue
-
-            lasty=sum(z["y"] for z in chosen[-1])/4
-            qy=sum(z["y"] for z in q)/4
-            if qy-lasty < 15:
-                continue
-
-            chosen.append(q)
-            if len(chosen)==4:
-                digits="".join(z["d"] for rr in chosen for z in sorted(rr,key=lambda z:z["x"]))
-                confs=[z["c"] for rr in chosen for z in rr]
-                av=sum(confs)/16
-                low=sum(1 for c in confs if c<20)
-
-                ys=[sum(z["y"] for z in rr)/4 for rr in chosen]
-                ygaps=[ys[j+1]-ys[j] for j in range(3)]
-                uniform=max(ygaps)/max(min(ygaps),1) if min(ygaps)>0 else 99
-
-                if len(digits)==16 and uniform<2.1:
-                    score=av-low*2
-                    results.append((score,av,low,digits))
-                break
-    return results
-
-def line_grid(img):
-    gray=cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
-    if max(gray.shape[:2])<1800:
-        s=1800/max(gray.shape[:2])
-        gray=cv2.resize(gray,None,fx=s,fy=s,interpolation=cv2.INTER_CUBIC)
-
-    inv=cv2.adaptiveThreshold(gray,255,cv2.ADAPTIVE_THRESH_MEAN_C,
-                              cv2.THRESH_BINARY_INV,31,9)
-
-    h,w=inv.shape
-    horiz=cv2.morphologyEx(
-        inv,cv2.MORPH_OPEN,
-        cv2.getStructuringElement(cv2.MORPH_RECT,(max(30,w//18),1))
-    )
-    vert=cv2.morphologyEx(
-        inv,cv2.MORPH_OPEN,
-        cv2.getStructuringElement(cv2.MORPH_RECT,(1,max(30,h//18)))
-    )
-
-    mask=cv2.bitwise_or(horiz,vert)
-    cnts,_=cv2.findContours(mask,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
-    boxes=[]
-    for c in cnts:
-        x,y,cw,ch=cv2.boundingRect(c)
-        area=cw*ch
-        if area < w*h*0.03:
+    # No x alignment requirement: rows may be staggered left/right.
+    for i in range(len(rows)-3):
+        block=rows[i:i+4]
+        ys=[sum(z["y"] for z in r)/4 for r in block]
+        yg=[ys[j+1]-ys[j] for j in range(3)]
+        if min(yg) <= 0:
             continue
-        ratio=cw/max(ch,1)
-        if 0.45 <= ratio <= 2.2 and cw>120 and ch>120:
-            boxes.append((area,x,y,cw,ch))
+        if max(yg)/max(min(yg),1) > 1.8:
+            continue
 
-    results=[]
-    for _,x,y,cw,ch in sorted(boxes,reverse=True)[:8]:
-        crop=gray[y:y+ch,x:x+cw]
-        digits=[]
-        confs=[]
-        ok=True
-        for r in range(4):
-            for c in range(4):
-                y0=round(r*ch/4); y1=round((r+1)*ch/4)
-                x0=round(c*cw/4); x1=round((c+1)*cw/4)
-                cell=crop[y0:y1,x0:x1]
-                mh=max(2,int(cell.shape[0]*.12))
-                mw=max(2,int(cell.shape[1]*.12))
-                cell=cell[mh:-mh,mw:-mw] if cell.shape[0]>2*mh and cell.shape[1]>2*mw else cell
-                cell=cv2.resize(cell,None,fx=3,fy=3,interpolation=cv2.INTER_CUBIC)
-                data=pytesseract.image_to_data(
-                    cell,
-                    config="--psm 10 -c tessedit_char_whitelist=0123456789",
-                    output_type=pytesseract.Output.DICT
-                )
-                best=None
-                for i,txt in enumerate(data.get("text",[])):
-                    ds=re.findall(r"\d",str(txt))
-                    if len(ds)!=1:
-                        continue
-                    try: cf=float(data["conf"][i])
-                    except: cf=-1
-                    if best is None or cf>best[1]:
-                        best=(ds[0],cf)
-                if best is None:
-                    ok=False; break
-                digits.append(best[0]); confs.append(best[1])
-            if not ok:
-                break
-        if ok and len(digits)==16:
-            av=sum(confs)/16
-            low=sum(1 for c in confs if c<20)
-            results.append((av-low*2,av,low,"".join(digits)))
+        digits="".join(z["d"] for r in block for z in sorted(r,key=lambda z:z["x"]))
+        confs=[z["c"] for r in block for z in r]
+        heights=[z["h"] for r in block for z in r]
+
+        if len(digits) != 16:
+            continue
+
+        avg=sum(confs)/16
+        low=sum(1 for c in confs if c<20)
+        hratio=max(heights)/max(min(heights),1)
+        score=avg-low*2-(hratio-1)*8
+
+        results.append((score,avg,low,digits))
+
     return results
 
-def smart_read(raw):
+def read_image(raw):
     img=decode(raw)
-    all_results=[]
+    allres=[]
 
-    for name,v in preprocess_variants(img):
+    for name,v in prep_variants(img):
         for psm in (6,11,12):
-            toks=ocr_tokens(v,psm)
-            rs=find_4x4(toks)
-            for r in rs:
-                print(f"TOKEN GRID {name}/psm{psm}: {r[3]} avg={r[1]:.1f} low={r[2]}")
-                all_results.append(r)
+            toks=digit_tokens(v,psm)
+            for r in staggered_grid(toks):
+                print(f"STAGGER GRID {name}/psm{psm}: {r[3]} avg={r[1]:.1f} low={r[2]}")
+                allres.append(r)
 
-    for r in line_grid(img):
-        print(f"LINE GRID: {r[3]} avg={r[1]:.1f} low={r[2]}")
-        all_results.append(r)
-
-    if not all_results:
+    if not allres:
         return None
 
-    all_results.sort(reverse=True)
-    best=all_results[0]
+    allres.sort(reverse=True)
 
-    # Strong single result
+    # Strong high-confidence result.
+    best=allres[0]
     if best[1] >= 45 and best[2] <= 4:
-        print("ACCEPT STRONG:", best[3])
+        print("ACCEPT STRONG:",best[3])
         return list(best[3])
 
-    # Agreement across independent attempts
+    # Agreement between independent OCR/crop variants.
     votes={}
-    for r in all_results:
+    for r in allres:
         if r[1] >= 20:
             votes[r[3]]=votes.get(r[3],0)+1
     if votes:
         dig,count=max(votes.items(),key=lambda kv:kv[1])
-        if count>=2:
+        if count >= 2:
             print("ACCEPT AGREEMENT:",dig,"votes=",count)
             return list(dig)
 
-    print("REJECT: no reliable 16-digit agreement")
     return None
 
 def main():
@@ -398,15 +320,10 @@ def main():
     print("NEW MTP:",date)
     nums=None
 
-    # Try likely chart images in reverse too because feed order can place promo first.
-    ordered=list(images)
-    if len(ordered)>1:
-        ordered=[ordered[1],ordered[0]]+ordered[2:]
-
-    for idx,image_url in enumerate(ordered,1):
+    for idx,image_url in enumerate(images,1):
         try:
-            print("SMART IMAGE TRY:",idx)
-            nums=smart_read(req(image_url).content)
+            print("IMAGE TRY:",idx)
+            nums=read_image(req(image_url).content)
             if nums:
                 print("OCR GRID:", "".join(nums))
                 break
@@ -417,14 +334,14 @@ def main():
         existing[date]={
             "date":date,
             "numbers":[str(x) for x in nums],
-            "source":"MTP-SMART-GRID-V6.3",
+            "source":"MTP-STAGGERED-GRID-V6.4",
             "url":post_url,
             "auto":True
         }
         print("AUTO SAVED:",date,"".join(nums))
     else:
         print("OCR NOT CONFIDENT:",date)
-        print("CLEAN DATA KEPT - NO FALLBACK")
+        print("NO FALLBACK / CLEAN DATA KEPT")
 
     save(existing)
 
