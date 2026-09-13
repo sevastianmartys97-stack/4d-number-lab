@@ -1,0 +1,367 @@
+name: Auto MTP Resilient V6
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/15 3-10 * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: auto-mtp-resilient-v6
+  cancel-in-progress: true
+
+jobs:
+  auto-mtp:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y tesseract-ocr
+          python3 -m pip install --upgrade pip
+          pip install requests beautifulsoup4 pillow pytesseract
+
+      - name: Install resilient scanner
+        run: |
+          mkdir -p scripts
+          cat > scripts/update_mtp_charta.py <<'PY'
+          from pathlib import Path
+          import re, json, io
+          from urllib.parse import urljoin, quote
+          from datetime import datetime, timezone, timedelta
+          import requests
+          from bs4 import BeautifulSoup
+          from PIL import Image, ImageOps, ImageEnhance, ImageFilter
+          import pytesseract
+
+          MYT = timezone(timedelta(hours=8))
+          NOW = datetime.now(MYT)
+          OUT = Path("data/mtp-charta.json")
+
+          PRIMARY = "https://aplanbee.blogspot.com"
+          SECONDARY = "https://cartaplanbee.blogspot.com"
+
+          UA = {
+              "User-Agent": "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/131 Mobile Safari/537.36",
+              "Accept-Language": "en-US,en;q=0.9"
+          }
+
+          def req(url, timeout=20):
+              r = requests.get(url, headers=UA, timeout=timeout, allow_redirects=True)
+              if r.status_code == 429 or "google.com/sorry" in r.url:
+                  raise RuntimeError("rate limited")
+              r.raise_for_status()
+              return r
+
+          def load_existing():
+              if not OUT.exists():
+                  return {}
+              try:
+                  d = json.loads(OUT.read_text(encoding="utf-8"))
+              except Exception:
+                  return {}
+              return {
+                  e["date"]: e for e in d.get("entries", [])
+                  if e.get("date") and len(e.get("numbers", [])) == 16
+              }
+
+          def save(existing):
+              entries = sorted(existing.values(), key=lambda e: e["date"], reverse=True)
+              OUT.parent.mkdir(exist_ok=True)
+              OUT.write_text(json.dumps({
+                  "source": "APLANBEE MTP ONLY",
+                  "updated_at": datetime.now(MYT).isoformat(timespec="seconds"),
+                  "entries": entries
+              }, ensure_ascii=False, indent=2), encoding="utf-8")
+              if entries:
+                  print("LATEST SAVED:", entries[0]["date"], "".join(map(str, entries[0]["numbers"])))
+
+          def parse_date(text):
+              m = re.search(r"\bMTP\s+(\d{1,2})[./-](\d{1,2})[./-](\d{4})\b", text, re.I)
+              if not m:
+                  return None
+              dd, mm, yy = m.groups()
+              return f"{yy}-{int(mm):02d}-{int(dd):02d}"
+
+          def extract_posts(html, base):
+              soup = BeautifulSoup(html, "html.parser")
+              found = {}
+              for a in soup.find_all("a", href=True):
+                  title = " ".join(a.get_text(" ", strip=True).split())
+                  if "MTP" not in title.upper() or "CARTA" not in title.upper():
+                      continue
+                  d = parse_date(title)
+                  if d:
+                      found[d] = urljoin(base, a["href"])
+              return found
+
+          def discover_home(base, label):
+              try:
+                  posts = extract_posts(req(base + "/").text, base)
+                  if posts:
+                      d, u = sorted(posts.items(), reverse=True)[0]
+                      print(f"DISCOVERY {label}:", d, u)
+                      return d, u
+              except Exception as e:
+                  print(f"{label} FAILED:", e)
+              return None, None
+
+          def discover_feed():
+              for base in (PRIMARY, SECONDARY):
+                  url = base + "/feeds/posts/default?alt=json&max-results=8"
+                  try:
+                      data = req(url).json()
+                      found = {}
+                      for e in data.get("feed", {}).get("entry", []):
+                          title = e.get("title", {}).get("$t", "")
+                          if "MTP" not in title.upper() or "CARTA" not in title.upper():
+                              continue
+                          d = parse_date(title)
+                          if not d:
+                              continue
+                          post_url = None
+                          for l in e.get("link", []):
+                              if l.get("rel") == "alternate":
+                                  post_url = l.get("href")
+                                  break
+                          if post_url:
+                              found[d] = post_url
+                      if found:
+                          d, u = sorted(found.items(), reverse=True)[0]
+                          print("DISCOVERY FEED:", d, u)
+                          return d, u
+                  except Exception as e:
+                      print("FEED FAILED:", base, e)
+              return None, None
+
+          def discover_search():
+              q = quote("MTP CARTA")
+              for base in (PRIMARY, SECONDARY):
+                  try:
+                      posts = extract_posts(req(f"{base}/search?q={q}").text, base)
+                      if posts:
+                          d, u = sorted(posts.items(), reverse=True)[0]
+                          print("DISCOVERY SEARCH:", d, u)
+                          return d, u
+                  except Exception as e:
+                      print("SEARCH FAILED:", base, e)
+              return None, None
+
+          def discover_latest():
+              for fn in (
+                  lambda: discover_home(PRIMARY, "PRIMARY"),
+                  discover_feed,
+                  lambda: discover_home(SECONDARY, "SECONDARY"),
+                  discover_search,
+              ):
+                  d, u = fn()
+                  if d and u:
+                      return d, u
+              return None, None
+
+          def image_candidates(post_url):
+              soup = BeautifulSoup(req(post_url).text, "html.parser")
+              body = soup.select_one(".post-body") or soup
+              scored = []
+              for img in body.find_all("img"):
+                  src = img.get("data-original") or img.get("data-src") or img.get("src")
+                  if not src:
+                      continue
+                  src = urljoin(post_url, src)
+                  src = re.sub(r"/s\d+(-c)?/", "/s1600/", src)
+                  src = re.sub(r"=w\d+(-h\d+)?(-no)?$", "=s1600", src)
+                  meta = " ".join([
+                      str(img.get("alt") or ""),
+                      str(img.get("title") or ""),
+                      str(img.get("class") or "")
+                  ]).lower()
+                  score = 0
+                  if "mtp" in meta: score += 10
+                  if "carta" in meta: score += 10
+                  if "ramalan" in meta: score += 3
+                  scored.append((score, src))
+              out = []
+              for _, src in sorted(scored, key=lambda x: x[0], reverse=True):
+                  if src not in out:
+                      out.append(src)
+              return out[:2]
+
+          def normalize(img):
+              img = ImageOps.exif_transpose(img).convert("L")
+              if max(img.size) < 1800:
+                  scale = 1800 / max(img.size)
+                  img = img.resize((int(img.width * scale), int(img.height * scale)))
+              img = ImageOps.autocontrast(img)
+              img = ImageEnhance.Contrast(img).enhance(1.8)
+              img = img.filter(ImageFilter.SHARPEN)
+              return img
+
+          def tokens_to_grid(data):
+              tokens = []
+              for i, txt in enumerate(data.get("text", [])):
+                  ds = re.findall(r"\d", str(txt).strip())
+                  if len(ds) != 1:
+                      continue
+                  try:
+                      conf = float(data["conf"][i])
+                  except Exception:
+                      conf = -1
+                  if conf < 10:
+                      continue
+                  x = int(data["left"][i]); y = int(data["top"][i])
+                  w = int(data["width"][i]); h = int(data["height"][i])
+                  if w <= 0 or h <= 0:
+                      continue
+                  tokens.append((ds[0], x+w/2, y+h/2, w, h))
+
+              rows = []
+              for t in sorted(tokens, key=lambda z: z[2]):
+                  placed = False
+                  for row in rows:
+                      ry = sum(z[2] for z in row) / len(row)
+                      rh = sum(z[4] for z in row) / len(row)
+                      if abs(t[2] - ry) <= max(18, rh * 0.8):
+                          row.append(t)
+                          placed = True
+                          break
+                  if not placed:
+                      rows.append([t])
+
+              good = []
+              for row in rows:
+                  row = sorted(row, key=lambda z: z[1])
+                  if len(row) < 4:
+                      continue
+                  for i in range(len(row)-3):
+                      q = row[i:i+4]
+                      xs = [z[1] for z in q]
+                      gaps = [xs[j+1]-xs[j] for j in range(3)]
+                      if min(gaps) > 0 and max(gaps)/max(min(gaps),1) < 2.0:
+                          good.append(q)
+
+              good.sort(key=lambda q: sum(z[2] for z in q)/4)
+              for i in range(len(good)):
+                  block = [good[i]]
+                  base_x = [z[1] for z in good[i]]
+                  spacing = max(1, sum(base_x[j+1]-base_x[j] for j in range(3))/3)
+                  for q in good[i+1:]:
+                      qx = [z[1] for z in q]
+                      if sum(abs(qx[j]-base_x[j]) for j in range(4))/4 > spacing*0.4:
+                          continue
+                      block.append(q)
+                      if len(block) == 4:
+                          digits = [z[0] for rr in block for z in sorted(rr, key=lambda a: a[1])]
+                          if len(digits) == 16:
+                              return digits
+                          break
+              return None
+
+          def extract_grid(raw):
+              img = normalize(Image.open(io.BytesIO(raw)))
+              variants = [
+                  img,
+                  img.point(lambda p: 255 if p > 150 else 0),
+                  img.point(lambda p: 255 if p > 180 else 0),
+              ]
+              for variant in variants:
+                  for psm in (6, 11, 12):
+                      data = pytesseract.image_to_data(
+                          variant,
+                          config=f"--psm {psm} -c tessedit_char_whitelist=0123456789",
+                          output_type=pytesseract.Output.DICT
+                      )
+                      nums = tokens_to_grid(data)
+                      if nums:
+                          return nums
+              return None
+
+          def main():
+              existing = load_existing()
+              date, url = discover_latest()
+
+              if not date:
+                  print("NO NEW DISCOVERY; KEEP EXISTING DB")
+                  save(existing)
+                  return
+
+              if date in existing:
+                  print("ALREADY SAVED:", date)
+                  save(existing)
+                  return
+
+              print("NEW MTP DETECTED:", date, url)
+
+              try:
+                  images = image_candidates(url)
+              except Exception as e:
+                  print("POST FETCH FAILED:", e)
+                  save(existing)
+                  return
+
+              print("IMAGE CANDIDATES:", len(images))
+              nums = None
+
+              for idx, img_url in enumerate(images, 1):
+                  try:
+                      print("OCR IMAGE:", idx)
+                      nums = extract_grid(req(img_url).content)
+                      if nums:
+                          break
+                  except Exception as e:
+                      print("IMAGE ERROR:", e)
+
+              if nums and len(nums) == 16:
+                  existing[date] = {
+                      "date": date,
+                      "numbers": [str(x) for x in nums],
+                      "source": "MTP",
+                      "url": url,
+                      "auto": True
+                  }
+                  print("AUTO SAVED:", date, "".join(nums))
+              else:
+                  print("OCR NOT CONFIDENT:", date)
+                  print("No fallback inserted.")
+
+              save(existing)
+
+          if __name__ == "__main__":
+              main()
+          PY
+
+      - name: Run resilient MTP scanner
+        run: |
+          python3 scripts/update_mtp_charta.py
+
+      - name: Validate database
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path("data/mtp-charta.json")
+          assert p.exists(), "mtp-charta.json missing"
+          d = json.loads(p.read_text(encoding="utf-8"))
+          entries = sorted(d.get("entries", []), key=lambda e: e["date"], reverse=True)
+          assert entries, "No MTP data"
+          assert all(len(e.get("numbers", [])) == 16 for e in entries)
+          print("LATEST SAVED:", entries[0]["date"], "".join(map(str, entries[0]["numbers"])))
+          PY
+
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/update_mtp_charta.py data/mtp-charta.json
+          if git diff --cached --quiet; then
+            echo "No changes"
+          else
+            git commit -m "Install Auto MTP Resilient V6"
+            git push
+          fi
