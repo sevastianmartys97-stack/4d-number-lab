@@ -1,386 +1,323 @@
 from pathlib import Path
-import re, json, io, html as htmlmod
-from datetime import datetime, timezone, timedelta
+import re, json, time, io
 from urllib.parse import urljoin
+from datetime import datetime, timezone, timedelta
 
 import requests
 from bs4 import BeautifulSoup
-import numpy as np
-import cv2
-from PIL import Image
+from PIL import Image, ImageOps, ImageEnhance, ImageFilter
 import pytesseract
-
-MYT = timezone(timedelta(hours=8))
-OUT = Path("data/mtp-charta.json")
 
 BASES = [
     "https://aplanbee.blogspot.com",
     "https://cartaplanbee.blogspot.com",
 ]
 
+MYT = timezone(timedelta(hours=8))
+NOW = datetime.now(MYT)
+YEAR, MONTH = NOW.year, NOW.month
+OUT = Path("data/mtp-charta.json")
+
 UA = {
     "User-Agent": "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/131 Mobile Safari/537.36",
     "Accept-Language": "en-US,en;q=0.9"
 }
 
-def req(url, timeout=25):
-    r = requests.get(url, headers=UA, timeout=timeout, allow_redirects=True)
-    if r.status_code == 429 or "google.com/sorry" in r.url:
-        raise RuntimeError("rate limited")
-    r.raise_for_status()
-    return r
+def get(url, retries=2):
+    last=None
+    for n in range(retries):
+        try:
+            r=requests.get(url,headers=UA,timeout=20,allow_redirects=True)
+            if r.status_code == 429 or "google.com/sorry" in r.url:
+                raise RuntimeError("rate limited")
+            r.raise_for_status()
+            return r
+        except Exception as e:
+            last=e
+            print("REQUEST RETRY:",url,e)
+            if n+1 < retries:
+                time.sleep(3)
+    raise last
 
-def parse_date(text):
-    m = re.search(r"\bMTP\s+(\d{1,2})[./-](\d{1,2})[./-](\d{4})\b", text, re.I)
+def date_from_title(title):
+    m=re.search(r"\bMTP\s+(\d{1,2})[./-](\d{1,2})[./-](\d{4})\b",title,re.I)
     if not m:
         return None
-    dd, mm, yy = m.groups()
+    dd,mm,yy=m.groups()
     return f"{yy}-{int(mm):02d}-{int(dd):02d}"
+
+def discover_latest():
+    found={}
+    for base in BASES:
+        # Homepage first; archive only if homepage gives nothing.
+        for url in (base+"/", f"{base}/{YEAR}/{MONTH:02d}/"):
+            try:
+                soup=BeautifulSoup(get(url).text,"html.parser")
+            except Exception as e:
+                print("DISCOVERY SKIP:",url,e)
+                continue
+
+            for a in soup.find_all("a",href=True):
+                title=" ".join(a.get_text(" ",strip=True).split())
+                if not re.search(r"\bMTP\b",title,re.I):
+                    continue
+                if not re.search(r"\bCARTA\b",title,re.I):
+                    continue
+                d=date_from_title(title)
+                if d:
+                    found[d]=urljoin(url,a["href"])
+
+            if found:
+                break
+        if found:
+            break
+
+    if not found:
+        return None,None
+
+    date,url=sorted(found.items(),key=lambda x:x[0],reverse=True)[0]
+    print("LATEST POST:",date,url)
+    return date,url
 
 def load_existing():
     if not OUT.exists():
         return {}
     try:
-        d = json.loads(OUT.read_text(encoding="utf-8"))
+        d=json.loads(OUT.read_text(encoding="utf-8"))
     except Exception:
         return {}
     return {
-        e["date"]: e for e in d.get("entries", [])
-        if e.get("date") and len(e.get("numbers", [])) == 16
+        e["date"]:e for e in d.get("entries",[])
+        if e.get("date") and len(e.get("numbers",[]))==16
     }
 
 def save(existing):
-    entries = sorted(existing.values(), key=lambda e:e["date"], reverse=True)
+    entries=sorted(existing.values(),key=lambda e:e["date"],reverse=True)
     OUT.parent.mkdir(exist_ok=True)
     OUT.write_text(json.dumps({
-        "source": "APLANBEE MTP ONLY",
-        "updated_at": datetime.now(MYT).isoformat(timespec="seconds"),
-        "entries": entries
-    }, ensure_ascii=False, indent=2), encoding="utf-8")
+        "source":"APLANBEE MTP ONLY",
+        "updated_at":datetime.now(MYT).isoformat(timespec="seconds"),
+        "entries":entries
+    },ensure_ascii=False,indent=2),encoding="utf-8")
     if entries:
-        print("LATEST SAVED:", entries[0]["date"], "".join(map(str, entries[0]["numbers"])))
+        print("LATEST SAVED:",entries[0]["date"],"".join(map(str,entries[0]["numbers"])))
 
-def large_blogger_image(url):
-    url = htmlmod.unescape(url)
-    url = re.sub(r"/s\d+(-c)?/", "/s1600/", url)
-    url = re.sub(r"=w\d+(-h\d+)?(-no)?$", "=s1600", url)
-    return url
+def image_candidates(post_url):
+    soup=BeautifulSoup(get(post_url).text,"html.parser")
+    body=soup.select_one(".post-body") or soup
+    scored=[]
 
-def images_from_html(raw_html, base):
-    soup = BeautifulSoup(raw_html or "", "html.parser")
-    scored = []
-    for img in soup.find_all("img"):
-        src = img.get("data-original") or img.get("data-src") or img.get("src")
+    for img in body.find_all("img"):
+        src=img.get("data-original") or img.get("data-src") or img.get("src")
         if not src:
             continue
 
-        src = large_blogger_image(urljoin(base, src))
-        meta = " ".join([
+        src=urljoin(post_url,src)
+        # Blogger often serves resized copies; request a larger copy.
+        src=re.sub(r"/s\d+(-c)?/", "/s1600/", src)
+        src=re.sub(r"=w\d+(-h\d+)?(-no)?$", "=s1600", src)
+
+        meta=(" ".join([
             str(img.get("alt") or ""),
             str(img.get("title") or ""),
             str(img.get("class") or "")
-        ]).lower()
+        ])).lower()
 
-        score = 0
-        if "mtp" in meta: score += 12
-        if "carta" in meta: score += 12
-        if "ramalan" in meta: score += 4
-        scored.append((score, src))
+        score=0
+        if "mtp" in meta: score+=8
+        if "carta" in meta: score+=8
+        if "ramalan" in meta: score+=3
 
-    out = []
-    for _, src in sorted(scored, key=lambda x:x[0], reverse=True):
+        try:
+            w=int(img.get("width") or 0)
+            h=int(img.get("height") or 0)
+            if w>=300 and h>=300: score+=2
+        except Exception:
+            pass
+
+        scored.append((score,src))
+
+    out=[]
+    for _,src in sorted(scored,key=lambda x:x[0],reverse=True):
         if src not in out:
             out.append(src)
-    return out
+    return out[:3]
 
-def discover_feed_direct():
-    for base in BASES:
-        feeds = [
-            base + "/feeds/posts/default?alt=json&max-results=10",
-            base + "/feeds/posts/default/-/MTP?alt=json&max-results=10",
-        ]
-        for feed_url in feeds:
-            try:
-                data = req(feed_url).json()
-            except Exception as e:
-                print("FEED SKIP:", feed_url, e)
-                continue
-
-            found = []
-            for e in data.get("feed", {}).get("entry", []):
-                title = e.get("title", {}).get("$t", "")
-                if "MTP" not in title.upper() or "CARTA" not in title.upper():
-                    continue
-
-                date = parse_date(title)
-                if not date:
-                    continue
-
-                post_url = ""
-                for l in e.get("link", []):
-                    if l.get("rel") == "alternate":
-                        post_url = l.get("href") or ""
-                        break
-
-                chunks = []
-                for key in ("content", "summary"):
-                    obj = e.get(key, {})
-                    if isinstance(obj, dict):
-                        chunks.append(obj.get("$t", "") or "")
-
-                imgs = []
-                for chunk in chunks:
-                    imgs.extend(images_from_html(chunk, post_url or base))
-
-                media = e.get("media$thumbnail", {})
-                if isinstance(media, dict) and media.get("url"):
-                    imgs.append(large_blogger_image(media["url"]))
-
-                unique = []
-                for u in imgs:
-                    if u and u not in unique:
-                        unique.append(u)
-
-                found.append((date, post_url, unique))
-
-            if found:
-                date, post_url, imgs = sorted(found, key=lambda x:x[0], reverse=True)[0]
-                print("FEED DIRECT FOUND:", date)
-                print("FEED IMAGE CANDIDATES:", len(imgs))
-                return date, post_url, imgs[:4]
-
-    return None, None, []
-
-def pil_to_cv(raw):
-    arr = np.frombuffer(raw, dtype=np.uint8)
-    img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
-    if img is None:
-        raise ValueError("image decode failed")
+def normalize(img):
+    img=ImageOps.exif_transpose(img).convert("L")
+    if max(img.size)<1800:
+        scale=1800/max(img.size)
+        img=img.resize((int(img.width*scale),int(img.height*scale)))
+    img=ImageOps.autocontrast(img)
+    img=ImageEnhance.Contrast(img).enhance(1.8)
+    img=img.filter(ImageFilter.SHARPEN)
     return img
 
-def candidate_crops(img):
-    h, w = img.shape[:2]
-    out = []
-
-    # Full image and central crops first.
-    out.append(("full", img))
-    out.append(("center90", img[int(h*.05):int(h*.95), int(w*.05):int(w*.95)]))
-    out.append(("center80", img[int(h*.10):int(h*.90), int(w*.10):int(w*.90)]))
-
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    blur = cv2.GaussianBlur(gray, (5,5), 0)
-
-    for mode, thr in [("otsu", None), ("t150", 150), ("t180", 180)]:
-        if thr is None:
-            _, bw = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-        else:
-            _, bw = cv2.threshold(blur, thr, 255, cv2.THRESH_BINARY_INV)
-
-        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5,5))
-        bw = cv2.morphologyEx(bw, cv2.MORPH_CLOSE, kernel, iterations=2)
-
-        cnts, _ = cv2.findContours(bw, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        boxes = []
-        for c in cnts:
-            x,y,cw,ch = cv2.boundingRect(c)
-            area = cw*ch
-            if area < (w*h)*0.05 or area > (w*h)*0.95:
-                continue
-            ratio = cw/max(ch,1)
-            if not (0.55 <= ratio <= 1.8):
-                continue
-            boxes.append((area,x,y,cw,ch))
-
-        for idx, (_,x,y,cw,ch) in enumerate(sorted(boxes, reverse=True)[:6]):
-            pad = int(min(cw,ch)*0.03)
-            x0=max(0,x-pad); y0=max(0,y-pad)
-            x1=min(w,x+cw+pad); y1=min(h,y+ch+pad)
-            crop = img[y0:y1, x0:x1]
-            if crop.size:
-                out.append((f"{mode}_box{idx}", crop))
-
-    # Remove near-duplicate crops by size.
-    unique = []
-    seen = set()
-    for name,crop in out:
-        key = (crop.shape[1]//20, crop.shape[0]//20)
-        if key in seen:
+def rows_from_data(data):
+    tokens=[]
+    n=len(data.get("text",[]))
+    for i in range(n):
+        text=str(data["text"][i]).strip()
+        ds=re.findall(r"\d",text)
+        if len(ds)!=1:
             continue
-        seen.add(key)
-        unique.append((name,crop))
-    return unique[:12]
+        try:
+            conf=float(data["conf"][i])
+        except Exception:
+            conf=-1
+        if conf<15:
+            continue
 
-def ocr_single_cell(cell):
-    if cell.size == 0:
-        return None, -1
+        x=int(data["left"][i]); y=int(data["top"][i])
+        w=int(data["width"][i]); h=int(data["height"][i])
+        if w<=0 or h<=0:
+            continue
+        tokens.append((ds[0],x+w/2,y+h/2,w,h,conf))
 
-    gray = cv2.cvtColor(cell, cv2.COLOR_BGR2GRAY) if len(cell.shape)==3 else cell
+    rows=[]
+    for t in sorted(tokens,key=lambda z:z[2]):
+        placed=False
+        for row in rows:
+            ys=[z[2] for z in row]
+            hs=[z[4] for z in row]
+            medy=sorted(ys)[len(ys)//2]
+            medh=sorted(hs)[len(hs)//2]
+            if abs(t[2]-medy)<=max(18,medh*.75):
+                row.append(t); placed=True; break
+        if not placed:
+            rows.append([t])
 
-    # Remove cell borders.
-    h,w = gray.shape[:2]
-    mx = max(2, int(w*.13))
-    my = max(2, int(h*.13))
-    core = gray[my:h-my, mx:w-mx] if h>2*my and w>2*mx else gray
+    candidates=[]
+    for row in rows:
+        row=sorted(row,key=lambda z:z[1])
+        if len(row)<4:
+            continue
+        for i in range(len(row)-3):
+            q=row[i:i+4]
+            xs=[z[1] for z in q]
+            gaps=[xs[j+1]-xs[j] for j in range(3)]
+            if min(gaps)<=0:
+                continue
+            if max(gaps)/max(min(gaps),1)>1.9:
+                continue
+            candidates.append(q)
 
-    scale = max(2.0, 180/max(core.shape[:2]))
-    core = cv2.resize(core, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
-    core = cv2.GaussianBlur(core, (3,3), 0)
+    candidates.sort(key=lambda q:sum(z[2] for z in q)/4)
 
-    variants = []
-    variants.append(core)
-    _, a = cv2.threshold(core, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    variants.append(a)
-    _, b = cv2.threshold(core, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-    variants.append(b)
+    for i in range(len(candidates)):
+        chosen=[candidates[i]]
+        base=[z[1] for z in candidates[i]]
+        spacing=max(1,sum(base[j+1]-base[j] for j in range(3))/3)
 
-    best_digit = None
-    best_conf = -1
+        for q in candidates[i+1:]:
+            qx=[z[1] for z in q]
+            if sum(abs(qx[j]-base[j]) for j in range(4))/4 > spacing*.35:
+                continue
 
-    for v in variants:
-        data = pytesseract.image_to_data(
-            v,
-            config="--psm 10 -c tessedit_char_whitelist=0123456789",
+            prev=sum(z[2] for z in chosen[-1])/4
+            cur=sum(z[2] for z in q)/4
+            mh=sum(z[4] for z in q)/4
+            if cur-prev < mh*.75:
+                continue
+
+            chosen.append(q)
+            if len(chosen)==4:
+                digits=[z[0] for rr in chosen for z in sorted(rr,key=lambda a:a[1])]
+                if len(digits)==16:
+                    return digits
+                break
+    return None
+
+def extract_grid(image_bytes):
+    img=normalize(Image.open(io.BytesIO(image_bytes)))
+
+    variants=[
+        img,
+        img.point(lambda p: 255 if p>150 else 0),
+        img.point(lambda p: 255 if p>180 else 0),
+        ImageOps.invert(img).point(lambda p: 255 if p>120 else 0),
+    ]
+
+    for variant in variants:
+        for psm in (6,11,12):
+            data=pytesseract.image_to_data(
+                variant,
+                config=f"--psm {psm} -c tessedit_char_whitelist=0123456789",
+                output_type=pytesseract.Output.DICT
+            )
+            nums=rows_from_data(data)
+            if nums:
+                return nums
+
+    # Last OCR fallback: crop central portions because chart is
+    # usually the dominant central object in the post image.
+    W,H=img.size
+    crops=[
+        img.crop((0,int(H*.10),W,int(H*.90))),
+        img.crop((int(W*.05),int(H*.15),int(W*.95),int(H*.85))),
+        img.crop((int(W*.10),int(H*.20),int(W*.90),int(H*.80))),
+    ]
+
+    for crop in crops:
+        data=pytesseract.image_to_data(
+            crop,
+            config="--psm 11 -c tessedit_char_whitelist=0123456789",
             output_type=pytesseract.Output.DICT
         )
-        for i, txt in enumerate(data.get("text", [])):
-            ds = re.findall(r"\d", str(txt))
-            if len(ds) != 1:
-                continue
-            try:
-                conf = float(data["conf"][i])
-            except Exception:
-                conf = -1
-            if conf > best_conf:
-                best_conf = conf
-                best_digit = ds[0]
+        nums=rows_from_data(data)
+        if nums:
+            return nums
 
-    return best_digit, best_conf
-
-def read_equal_grid(crop):
-    h,w = crop.shape[:2]
-    if min(h,w) < 180:
-        return None
-
-    # Try slight trims because outer poster decoration may surround grid.
-    trim_sets = [0.00, 0.03, 0.06, 0.10]
-    best = None
-
-    for trim in trim_sets:
-        x0=int(w*trim); x1=int(w*(1-trim))
-        y0=int(h*trim); y1=int(h*(1-trim))
-        g = crop[y0:y1, x0:x1]
-        gh,gw = g.shape[:2]
-        if min(gh,gw) < 160:
-            continue
-
-        digits=[]
-        confs=[]
-        ok=True
-
-        for r in range(4):
-            for c in range(4):
-                cy0=round(r*gh/4); cy1=round((r+1)*gh/4)
-                cx0=round(c*gw/4); cx1=round((c+1)*gw/4)
-                cell=g[cy0:cy1, cx0:cx1]
-                d,conf=ocr_single_cell(cell)
-                if d is None:
-                    ok=False
-                    break
-                digits.append(d)
-                confs.append(conf)
-            if not ok:
-                break
-
-        if ok and len(digits)==16:
-            avg=sum(confs)/16
-            low=sum(1 for x in confs if x < 20)
-            score=avg - low*3
-            candidate=("".join(digits), avg, low, trim, score)
-            if best is None or candidate[4] > best[4]:
-                best=candidate
-
-    return best
-
-def read_grid(raw):
-    img = pil_to_cv(raw)
-    results = []
-
-    for name,crop in candidate_crops(img):
-        res = read_equal_grid(crop)
-        if res:
-            digits, avg, low, trim, score = res
-            print(f"GRID CANDIDATE {name} trim={trim:.2f} avg={avg:.1f} low={low}: {digits}")
-            results.append((score, avg, low, digits, name))
-
-    if not results:
-        return None
-
-    results.sort(reverse=True)
-    best = results[0]
-    score, avg, low, digits, name = best
-
-    # Conservative acceptance: all 16 cells read, decent overall confidence,
-    # and not too many weak cells.
-    if avg >= 35 and low <= 5:
-        print(f"GRID ACCEPTED {name}: {digits} avg={avg:.1f}")
-        return list(digits)
-
-    # Agreement fallback: same 16 digits independently from >=2 crop hypotheses.
-    counts = {}
-    for _,avg2,low2,dig2,name2 in results:
-        if avg2 >= 20:
-            counts.setdefault(dig2, []).append((avg2,low2,name2))
-    agreed = sorted(counts.items(), key=lambda kv: len(kv[1]), reverse=True)
-    if agreed and len(agreed[0][1]) >= 2:
-        dig = agreed[0][0]
-        print("GRID ACCEPTED BY AGREEMENT:", dig, "votes=", len(agreed[0][1]))
-        return list(dig)
-
-    print("GRID REJECTED: confidence/agreement not enough")
     return None
 
 def main():
-    existing = load_existing()
-    date, post_url, images = discover_feed_direct()
+    existing=load_existing()
+    date,url=discover_latest()
 
     if not date:
-        print("NO FEED DISCOVERY; KEEP EXISTING DB")
+        print("No latest MTP post found. Keep existing data.")
         save(existing)
         return
 
     if date in existing:
-        print("ALREADY SAVED:", date)
+        print("Already saved:",date)
         save(existing)
         return
 
-    print("NEW MTP:", date)
+    nums=None
+    try:
+        images=image_candidates(url)
+        print("IMAGE CANDIDATES:",len(images))
+    except Exception as e:
+        print("POST IMAGE ERROR:",e)
+        images=[]
 
-    nums = None
-    for idx, image_url in enumerate(images, 1):
+    for idx,img_url in enumerate(images,1):
         try:
-            print("IMAGE TRY:", idx, image_url)
-            raw = req(image_url).content
-            nums = read_grid(raw)
+            print("TRY IMAGE",idx)
+            r=get(img_url)
+            nums=extract_grid(r.content)
             if nums:
-                print("OCR GRID:", "".join(nums))
+                print("OCR GRID:",date,"".join(nums))
                 break
         except Exception as e:
-            print("IMAGE FAILED:", idx, e)
+            print("IMAGE SKIP:",e)
 
-    if nums and len(nums) == 16:
-        existing[date] = {
-            "date": date,
-            "numbers": [str(x) for x in nums],
-            "source": "MTP-GRID-OCR-V6.2",
-            "url": post_url,
-            "auto": True
+    if nums and len(nums)==16:
+        existing[date]={
+            "date":date,
+            "numbers":[str(x) for x in nums],
+            "source":"MTP",
+            "url":url,
+            "auto":True
         }
-        print("AUTO SAVED:", date, "".join(nums))
+        print("AUTO SAVED:",date,"".join(nums))
     else:
-        print("OCR NOT CONFIDENT:", date)
-        print("NO FALLBACK / NO WRONG DATA INSERTED")
+        # Important: no hardcoded/fallback numbers.
+        print("NEW MTP FOUND, OCR NOT CONFIDENT:",date)
+        print("No fallback inserted; existing DB kept safely.")
 
     save(existing)
 
-if __name__ == "__main__":
+if __name__=="__main__":
     main()
