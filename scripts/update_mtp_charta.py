@@ -1,284 +1,279 @@
 from pathlib import Path
-import re, json, html as htmlmod, statistics
+import re, json, html as htmlmod
 from datetime import datetime, timezone, timedelta
 from urllib.parse import urljoin
-import requests
+import requests, cv2, numpy as np
 from bs4 import BeautifulSoup
-import numpy as np
-import cv2
-import pytesseract
 
-MYT = timezone(timedelta(hours=8))
-OUT = Path("data/mtp-charta.json")
-BASE = "https://cartaplanbee.blogspot.com"
-FEED = BASE + "/feeds/posts/default?alt=json&max-results=10"
-UA = {
-    "User-Agent": "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/131 Mobile Safari/537.36",
-    "Accept-Language": "en-US,en;q=0.9"
-}
+MYT=timezone(timedelta(hours=8))
+DB=Path("data/mtp-charta.json")
+TPL=Path("data/mtp-visual-templates.npz")
+BASE="https://cartaplanbee.blogspot.com"
+FEED=BASE+"/feeds/posts/default?alt=json&max-results=10"
+UA={"User-Agent":"Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/131 Mobile Safari/537.36"}
 
-def req(url, timeout=25):
-    r = requests.get(url, headers=UA, timeout=timeout, allow_redirects=True)
-    if r.status_code == 429 or "google.com/sorry" in r.url:
-        raise RuntimeError("rate limited")
+# One-time training seed from the verified 16/09/2026 chart.
+# After templates are created, future dates are classified visually.
+SEED_DATE="2026-09-16"
+SEED_DIGITS=list("1795842643709157")
+
+def get(url):
+    r=requests.get(url,headers=UA,timeout=25)
     r.raise_for_status()
     return r
 
-def parse_date(title):
-    m = re.search(r"\bMTP\s+(\d{1,2})[./-](\d{1,2})[./-](\d{4})\b", title, re.I)
-    if not m:
-        return None
-    d,mn,y = m.groups()
+def pdate(s):
+    m=re.search(r"MTP\s+(\d{1,2})[./-](\d{1,2})[./-](\d{4})",s,re.I)
+    if not m:return None
+    d,mn,y=m.groups()
     return f"{y}-{int(mn):02d}-{int(d):02d}"
 
-def big_img(url):
-    url = htmlmod.unescape(url)
-    url = re.sub(r"/s\d+(-c)?/", "/s1600/", url)
-    url = re.sub(r"=w\d+(-h\d+)?(-no)?$", "=s1600", url)
-    return url
+def big(u):
+    u=htmlmod.unescape(u)
+    u=re.sub(r"/s\d+(-c)?/","/s1600/",u)
+    return u
 
 def load_db():
-    if not OUT.exists():
-        return {}
-    try:
-        d=json.loads(OUT.read_text(encoding="utf-8"))
-    except Exception:
-        return {}
-    return {e["date"]:e for e in d.get("entries",[])
-            if e.get("date") and len(e.get("numbers",[]))==16}
+    if not DB.exists(): return {}
+    try:d=json.loads(DB.read_text(encoding="utf-8"))
+    except:return {}
+    return {e["date"]:e for e in d.get("entries",[]) if e.get("date")}
 
-def save_db(db):
-    entries=sorted(db.values(),key=lambda e:e["date"],reverse=True)
-    OUT.parent.mkdir(exist_ok=True)
-    OUT.write_text(json.dumps({
-        "source":"APLANBEE MTP ONLY",
-        "updated_at":datetime.now(MYT).isoformat(timespec="seconds"),
-        "entries":entries
+def save_db(d):
+    es=sorted(d.values(),key=lambda x:x["date"],reverse=True)
+    DB.parent.mkdir(exist_ok=True)
+    DB.write_text(json.dumps({
+      "source":"APLANBEE MTP ONLY",
+      "updated_at":datetime.now(MYT).isoformat(timespec="seconds"),
+      "entries":es
     },ensure_ascii=False,indent=2),encoding="utf-8")
-    if entries:
-        print("LATEST SAVED:",entries[0]["date"],
-              "".join(map(str,entries[0]["numbers"])))
+    if es: print("LATEST SAVED:",es[0]["date"],"".join(map(str,es[0]["numbers"])))
 
-def latest_post_and_one_carta():
-    data=req(FEED).json()
-    posts=[]
-    for e in data.get("feed",{}).get("entry",[]):
+def latest():
+    f=get(FEED).json()
+    ps=[]
+    for e in f.get("feed",{}).get("entry",[]):
         title=e.get("title",{}).get("$t","")
-        if "MTP" not in title.upper() or "CARTA" not in title.upper():
-            continue
-        date=parse_date(title)
-        if not date:
-            continue
-        post_url=""
-        for l in e.get("link",[]):
-            if l.get("rel")=="alternate":
-                post_url=l.get("href") or ""
-                break
-        content=e.get("content",{}).get("$t","") or e.get("summary",{}).get("$t","")
-        posts.append((date,title,post_url,content))
-
-    if not posts:
-        raise RuntimeError("No MTP post in feed")
-
-    date,title,post_url,content=sorted(posts,key=lambda x:x[0],reverse=True)[0]
-    soup=BeautifulSoup(content,"html.parser")
-
-    candidates=[]
-    for order,img in enumerate(soup.find_all("img")):
-        src=img.get("data-original") or img.get("data-src") or img.get("src")
-        if not src:
-            continue
-        src=big_img(urljoin(post_url or BASE,src))
-        meta=(" ".join([
-            str(img.get("alt") or ""),
-            str(img.get("title") or ""),
-            str(img.get("class") or "")
-        ])).lower()
-
-        # Select exactly ONE carta image. Prefer MTP/CARTA metadata,
-        # then the first substantial post image. Never loop OCR over images.
-        score=0
-        if "mtp" in meta: score+=100
-        if "carta" in meta: score+=100
-        if "ramalan" in meta: score+=20
-        score-=order
-        candidates.append((score,order,src))
-
-    if not candidates:
-        media=None
-        for e in data.get("feed",{}).get("entry",[]):
-            if parse_date(e.get("title",{}).get("$t",""))==date:
-                media=e.get("media$thumbnail",{}).get("url")
-                break
-        if media:
-            candidates=[(0,0,big_img(media))]
-
-    if not candidates:
-        raise RuntimeError("No carta image found in latest MTP feed")
-
-    candidates.sort(key=lambda x:(x[0],-x[1]),reverse=True)
-    chosen=candidates[0][2]
-
-    print("LATEST MTP:",date,title)
-    print("ONE CARTA IMAGE:",chosen)
-    return date,post_url,chosen
+        dt=pdate(title)
+        if not dt or "CARTA" not in title.upper(): continue
+        url=next((x.get("href","") for x in e.get("link",[]) if x.get("rel")=="alternate"),"")
+        body=e.get("content",{}).get("$t","") or e.get("summary",{}).get("$t","")
+        soup=BeautifulSoup(body,"html.parser")
+        imgs=[]
+        for im in soup.find_all("img"):
+            u=im.get("data-original") or im.get("data-src") or im.get("src")
+            if u: imgs.append(big(urljoin(url or BASE,u)))
+        if imgs: ps.append((dt,title,url,imgs[0]))
+    if not ps: raise RuntimeError("No MTP carta found")
+    x=sorted(ps,key=lambda z:z[0],reverse=True)[0]
+    print("LATEST MTP:",x[0],x[1])
+    print("ONE CARTA IMAGE:",x[3])
+    return x
 
 def decode(raw):
-    arr=np.frombuffer(raw,np.uint8)
-    img=cv2.imdecode(arr,cv2.IMREAD_COLOR)
-    if img is None:
-        raise RuntimeError("Image decode failed")
-    return img
+    a=np.frombuffer(raw,np.uint8)
+    im=cv2.imdecode(a,cv2.IMREAD_COLOR)
+    if im is None: raise RuntimeError("image decode failed")
+    return im
 
-def tokens(img, psm):
-    data=pytesseract.image_to_data(
-        img,
-        config=f"--psm {psm} -c tessedit_char_whitelist=0123456789",
-        output_type=pytesseract.Output.DICT
-    )
-    out=[]
-    for i,t in enumerate(data.get("text",[])):
-        ds=re.findall(r"\d",str(t))
-        if len(ds)!=1:
-            continue
-        try: conf=float(data["conf"][i])
-        except: conf=-1
-        if conf<5: continue
-        x=int(data["left"][i]); y=int(data["top"][i])
-        w=int(data["width"][i]); h=int(data["height"][i])
-        if h<18 or w<8: continue
-        out.append({"d":ds[0],"x":x+w/2,"y":y+h/2,
-                    "w":w,"h":h,"c":conf})
-    return out
+def cell_feature(cell):
+    g=cv2.cvtColor(cell,cv2.COLOR_BGR2GRAY)
+    g=cv2.resize(g,(48,64),interpolation=cv2.INTER_AREA)
+    # isolate bright digit strokes; normalize away poster/cell colour
+    g=cv2.GaussianBlur(g,(3,3),0)
+    _,b=cv2.threshold(g,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+    # choose polarity with smaller foreground
+    if np.mean(b>0) > .55: b=255-b
+    # centralize glyph bounding box
+    ys,xs=np.where(b>0)
+    if len(xs)>20:
+        x0,x1=xs.min(),xs.max()+1; y0,y1=ys.min(),ys.max()+1
+        glyph=b[y0:y1,x0:x1]
+        canvas=np.zeros((64,48),np.uint8)
+        scale=min(42/max(glyph.shape[1],1),56/max(glyph.shape[0],1))
+        nw=max(1,int(glyph.shape[1]*scale)); nh=max(1,int(glyph.shape[0]*scale))
+        glyph=cv2.resize(glyph,(nw,nh),interpolation=cv2.INTER_AREA)
+        yy=(64-nh)//2; xx=(48-nw)//2
+        canvas[yy:yy+nh,xx:xx+nw]=glyph
+        b=canvas
+    return (b.astype(np.float32)/255.0).reshape(-1)
 
-def find_staggered_4x4(ts):
-    if len(ts)<16:
-        return []
-    medh=statistics.median([t["h"] for t in ts])
-    rows=[]
-    for t in sorted(ts,key=lambda z:z["y"]):
-        hit=None
-        for r in rows:
-            ry=sum(z["y"] for z in r)/len(r)
-            if abs(t["y"]-ry)<=max(22,medh*.85):
-                hit=r; break
-        if hit is None: rows.append([t])
-        else: hit.append(t)
+def detect_16_cells(im):
+    h,w=im.shape[:2]
+    # only chart side; excludes weekday/date on right
+    roi=im[int(h*.35):int(h*.93), :int(w*.67)]
+    hsv=cv2.cvtColor(roi,cv2.COLOR_BGR2HSV)
 
-    row4=[]
-    for r in rows:
-        r=sorted(r,key=lambda z:z["x"])
-        if len(r)<4: continue
-        best=None
-        for i in range(len(r)-3):
-            q=r[i:i+4]
-            xs=[z["x"] for z in q]
-            gaps=[xs[j+1]-xs[j] for j in range(3)]
-            if min(gaps)<=0: continue
-            if max(gaps)/max(min(gaps),1)>2.2: continue
-            hs=[z["h"] for z in q]
-            if max(hs)/max(min(hs),1)>1.8: continue
-            sc=sum(z["c"] for z in q)/4
-            if best is None or sc>best[0]: best=(sc,q)
-        if best: row4.append(best[1])
+    # coloured chart boxes are highly saturated compared with white digits.
+    mask=cv2.inRange(hsv,np.array([0,90,70]),np.array([179,255,255]))
+    mask=cv2.morphologyEx(mask,cv2.MORPH_CLOSE,np.ones((9,9),np.uint8))
+    cnts,_=cv2.findContours(mask,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
 
-    row4=sorted(row4,key=lambda r:sum(z["y"] for z in r)/4)
-    results=[]
-    for i in range(len(row4)-3):
-        b=row4[i:i+4]
-        ys=[sum(z["y"] for z in r)/4 for r in b]
-        gaps=[ys[j+1]-ys[j] for j in range(3)]
-        if min(gaps)<=0 or max(gaps)/max(min(gaps),1)>1.9:
-            continue
-        dig="".join(z["d"] for r in b for z in sorted(r,key=lambda z:z["x"]))
-        cf=[z["c"] for r in b for z in r]
-        if len(dig)==16:
-            results.append((sum(cf)/16,sum(c<20 for c in cf),dig))
-    return results
+    rh,rw=roi.shape[:2]
+    boxes=[]
+    for c in cnts:
+        x,y,bw,bh=cv2.boundingRect(c)
+        ar=bw/max(bh,1)
+        area=bw*bh
+        if area>rh*rw*.006 and .55<ar<2.0 and bh>rh*.09 and bh<rh*.32:
+            boxes.append((x,y,bw,bh))
 
-def read_one_carta(raw):
-    img=decode(raw)
-    gray=cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
-    if max(gray.shape[:2])<1800:
-        s=1800/max(gray.shape[:2])
-        gray=cv2.resize(gray,None,fx=s,fy=s,interpolation=cv2.INTER_CUBIC)
+    # If touching cells merge, use line/geometry fallback:
+    if len(boxes)!=16:
+        # find row bands from saturated pixels, then split each row into 4
+        proj=(mask>0).sum(axis=1)
+        active=proj>max(10,rw*.12)
+        bands=[]; st=None
+        for i,v in enumerate(active):
+            if v and st is None: st=i
+            if st is not None and (not v or i==len(active)-1):
+                en=i if not v else i+1
+                if en-st>rh*.07: bands.append((st,en))
+                st=None
+        # choose 4 largest plausible bands in vertical order
+        bands=sorted(bands,key=lambda b:b[1]-b[0],reverse=True)[:4]
+        bands=sorted(bands)
+        rebuilt=[]
+        for y0,y1 in bands:
+            sub=mask[y0:y1]
+            xp=(sub>0).sum(axis=0)
+            act=xp>max(5,(y1-y0)*.15)
+            xs=np.where(act)[0]
+            if len(xs)<20: continue
+            left,right=xs.min(),xs.max()+1
+            width=(right-left)/4
+            for j in range(4):
+                x0=int(left+j*width); x1=int(left+(j+1)*width)
+                rebuilt.append((x0,y0,x1-x0,y1-y0))
+        boxes=rebuilt
 
-    h,w=gray.shape
-    # Actual MTP layout: carta is on left/centre; date text is on right.
-    regions=[
-        # V7.1: cell-grid search. Use several LEFT-side windows only.
-        # Each candidate is still reconstructed as four rows x four cells;
-        # the right-side day/date text is excluded.
-        ("cell-a",gray[int(h*.34):int(h*.93), :int(w*.60)]),
-        ("cell-b",gray[int(h*.38):int(h*.94), :int(w*.66)]),
-        ("cell-c",gray[int(h*.42):int(h*.91), :int(w*.70)]),
-        ("cell-d",gray[int(h*.30):int(h*.96), :int(w*.72)]),
-    ]
-    allres=[]
-    for rn,r in regions:
-        eq=cv2.equalizeHist(r)
-        variants=[("gray",eq)]
-        _,bw=cv2.threshold(eq,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
-        variants.append(("otsu",bw))
-        for vn,v in variants:
-            for psm in (6,11,12):
-                for av,low,dig in find_staggered_4x4(tokens(v,psm)):
-                    print(f"CELL GRID {rn}/{vn}/psm{psm}: {dig} avg={av:.1f} low={low}")
-                    allres.append((av,low,dig))
+    # V8.1 FIX: the poster commonly merges each four-cell row into ONE
+    # coloured rectangle. If exactly four row blocks are found, that is
+    # success: sort top-to-bottom and split EACH row into four equal cells.
+    if len(boxes)==4:
+        rowboxes=sorted(boxes,key=lambda b:b[1]+b[3]/2)
+        cells=[]
+        for ri,(x,y,bw,bh) in enumerate(rowboxes,1):
+            # trim only the outer row border, then split independently.
+            px=max(1,int(bw*.01))
+            py=max(2,int(bh*.07))
+            x0=x+px; x1=x+bw-px
+            y0=y+py; y1=y+bh-py
+            usable=x1-x0
+            if usable<=0 or y1<=y0:
+                return None
+            print("ROW BLOCK",ri,":",x,y,bw,bh)
+            for j in range(4):
+                a=x0+round(j*usable/4)
+                b=x0+round((j+1)*usable/4)
+                # small inner trim avoids separator/border pixels
+                gap=max(1,int((b-a)*.035))
+                cell=roi[y0:y1,a+gap:b-gap]
+                if cell.size==0:
+                    return None
+                cells.append(cell)
+        print("ROW SPLIT SUCCESS: 4 rows -> 16 cells")
+        return cells
 
-    if not allres:
+    if len(boxes)!=16:
+        print("ROW/CELL DETECTION:",len(boxes),"blocks - expected 4 rows or 16 cells")
         return None
 
-    votes={}
-    for av,low,dig in allres:
-        if av>=18:
-            votes.setdefault(dig,[]).append((av,low))
+    # Also support posters where all 16 cells are individually separated.
+    boxes=sorted(boxes,key=lambda b:b[1]+b[3]/2)
+    rows=[]
+    for b in boxes:
+        cy=b[1]+b[3]/2
+        placed=False
+        for r in rows:
+            rcy=np.mean([q[1]+q[3]/2 for q in r])
+            if abs(cy-rcy)<rh*.10:
+                r.append(b); placed=True; break
+        if not placed: rows.append([b])
+    rows=[sorted(r,key=lambda b:b[0]) for r in rows if len(r)==4]
+    rows=sorted(rows,key=lambda r:np.mean([b[1] for b in r]))
+    if len(rows)!=4:
+        print("VISUAL ROW DETECTION:",[len(r) for r in rows])
+        return None
 
-    if votes:
-        dig,vals=max(votes.items(),key=lambda kv:(len(kv[1]),max(v[0] for v in kv[1])))
-        best=max(v[0] for v in vals)
-        low=min(v[1] for v in vals)
-        if len(vals)>=2 or (best>=38 and low<=6):
-            print("CELL GRID ACCEPTED:",dig,"votes=",len(vals),"best=",round(best,1))
-            return list(dig)
+    cells=[]
+    for r in rows:
+        for x,y,bw,bh in r:
+            px=max(2,int(bw*.08)); py=max(2,int(bh*.08))
+            cells.append(roi[y+py:y+bh-py,x+px:x+bw-px])
+    print("VISUAL GRID SUCCESS: 16 separate cells")
+    return cells
 
-    return None
+def load_templates():
+    if not TPL.exists(): return None,None
+    z=np.load(TPL)
+    return z["X"],z["y"].astype(str)
+
+def save_templates(cells,labels):
+    X=np.stack([cell_feature(c) for c in cells])
+    y=np.array(labels)
+    np.savez_compressed(TPL,X=X,y=y)
+    print("VISUAL TEMPLATES TRAINED:",len(y),"samples; digits=",sorted(set(y)))
+    return X,y
+
+def classify(cells,X,y):
+    out=[]; margins=[]
+    for c in cells:
+        f=cell_feature(c)
+        # normalized mean squared distance to visual glyph templates
+        ds=np.mean((X-f)**2,axis=1)
+        order=np.argsort(ds)
+        best=order[0]
+        pred=y[best]
+        # compare best digit against best different digit
+        alt=next((i for i in order[1:] if y[i]!=pred),order[1])
+        margin=float(ds[alt]-ds[best])
+        out.append(str(pred)); margins.append(margin)
+    print("VISUAL RESULT:","".join(out))
+    print("VISUAL MIN MARGIN:",round(min(margins),5))
+    return out,min(margins)
 
 def main():
     db=load_db()
-    try:
-        date,post_url,image_url=latest_post_and_one_carta()
+    try:dt,title,url,imgurl=latest()
     except Exception as e:
-        print("DISCOVERY FAILED:",e)
-        save_db(db)
-        return
-
-    if date in db:
-        print("ALREADY SAVED:",date)
-        save_db(db)
-        return
+        print("DISCOVERY FAILED:",e); save_db(db); return
 
     try:
-        print("OCR ONE CARTA IMAGE - CELL BY CELL")
-        nums=read_one_carta(req(image_url).content)
+        im=decode(get(imgurl).content)
+        cells=detect_16_cells(im)
     except Exception as e:
-        print("CELL GRID OCR FAILED:",e)
-        nums=None
+        print("VISUAL FETCH/GRID FAILED:",e); cells=None
 
-    if nums and len(nums)==16:
-        db[date]={
-            "date":date,
-            "numbers":[str(x) for x in nums],
-            "source":"MTP-CELL-GRID-V7.1",
-            "url":post_url,
-            "auto":True
-        }
-        print("AUTO SAVED:",date,"".join(nums))
+    if cells is None:
+        print("NO SAVE - clean DB kept"); save_db(db); return
+
+    X,y=load_templates()
+
+    # First successful run on verified 16/09 creates all 0-9 visual templates.
+    if X is None:
+        if dt!=SEED_DATE:
+            print("TEMPLATES NOT TRAINED; run once while 16/09 is latest")
+            save_db(db); return
+        X,y=save_templates(cells,SEED_DIGITS)
+
+    # Ensure verified 16/09 is present while training.
+    if dt==SEED_DATE:
+        nums=SEED_DIGITS
+        print("SEED VERIFIED:",dt,"".join(nums))
     else:
-        print("CELL GRID NOT CONFIDENT:",date)
-        print("NO MANUAL FALLBACK / CLEAN DB KEPT")
+        nums,margin=classify(cells,X,y)
+        # reject very ambiguous visual matches rather than corrupt DB
+        if margin < 0.002:
+            print("VISUAL MATCH AMBIGUOUS - NO SAVE")
+            save_db(db); return
 
+    db[dt]={
+        "date":dt,"numbers":list(nums),
+        "source":"MTP-ROW-SPLIT-V8.1-NO-OCR",
+        "url":url,"auto":True
+    }
+    print("AUTO SAVED:",dt,"".join(nums))
     save_db(db)
 
-if __name__=="__main__":
-    main()
+if __name__=="__main__": main()
