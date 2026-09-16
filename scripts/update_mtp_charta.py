@@ -206,10 +206,13 @@ def read_one_carta(raw):
     h,w=gray.shape
     # Actual MTP layout: carta is on left/centre; date text is on right.
     regions=[
-        # Fixed MTP layout observed on 13/09 and 16/09:
-        # 4x4 staggered chart is on the left; date/day text is on the right.
-        ("fixed-carta",gray[int(h*.38):int(h*.91), :int(w*.62)]),
-        ("fixed-wide",gray[int(h*.34):int(h*.93), :int(w*.68)]),
+        # V7.1: cell-grid search. Use several LEFT-side windows only.
+        # Each candidate is still reconstructed as four rows x four cells;
+        # the right-side day/date text is excluded.
+        ("cell-a",gray[int(h*.34):int(h*.93), :int(w*.60)]),
+        ("cell-b",gray[int(h*.38):int(h*.94), :int(w*.66)]),
+        ("cell-c",gray[int(h*.42):int(h*.91), :int(w*.70)]),
+        ("cell-d",gray[int(h*.30):int(h*.96), :int(w*.72)]),
     ]
     allres=[]
     for rn,r in regions:
@@ -220,7 +223,7 @@ def read_one_carta(raw):
         for vn,v in variants:
             for psm in (6,11,12):
                 for av,low,dig in find_staggered_4x4(tokens(v,psm)):
-                    print(f"CARTA GRID {rn}/{vn}/psm{psm}: {dig} avg={av:.1f} low={low}")
+                    print(f"CELL GRID {rn}/{vn}/psm{psm}: {dig} avg={av:.1f} low={low}")
                     allres.append((av,low,dig))
 
     if not allres:
@@ -235,8 +238,8 @@ def read_one_carta(raw):
         dig,vals=max(votes.items(),key=lambda kv:(len(kv[1]),max(v[0] for v in kv[1])))
         best=max(v[0] for v in vals)
         low=min(v[1] for v in vals)
-        if len(vals)>=2 or (best>=45 and low<=4):
-            print("CARTA ACCEPTED:",dig,"votes=",len(vals))
+        if len(vals)>=2 or (best>=38 and low<=6):
+            print("CELL GRID ACCEPTED:",dig,"votes=",len(vals),"best=",round(best,1))
             return list(dig)
 
     return None
@@ -256,23 +259,23 @@ def main():
         return
 
     try:
-        print("OCR ONE CARTA IMAGE")
+        print("OCR ONE CARTA IMAGE - CELL BY CELL")
         nums=read_one_carta(req(image_url).content)
     except Exception as e:
-        print("CARTA OCR FAILED:",e)
+        print("CELL GRID OCR FAILED:",e)
         nums=None
 
     if nums and len(nums)==16:
         db[date]={
             "date":date,
             "numbers":[str(x) for x in nums],
-            "source":"MTP-FIXED-GRID-V7",
+            "source":"MTP-CELL-GRID-V7.1",
             "url":post_url,
             "auto":True
         }
         print("AUTO SAVED:",date,"".join(nums))
     else:
-        print("OCR NOT CONFIDENT:",date)
+        print("CELL GRID NOT CONFIDENT:",date)
         print("NO MANUAL FALLBACK / CLEAN DB KEPT")
 
     save_db(db)
