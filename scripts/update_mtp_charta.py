@@ -206,9 +206,10 @@ def read_one_carta(raw):
     h,w=gray.shape
     # Actual MTP layout: carta is on left/centre; date text is on right.
     regions=[
-        ("left72",gray[:, :int(w*.72)]),
-        ("left65",gray[:, :int(w*.65)]),
-        ("carta-zone",gray[int(h*.28):int(h*.90), :int(w*.72)]),
+        # Fixed MTP layout observed on 13/09 and 16/09:
+        # 4x4 staggered chart is on the left; date/day text is on the right.
+        ("fixed-carta",gray[int(h*.38):int(h*.91), :int(w*.62)]),
+        ("fixed-wide",gray[int(h*.34):int(h*.93), :int(w*.68)]),
     ]
     allres=[]
     for rn,r in regions:
@@ -265,7 +266,7 @@ def main():
         db[date]={
             "date":date,
             "numbers":[str(x) for x in nums],
-            "source":"MTP-SINGLE-CARTA-V6.5",
+            "source":"MTP-FIXED-GRID-V7",
             "url":post_url,
             "auto":True
         }
