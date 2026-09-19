@@ -1,0 +1,87 @@
+name: Fix Cash Sweep Special Parser V2.1
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Fix parser and repair Cash Sweep 19-09-2026
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json,re
+          p=Path("scripts/update_results.py")
+          if not p.exists(): raise SystemExit("scripts/update_results.py not found")
+          s=p.read_text(encoding="utf-8")
+          a=s.index("def block(sec, start, end=None):")
+          b=s.index("\ndef parse_4dd",a)
+          lines=[
+          'def block(sec, start, end=None):',
+          '    # V2.1: headings must be standalone lines; do not match operator title Special CashSweep.',
+          '    sm = re.search(rf"(?im)^\\s*{re.escape(start)}(?:\\s+Prize)?\\s*$", sec)',
+          '    if not sm: return []',
+          '    tail = sec[sm.end():]',
+          '    if end:',
+          '        em = re.search(rf"(?im)^\\s*{re.escape(end)}(?:\\s+Prize)?\\s*$", tail)',
+          '        body = tail[:em.start()] if em else tail',
+          '    else:',
+          '        body = tail',
+          '    return [n4(x) for x in re.findall(r"(?<!\\d)\\d{4}(?!\\d)", body)][:10]',
+          ''
+          ]
+          s=s[:a]+"\n".join(lines)+s[b:]
+          p.write_text(s,encoding="utf-8")
+          print("PARSER FIXED: operator title cannot enter Special list")
+
+          q=Path("data/cashsweep.json")
+          db=json.loads(q.read_text(encoding="utf-8"))
+          rec={"draw":"5346/26","date":"2026-09-19","first":"7224","second":"3585","third":"4598",
+               "special":["5234","9560","1460","0674","5466","7872","3903","8020","6138","1949"],
+               "consolation":["0722","7637","8638","4173","3877","1812","7970","4595","0969","4883"]}
+          draws=db.setdefault("draws",[])
+          for i,x in enumerate(draws):
+              if x.get("date")=="2026-09-19":
+                  draws[i]={**x,**rec}; break
+          else: draws.append(rec)
+          draws.sort(key=lambda x:x.get("date",""),reverse=True)
+          db["lastUpdated"]="2026-09-19"
+          db["latestUpdateSource"]="Cash Sweep parser V2.1"
+          dates=[x["date"] for x in draws if x.get("date")]
+          c=db.setdefault("historyCoverage",{})
+          c.update({"drawCount":len(draws),"oldestDate":min(dates),"newestDate":max(dates)})
+          q.write_text(json.dumps(db,ensure_ascii=False,indent=2),encoding="utf-8")
+          print("REPAIRED: 2026-09-19 7224/3585/4598")
+          print("SPECIAL:",*rec["special"])
+          print("CONSOLATION:",*rec["consolation"])
+          PY
+      - name: Validate
+        run: |
+          python3 - <<'PY'
+          import json
+          d=json.load(open("data/cashsweep.json"))
+          r=next(x for x in d["draws"] if x.get("date")=="2026-09-19")
+          assert r["special"]==["5234","9560","1460","0674","5466","7872","3903","8020","6138","1949"]
+          assert r["consolation"]==["0722","7637","8638","4173","3877","1812","7970","4595","0969","4883"]
+          assert all(x not in r["special"] for x in ["2026","7224","3585","4598"])
+          assert len(r["special"])==10 and len(r["consolation"])==10
+          print("VALID: 3 TOP + 10 SPECIAL + 10 CONSOLATION")
+          PY
+      - name: Commit safely
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/update_results.py data/cashsweep.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Fix Cash Sweep Special parser"
+          for n in 1 2 3; do
+            git fetch origin main
+            if git rebase origin/main && git push origin HEAD:main; then exit 0; fi
+            git rebase --abort 2>/dev/null || true
+            sleep 3
+          done
+          exit 1
