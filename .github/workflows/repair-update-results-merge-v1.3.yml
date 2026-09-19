@@ -1,0 +1,95 @@
+name: Repair Update Results Merge V1.3
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Repair merge function
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("scripts/update_results.py")
+          s=p.read_text(encoding="utf-8")
+          a=s.find("def merge(db,new):")
+          b=s.find("\ndef meta(",a)
+          if a<0 or b<0:
+              raise SystemExit("merge/meta boundary not found")
+          fixed='''def merge(db,new):
+              # MERGE-REPAIR-V1.3
+              clean = {k:v for k,v in new.items() if not k.startswith("_")}
+
+              # Remove podium numbers from Special/Consolation safely.
+              podium = {str(clean.get(k,"")).zfill(4) for k in ("first","second","third")}
+              podium.discard("")
+              for field in ("special","consolation"):
+                  vals = clean.get(field, [])
+                  if isinstance(vals, list):
+                      clean[field] = [
+                          str(x).zfill(4) for x in vals
+                          if str(x).zfill(4) not in podium
+                      ]
+
+              draws = db.setdefault("draws",[])
+              for i,old in enumerate(draws):
+                  if old.get("date") == clean.get("date"):
+                      merged = dict(old)
+                      for k,v in clean.items():
+                          if k=="draw" and not v:
+                              continue
+                          if v not in ("",None,[]):
+                              merged[k]=v
+                      if merged != old:
+                          draws[i]=merged
+                          return True
+                      return False
+              draws.append(clean)
+              return True
+          '''
+          p.write_text(s[:a]+fixed+s[b:],encoding="utf-8")
+          print("MERGE REPAIRED V1.3")
+          PY
+
+      - name: Syntax validation only
+        run: |
+          python3 -m py_compile scripts/update_results.py
+          echo "PYTHON SYNTAX VALID"
+
+      - name: Direct merge logic test without imports
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import ast
+          s=Path("scripts/update_results.py").read_text(encoding="utf-8")
+          tree=ast.parse(s)
+          node=next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=="merge")
+          mod=ast.Module(body=[node],type_ignores=[])
+          ns={}
+          exec(compile(mod,"merge-test","exec"),ns)
+          db={"draws":[]}
+          rec={"date":"2099-01-01","first":"1111","second":"2222","third":"3333",
+               "special":["1111","4444"],"consolation":["5555","2222"],"_source":"test"}
+          assert ns["merge"](db,rec)
+          r=db["draws"][0]
+          assert r["special"]==["4444"]
+          assert r["consolation"]==["5555"]
+          print("MERGE LOGIC VALID")
+          print("PODIUM FILTER VALID")
+          PY
+
+      - name: Commit repair
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/update_results.py
+          git diff --cached --quiet && exit 0
+          git commit -m "Repair update results merge V1.3"
+          git pull --rebase origin main
+          git push origin HEAD:main
