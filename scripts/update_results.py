@@ -95,6 +95,11 @@ def load(path):
     return json.loads(path.read_text(encoding="utf-8"))
 
 def merge(db,new):
+    # PODIUM-FILTER-V11
+    podium={str(clean.get(k,"")).zfill(4) for k in ("first","second","third")}
+    for field in ("special","consolation"):
+        if field in clean:
+            clean[field]=[str(x).zfill(4) for x in clean[field] if str(x).zfill(4) not in podium]
     draws = db.setdefault("draws",[])
     clean = {k:v for k,v in new.items() if not k.startswith("_")}
     for i,old in enumerate(draws):
