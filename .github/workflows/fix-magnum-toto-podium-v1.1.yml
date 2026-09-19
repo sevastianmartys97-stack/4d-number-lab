@@ -1,0 +1,83 @@
+name: Fix Magnum Toto Podium V1.1
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Clean Magnum Toto podium duplicates
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          for fn in ("magnum.json","toto.json"):
+              p=Path("data")/fn
+              if not p.exists(): continue
+              db=json.loads(p.read_text(encoding="utf-8"))
+              removed=0
+              for d in db.get("draws",[]):
+                  podium={str(d.get(k,"")).zfill(4) for k in ("first","second","third")}
+                  for field in ("special","consolation"):
+                      old=[str(x).zfill(4) for x in d.get(field,[])]
+                      new=[x for x in old if x not in podium]
+                      removed += len(old)-len(new)
+                      d[field]=new
+              p.write_text(json.dumps(db,ensure_ascii=False,indent=2),encoding="utf-8")
+              print(fn,"removed:",removed)
+          PY
+      - name: Install permanent filter in merge
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("scripts/update_results.py")
+          s=p.read_text(encoding="utf-8")
+          marker="# PODIUM-FILTER-V11"
+          if marker not in s:
+              needle='def merge(db,new):\n'
+              if needle not in s: raise SystemExit("merge function not found")
+              replacement='''def merge(db,new):
+              # PODIUM-FILTER-V11
+              clean = {k:v for k,v in new.items() if not k.startswith("_")}
+              podium={str(clean.get(k,"")).zfill(4) for k in ("first","second","third")}
+              for field in ("special","consolation"):
+                  if field in clean:
+                      clean[field]=[str(x).zfill(4) for x in clean[field] if str(x).zfill(4) not in podium]
+          '''
+              # Replace merge header plus its original clean assignment to avoid duplicate.
+              s=s.replace(needle,replacement,1)
+              duplicate='    clean = {k:v for k,v in new.items() if not k.startswith("_")}\n'
+              pos=s.find(duplicate,s.find(marker)+len(marker))
+              if pos!=-1:
+                  s=s[:pos]+s[pos+len(duplicate):]
+              p.write_text(s,encoding="utf-8")
+              print("PERMANENT FILTER INSTALLED")
+          else:
+              print("FILTER ALREADY INSTALLED")
+          PY
+      - name: Validate
+        run: |
+          python3 -m py_compile scripts/update_results.py
+          python3 - <<'PY'
+          import json
+          for fn in ("data/magnum.json","data/toto.json"):
+              d=json.load(open(fn))
+              for r in d.get("draws",[]):
+                  podium={str(r.get(k,"")).zfill(4) for k in ("first","second","third")}
+                  others={str(x).zfill(4) for x in r.get("special",[])+r.get("consolation",[])}
+                  assert not podium.intersection(others)
+              print("VALID:",fn)
+          PY
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/update_results.py data/magnum.json data/toto.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Fix Magnum Toto podium duplicates V1.1"
+          git pull --rebase origin main
+          git push origin HEAD:main
