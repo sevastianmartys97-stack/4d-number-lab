@@ -1,0 +1,145 @@
+name: Fix Magnum Toto Podium Duplicates V1
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install permanent podium filter
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p=Path("scripts/update_results.py")
+          if not p.exists():
+              raise SystemExit("scripts/update_results.py not found")
+
+          s=p.read_text(encoding="utf-8")
+          marker="# PODIUM-DUPLICATE-FILTER-V1"
+
+          if marker not in s:
+              anchor="def load(path):"
+              if anchor not in s:
+                  raise SystemExit("load() anchor not found")
+
+              helper='''# PODIUM-DUPLICATE-FILTER-V1
+          def remove_podium_duplicates(rec):
+              podium = {n4(rec.get("first")), n4(rec.get("second")), n4(rec.get("third"))}
+              podium.discard("")
+              for field in ("special", "consolation"):
+                  vals = [n4(x) for x in rec.get(field, [])]
+                  rec[field] = [x for x in vals if x and x not in podium]
+              return rec
+
+          '''
+              s=s.replace(anchor, helper+anchor, 1)
+
+              old='''        rec=combined.get(key)
+              if not rec:
+                  print(key,": no validated fresh record")
+                  continue
+              accepted+=1
+          '''
+              new='''        rec=combined.get(key)
+              if not rec:
+                  print(key,": no validated fresh record")
+                  continue
+              if key in ("magnum", "toto"):
+                  before_sp=list(rec.get("special",[]))
+                  before_co=list(rec.get("consolation",[]))
+                  rec=remove_podium_duplicates(rec)
+                  if before_sp != rec.get("special",[]) or before_co != rec.get("consolation",[]):
+                      print(key,": podium duplicate removed from Special/Consolation")
+              accepted+=1
+          '''
+              if old not in s:
+                  raise SystemExit("main parser anchor not found; no unsafe patch made")
+              s=s.replace(old,new,1)
+              p.write_text(s,encoding="utf-8")
+              print("PERMANENT FILTER INSTALLED")
+          else:
+              print("PERMANENT FILTER ALREADY INSTALLED")
+          PY
+
+      - name: Clean existing Magnum and Toto database
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+
+          for fn in ("magnum.json","toto.json"):
+              p=Path("data")/fn
+              if not p.exists():
+                  print(fn,": not found - skipped")
+                  continue
+              db=json.loads(p.read_text(encoding="utf-8"))
+              changed=0
+              removed=0
+
+              for d in db.get("draws",[]):
+                  podium={str(d.get("first","")).zfill(4),
+                          str(d.get("second","")).zfill(4),
+                          str(d.get("third","")).zfill(4)}
+                  podium.discard("")
+                  for field in ("special","consolation"):
+                      old=[str(x).zfill(4) for x in d.get(field,[])]
+                      new=[x for x in old if x not in podium]
+                      removed += len(old)-len(new)
+                      if new != old:
+                          d[field]=new
+                          changed+=1
+
+              p.write_text(json.dumps(db,ensure_ascii=False,indent=2),encoding="utf-8")
+              print(fn,": cleaned fields =",changed,"removed podium duplicates =",removed)
+          PY
+
+      - name: Validate no podium duplicates
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          for fn in ("magnum.json","toto.json"):
+              p=Path("data")/fn
+              if not p.exists(): continue
+              db=json.loads(p.read_text(encoding="utf-8"))
+              for d in db.get("draws",[]):
+                  podium={str(d.get("first","")).zfill(4),
+                          str(d.get("second","")).zfill(4),
+                          str(d.get("third","")).zfill(4)}
+                  extra=set(map(str,d.get("special",[]))) | set(map(str,d.get("consolation",[])))
+                  dup=podium & extra
+                  assert not dup, f"{fn} {d.get('date')}: duplicate {dup}"
+              print("VALID",fn,": podium never repeated in Special/Consolation")
+          PY
+
+      - name: Commit safely
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/update_results.py data/magnum.json data/toto.json
+          if git diff --cached --quiet; then
+            echo "No changes"
+            exit 0
+          fi
+          git commit -m "Remove Magnum Toto podium duplicates"
+          for n in 1 2 3; do
+            git fetch origin main
+            if git rebase origin/main && git push origin HEAD:main; then
+              echo "Push successful"
+              exit 0
+            fi
+            git rebase --abort 2>/dev/null || true
+            sleep 3
+          done
+          exit 1
