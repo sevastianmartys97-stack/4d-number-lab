@@ -1,0 +1,98 @@
+name: Repair Update Results Merge V1.2
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Repair merge function
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          p=Path("scripts/update_results.py")
+          s=p.read_text(encoding="utf-8")
+
+          start=s.find("def merge(db,new):")
+          end=s.find("\ndef meta(", start)
+          if start < 0 or end < 0:
+              raise SystemExit("merge/meta function boundary not found")
+
+          fixed='''def merge(db,new):
+              # MERGE-REPAIR-V1.2
+              # Build clean FIRST, then filter podium duplicates safely.
+              clean = {k:v for k,v in new.items() if not k.startswith("_")}
+              podium = {str(clean.get(k,"")).zfill(4) for k in ("first","second","third")}
+              podium.discard("0000")
+              for field in ("special","consolation"):
+                  if field in clean:
+                      clean[field] = [
+                          str(x).zfill(4) for x in clean.get(field,[])
+                          if str(x).zfill(4) not in podium
+                      ]
+
+              draws = db.setdefault("draws",[])
+              for i,old in enumerate(draws):
+                  if old.get("date") == clean.get("date"):
+                      merged = dict(old)
+                      for k,v in clean.items():
+                          if k=="draw" and not v:
+                              continue
+                          if v not in ("",None,[]):
+                              merged[k]=v
+                      if merged != old:
+                          draws[i]=merged
+                          return True
+                      return False
+              draws.append(clean)
+              return True
+          '''
+
+          s=s[:start]+fixed+s[end:]
+          p.write_text(s,encoding="utf-8")
+          print("MERGE FUNCTION REPAIRED")
+          PY
+
+      - name: Validate Python and merge logic
+        run: |
+          python3 -m py_compile scripts/update_results.py
+          python3 - <<'PY'
+          import sys
+          sys.path.insert(0,"scripts")
+          import update_results as u
+
+          db={"draws":[]}
+          rec={
+            "date":"2099-01-01","draw":"",
+            "first":"1111","second":"2222","third":"3333",
+            "special":["1111","4444","5555"],
+            "consolation":["6666","2222","7777"],
+            "_source":"test"
+          }
+          assert u.merge(db,rec) is True
+          r=db["draws"][0]
+          assert "1111" not in r["special"]
+          assert "2222" not in r["consolation"]
+          assert r["special"]==["4444","5555"]
+          assert r["consolation"]==["6666","7777"]
+          print("VALID: update_results.py")
+          print("VALID: podium filter works")
+          PY
+
+      - name: Commit repair
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/update_results.py
+          git diff --cached --quiet && exit 0
+          git commit -m "Repair update_results merge after podium filter"
+          git pull --rebase origin main
+          git push origin HEAD:main
