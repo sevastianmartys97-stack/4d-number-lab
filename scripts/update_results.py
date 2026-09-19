@@ -95,19 +95,29 @@ def load(path):
     return json.loads(path.read_text(encoding="utf-8"))
 
 def merge(db,new):
-    # PODIUM-FILTER-V11
-    podium={str(clean.get(k,"")).zfill(4) for k in ("first","second","third")}
-    for field in ("special","consolation"):
-        if field in clean:
-            clean[field]=[str(x).zfill(4) for x in clean[field] if str(x).zfill(4) not in podium]
-    draws = db.setdefault("draws",[])
+    # MERGE-REPAIR-V1.3
     clean = {k:v for k,v in new.items() if not k.startswith("_")}
+
+    # Remove podium numbers from Special/Consolation safely.
+    podium = {str(clean.get(k,"")).zfill(4) for k in ("first","second","third")}
+    podium.discard("")
+    for field in ("special","consolation"):
+        vals = clean.get(field, [])
+        if isinstance(vals, list):
+            clean[field] = [
+                str(x).zfill(4) for x in vals
+                if str(x).zfill(4) not in podium
+            ]
+
+    draws = db.setdefault("draws",[])
     for i,old in enumerate(draws):
-        if old.get("date") == clean["date"]:
+        if old.get("date") == clean.get("date"):
             merged = dict(old)
             for k,v in clean.items():
-                if k=="draw" and not v: continue
-                if v not in ("",None,[]): merged[k]=v
+                if k=="draw" and not v:
+                    continue
+                if v not in ("",None,[]):
+                    merged[k]=v
             if merged != old:
                 draws[i]=merged
                 return True
