@@ -55,12 +55,16 @@ def prize(sec, label):
     return n4(m.group(1)) if m else ""
 
 def block(sec, start, end=None):
+    # V2.1: headings must be standalone lines; do not match operator title Special CashSweep.
+    sm = re.search(rf"(?im)^\s*{re.escape(start)}(?:\s+Prize)?\s*$", sec)
+    if not sm: return []
+    tail = sec[sm.end():]
     if end:
-        m = re.search(rf"{start}(?:\s+Prize)?(.*?){end}", sec, re.I|re.S)
+        em = re.search(rf"(?im)^\s*{re.escape(end)}(?:\s+Prize)?\s*$", tail)
+        body = tail[:em.start()] if em else tail
     else:
-        m = re.search(rf"{start}(?:\s+Prize)?(.*)", sec, re.I|re.S)
-    if not m: return []
-    return [n4(x) for x in re.findall(r"\b\d{4}\b", m.group(1))][:10]
+        body = tail
+    return [n4(x) for x in re.findall(r"(?<!\d)\d{4}(?!\d)", body)][:10]
 
 def parse_4dd(html):
     t = textify(html)

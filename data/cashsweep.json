@@ -13,22 +13,22 @@
   "historySource": "4D2U historical Cash Sweep archive + existing records",
   "draws": [
     {
-      "draw": "",
+      "draw": "5346/26",
       "date": "2026-09-19",
       "first": "7224",
       "second": "3585",
       "third": "4598",
       "special": [
-        "2026",
-        "7224",
-        "3585",
-        "4598",
         "5234",
         "9560",
         "1460",
         "0674",
         "5466",
-        "7872"
+        "7872",
+        "3903",
+        "8020",
+        "6138",
+        "1949"
       ],
       "consolation": [
         "0722",
@@ -27448,5 +27448,5 @@
       ]
     }
   ],
-  "latestUpdateSource": "4dd.co"
+  "latestUpdateSource": "Cash Sweep parser V2.1"
 }
