@@ -7,7 +7,7 @@ from bs4 import BeautifulSoup
 
 MYT=timezone(timedelta(hours=8))
 DB=Path("data/mtp-charta.json")
-TPL=Path("data/mtp-visual-templates.npz")
+TPL=Path("data/mtp-visual-templates-v84.npz")
 BASE="https://cartaplanbee.blogspot.com"
 FEED=BASE+"/feeds/posts/default?alt=json&max-results=10"
 UA={"User-Agent":"Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/131 Mobile Safari/537.36"}
@@ -69,6 +69,19 @@ def latest():
     print("LATEST MTP:",x[0],x[1])
     print("ONE CARTA IMAGE:",x[3])
     return x
+
+def seed_image():
+    f=get(FEED).json()
+    for e in f.get("feed",{}).get("entry",[]):
+        title=e.get("title",{}).get("$t","")
+        if pdate(title)!=SEED_DATE: continue
+        body=e.get("content",{}).get("$t","") or e.get("summary",{}).get("$t","")
+        soup=BeautifulSoup(body,"html.parser")
+        for im in soup.find_all("img"):
+            u=im.get("data-original") or im.get("data-src") or im.get("src")
+            if u:
+                return big(urljoin(BASE,u))
+    return None
 
 def decode(raw):
     a=np.frombuffer(raw,np.uint8)
@@ -147,33 +160,56 @@ def detect_16_cells(im):
                 rebuilt.append((x0,y0,x1-x0,y1-y0))
         boxes=rebuilt
 
-    # V8.1 FIX: the poster commonly merges each four-cell row into ONE
-    # coloured rectangle. If exactly four row blocks are found, that is
-    # success: sort top-to-bottom and split EACH row into four equal cells.
+    # V8.4 GEOMETRY FIX:
+    # Previous versions misread four tall detected strips as four ROWS.
+    # Logs proved the boxes were x=0/180/361/542, y=0, h=626:
+    # they are FOUR COLUMNS spanning the chart height.
+    # Split each column vertically into four cells, then transpose to
+    # row-major order: row1 col1..4, row2 col1..4, etc.
     if len(boxes)==4:
-        rowboxes=sorted(boxes,key=lambda b:b[1]+b[3]/2)
-        cells=[]
-        for ri,(x,y,bw,bh) in enumerate(rowboxes,1):
-            # trim only the outer row border, then split independently.
-            px=max(1,int(bw*.01))
-            py=max(2,int(bh*.07))
-            x0=x+px; x1=x+bw-px
-            y0=y+py; y1=y+bh-py
-            usable=x1-x0
-            if usable<=0 or y1<=y0:
-                return None
-            print("ROW BLOCK",ri,":",x,y,bw,bh)
-            for j in range(4):
-                a=x0+round(j*usable/4)
-                b=x0+round((j+1)*usable/4)
-                # small inner trim avoids separator/border pixels
-                gap=max(1,int((b-a)*.035))
-                cell=roi[y0:y1,a+gap:b-gap]
-                if cell.size==0:
-                    return None
-                cells.append(cell)
-        print("ROW SPLIT SUCCESS: 4 rows -> 16 cells")
-        return cells
+        colboxes=sorted(boxes,key=lambda b:b[0]+b[2]/2)
+        # Require tall column geometry; never silently treat columns as rows.
+        if all(bh > bw*1.8 for x,y,bw,bh in colboxes):
+            grid=[[None]*4 for _ in range(4)]
+            for ci,(x,y,bw,bh) in enumerate(colboxes):
+                px=max(2,int(bw*.07))
+                py=max(1,int(bh*.01))
+                x0=x+px; x1=x+bw-px
+                y0=y+py; y1=y+bh-py
+                usable=y1-y0
+                print("COLUMN BLOCK",ci+1,":",x,y,bw,bh)
+                for ri in range(4):
+                    a=y0+round(ri*usable/4)
+                    b=y0+round((ri+1)*usable/4)
+                    gap=max(1,int((b-a)*.035))
+                    cell=roi[a+gap:b-gap,x0:x1]
+                    if cell.size==0:
+                        return None
+                    grid[ri][ci]=cell
+            cells=[grid[r][c] for r in range(4) for c in range(4)]
+            print("GEOMETRY FIX SUCCESS: 4 columns x 4 rows -> 16 cells")
+            return cells
+
+        # Support genuine four horizontal row blocks if poster layout changes.
+        if all(bw > bh*1.8 for x,y,bw,bh in colboxes):
+            rowboxes=sorted(colboxes,key=lambda b:b[1]+b[3]/2)
+            cells=[]
+            for ri,(x,y,bw,bh) in enumerate(rowboxes,1):
+                px=max(1,int(bw*.01)); py=max(2,int(bh*.07))
+                x0=x+px; x1=x+bw-px; y0=y+py; y1=y+bh-py
+                usable=x1-x0
+                print("ROW BLOCK",ri,":",x,y,bw,bh)
+                for j in range(4):
+                    a=x0+round(j*usable/4); b=x0+round((j+1)*usable/4)
+                    gap=max(1,int((b-a)*.035))
+                    cell=roi[y0:y1,a+gap:b-gap]
+                    if cell.size==0: return None
+                    cells.append(cell)
+            print("ROW SPLIT SUCCESS: 4 rows x 4 columns -> 16 cells")
+            return cells
+
+        print("4 BLOCKS FOUND BUT GEOMETRY UNKNOWN - NO SAVE")
+        return None
 
     if len(boxes)!=16:
         print("ROW/CELL DETECTION:",len(boxes),"blocks - expected 4 rows or 16 cells")
@@ -283,12 +319,18 @@ def main():
 
     # First successful run on verified 16/09 creates all 0-9 visual templates.
     if X is None:
-        if dt!=SEED_DATE:
-            print("TEMPLATES NOT TRAINED; run once while 16/09 is latest")
+        su=seed_image()
+        if not su:
+            print("VERIFIED 16/09 SEED IMAGE NOT FOUND - NO SAVE")
             save_db(db); return
-        X,y=save_templates(cells,SEED_DIGITS)
+        print("BOOTSTRAP VERIFIED SEED:",SEED_DATE)
+        sim=decode(get(su).content)
+        scells=detect_16_cells(sim)
+        if scells is None:
+            print("SEED GEOMETRY FAILED - NO SAVE")
+            save_db(db); return
+        X,y=save_templates(scells,SEED_DIGITS)
 
-    # Ensure verified 16/09 is present while training.
     if dt==SEED_DATE:
         nums=SEED_DIGITS
         print("SEED VERIFIED:",dt,"".join(nums))
@@ -305,7 +347,7 @@ def main():
 
     db[dt]={
         "date":dt,"numbers":list(nums),
-        "source":"MTP-ADAPTIVE-V8.3-NO-OCR",
+        "source":"MTP-GEOMETRY-V8.4-NO-OCR",
         "url":url,"auto":True
     }
     print("AUTO SAVED:",dt,"".join(nums))
