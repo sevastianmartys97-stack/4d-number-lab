@@ -270,7 +270,7 @@ def main():
 
     db[dt]={
         "date":dt,"numbers":list(nums),
-        "source":"MTP-ROW-SPLIT-V8.1-NO-OCR",
+        "source":"MTP-ROW-SPLIT-V8.2-NO-OCR",
         "url":url,"auto":True
     }
     print("AUTO SAVED:",dt,"".join(nums))
