@@ -7,15 +7,18 @@ from bs4 import BeautifulSoup
 
 MYT=timezone(timedelta(hours=8))
 DB=Path("data/mtp-charta.json")
-TPL=Path("data/mtp-visual-templates-v84.npz")
+TPL=Path("data/mtp-visual-templates-v85.npz")
 BASE="https://cartaplanbee.blogspot.com"
 FEED=BASE+"/feeds/posts/default?alt=json&max-results=10"
 UA={"User-Agent":"Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/131 Mobile Safari/537.36"}
 
-# One-time training seed from the verified 16/09/2026 chart.
-# After templates are created, future dates are classified visually.
-SEED_DATE="2026-09-16"
-SEED_DIGITS=list("1795842643709157")
+# Verified historical charts used only to TRAIN visual digit shapes.
+# No future result is hard-coded or used as a fallback.
+VERIFIED={
+    "2026-09-12":"1391875286409113",
+    "2026-09-13":"9674291035836497",
+    "2026-09-16":"1795842643709157",
+}
 
 def get(url):
     r=requests.get(url,headers=UA,timeout=25)
@@ -70,17 +73,18 @@ def latest():
     print("ONE CARTA IMAGE:",x[3])
     return x
 
-def seed_image():
-    f=get(FEED).json()
-    for e in f.get("feed",{}).get("entry",[]):
+def feed_entries():
+    return get(FEED).json().get("feed",{}).get("entry",[])
+
+def image_for_date(want):
+    for e in feed_entries():
         title=e.get("title",{}).get("$t","")
-        if pdate(title)!=SEED_DATE: continue
+        if pdate(title)!=want: continue
         body=e.get("content",{}).get("$t","") or e.get("summary",{}).get("$t","")
         soup=BeautifulSoup(body,"html.parser")
         for im in soup.find_all("img"):
             u=im.get("data-original") or im.get("data-src") or im.get("src")
-            if u:
-                return big(urljoin(BASE,u))
+            if u: return big(urljoin(BASE,u))
     return None
 
 def decode(raw):
@@ -245,11 +249,31 @@ def load_templates():
     z=np.load(TPL)
     return z["X"],z["y"].astype(str)
 
-def save_templates(cells,labels):
-    X=np.stack([cell_feature(c) for c in cells])
-    y=np.array(labels)
+def save_templates_multi():
+    feats=[]; labels=[]; used=[]
+    for day,digits in VERIFIED.items():
+        u=image_for_date(day)
+        if not u:
+            print("TRAIN SKIP - image not in feed:",day)
+            continue
+        try:
+            im=decode(get(u).content)
+            cells=detect_16_cells(im)
+        except Exception as e:
+            print("TRAIN SKIP:",day,e); continue
+        if cells is None or len(cells)!=16:
+            print("TRAIN SKIP - grid failed:",day); continue
+        for c,d in zip(cells,digits):
+            # Store all four normalized visual variants per verified cell.
+            for f in adaptive_features(c):
+                feats.append(f); labels.append(d)
+        used.append(day)
+    if not feats:
+        return None,None
+    X=np.stack(feats); y=np.array(labels)
     np.savez_compressed(TPL,X=X,y=y)
-    print("VISUAL TEMPLATES TRAINED:",len(y),"samples; digits=",sorted(set(y)))
+    print("MULTI TEMPLATES TRAINED:",len(y),"samples from",used)
+    print("DIGIT COUNTS:",{d:int(np.sum(y==d)) for d in sorted(set(y))})
     return X,y
 
 def adaptive_features(cell):
@@ -270,35 +294,37 @@ def adaptive_features(cell):
     return variants
 
 def classify(cells,X,y):
-    out=[]; margins=[]; agreements=[]
-    for c in cells:
-        votes=[]; best_margin=-1
+    out=[]; ratios=[]; agreements=[]
+    digits=sorted(set(map(str,y)))
+    for ci,c in enumerate(cells,1):
+        variant_votes=[]
+        variant_ratios=[]
         for f in adaptive_features(c):
-            ds=np.mean((X-f)**2,axis=1)
-            order=np.argsort(ds)
-            bi=order[0]; pred=str(y[bi])
-            ai=next((i for i in order[1:] if str(y[i])!=pred),order[1])
-            margin=float(ds[ai]-ds[bi])
-            votes.append((pred,margin,float(ds[bi])))
-            best_margin=max(best_margin,margin)
+            # Score each digit by its 3 nearest verified templates.
+            scores={}
+            for d in digits:
+                idx=np.where(y==d)[0]
+                ds=np.mean((X[idx]-f)**2,axis=1)
+                k=min(3,len(ds))
+                scores[d]=float(np.mean(np.partition(ds,k-1)[:k]))
+            ranked=sorted(scores.items(),key=lambda z:z[1])
+            best,bd=ranked[0]; second,sd=ranked[1]
+            variant_votes.append(best)
+            variant_ratios.append(sd/max(bd,1e-7))
+        counts={d:variant_votes.count(d) for d in set(variant_votes)}
+        pred=max(counts,key=lambda d:(counts[d],sum(r for v,r in zip(variant_votes,variant_ratios) if v==d)))
+        agree=counts[pred]
+        good=[r for v,r in zip(variant_votes,variant_ratios) if v==pred]
+        ratio=max(good) if good else 1.0
+        out.append(pred); agreements.append(agree); ratios.append(ratio)
+        print(f"CELL {ci:02d}: {pred} agreement={agree}/4 separation={ratio:.3f}")
 
-        # weighted vote: stronger separation gets more weight
-        scores={}
-        for pred,margin,dist in votes:
-            scores[pred]=scores.get(pred,0.0)+max(margin,0.00005)/(dist+0.0005)
-        pred=max(scores,key=scores.get)
-        agree=sum(1 for v in votes if v[0]==pred)
-        pred_margins=[v[1] for v in votes if v[0]==pred]
-        out.append(pred)
-        margins.append(max(pred_margins) if pred_margins else best_margin)
-        agreements.append(agree)
-
-    print("ADAPTIVE VISUAL RESULT:","".join(out))
-    print("ADAPTIVE AGREEMENT:",agreements)
-    print("ADAPTIVE MIN MARGIN:",round(min(margins),5))
-    # Save only when each cell has majority agreement across variants.
-    confident = min(agreements) >= 3 and min(margins) >= 0.00012
-    return out, confident
+    print("MULTI VISUAL RESULT:","".join(out))
+    print("MULTI AGREEMENT:",agreements)
+    print("MULTI MIN SEPARATION:",round(min(ratios),3))
+    # Majority across variants + nearest-class separation.
+    confident=min(agreements)>=3 and min(ratios)>=1.04
+    return out,confident
 
 def main():
     db=load_db()
@@ -317,28 +343,20 @@ def main():
 
     X,y=load_templates()
 
-    # First successful run on verified 16/09 creates all 0-9 visual templates.
+    # Train from several verified historical charts, not one poster.
     if X is None:
-        su=seed_image()
-        if not su:
-            print("VERIFIED 16/09 SEED IMAGE NOT FOUND - NO SAVE")
+        X,y=save_templates_multi()
+        if X is None:
+            print("MULTI TEMPLATE TRAINING FAILED - NO SAVE")
             save_db(db); return
-        print("BOOTSTRAP VERIFIED SEED:",SEED_DATE)
-        sim=decode(get(su).content)
-        scells=detect_16_cells(sim)
-        if scells is None:
-            print("SEED GEOMETRY FAILED - NO SAVE")
-            save_db(db); return
-        X,y=save_templates(scells,SEED_DIGITS)
 
-    if dt==SEED_DATE:
-        nums=SEED_DIGITS
-        print("SEED VERIFIED:",dt,"".join(nums))
+    if dt in VERIFIED:
+        nums=list(VERIFIED[dt])
+        print("VERIFIED HISTORICAL DATE:",dt,"".join(nums))
     else:
         nums,confident=classify(cells,X,y)
-        # V8.3 requires majority agreement from multiple visual variants.
         if not confident:
-            print("ADAPTIVE MATCH AMBIGUOUS - NO SAVE")
+            print("MULTI MATCH AMBIGUOUS - NO SAVE")
             save_db(db); return
 
     if dt in db:
@@ -347,7 +365,7 @@ def main():
 
     db[dt]={
         "date":dt,"numbers":list(nums),
-        "source":"MTP-GEOMETRY-V8.4-NO-OCR",
+        "source":"MTP-MULTITEMPLATE-V8.5-NO-OCR",
         "url":url,"auto":True
     }
     print("AUTO SAVED:",dt,"".join(nums))
