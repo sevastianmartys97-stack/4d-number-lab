@@ -7,9 +7,9 @@ from bs4 import BeautifulSoup
 
 MYT=timezone(timedelta(hours=8))
 DB=Path("data/mtp-charta.json")
-TPL=Path("data/mtp-visual-templates-v85.npz")
+TPL=Path("data/mtp-visual-templates-v9.npz")
 BASE="https://cartaplanbee.blogspot.com"
-FEED=BASE+"/feeds/posts/default?alt=json&max-results=10"
+FEED=BASE+"/feeds/posts/default?alt=json&max-results=50"
 UA={"User-Agent":"Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/131 Mobile Safari/537.36"}
 
 # Verified historical charts used only to TRAIN visual digit shapes.
@@ -293,6 +293,19 @@ def adaptive_features(cell):
         variants.append(cell_feature(cv2.cvtColor(z,cv2.COLOR_GRAY2BGR)))
     return variants
 
+def append_templates(cells,labels,X,y):
+    nf=[]; nl=[]
+    for c,d in zip(cells,labels):
+        for f in adaptive_features(c):
+            nf.append(f); nl.append(str(d))
+    NX=np.stack(nf); Ny=np.array(nl)
+    if X is not None:
+        NX=np.concatenate([X,NX],axis=0)
+        Ny=np.concatenate([y,Ny],axis=0)
+    np.savez_compressed(TPL,X=NX,y=Ny)
+    print("SELF LEARNED:",len(labels),"cells; total templates:",len(Ny))
+    return NX,Ny
+
 def classify(cells,X,y):
     out=[]; ratios=[]; agreements=[]
     digits=sorted(set(map(str,y)))
@@ -323,7 +336,9 @@ def classify(cells,X,y):
     print("MULTI AGREEMENT:",agreements)
     print("MULTI MIN SEPARATION:",round(min(ratios),3))
     # Majority across variants + nearest-class separation.
-    confident=min(agreements)>=3 and min(ratios)>=1.04
+    cell_ok=[(a>=3 and r>=1.015) or (a>=2 and r>=1.18) for a,r in zip(agreements,ratios)]
+    confident=all(cell_ok)
+    print("CELL VALID:",cell_ok)
     return out,confident
 
 def main():
@@ -365,10 +380,16 @@ def main():
 
     db[dt]={
         "date":dt,"numbers":list(nums),
-        "source":"MTP-MULTITEMPLATE-V8.5-NO-OCR",
+        "source":"MTP-DAILY-SELF-LEARNING-V9",
         "url":url,"auto":True
     }
     print("AUTO SAVED:",dt,"".join(nums))
+    # Once a date passes the confidence gate, learn that day's actual
+    # visual style so tomorrow is compared with recent posters too.
+    try:
+        X,y=append_templates(cells,nums,X,y)
+    except Exception as e:
+        print("SELF LEARN SKIP:",e)
     save_db(db)
 
 if __name__=="__main__": main()
