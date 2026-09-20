@@ -216,22 +216,53 @@ def save_templates(cells,labels):
     print("VISUAL TEMPLATES TRAINED:",len(y),"samples; digits=",sorted(set(y)))
     return X,y
 
+def adaptive_features(cell):
+    # V8.3: compare several illumination/threshold variants so changes
+    # in poster colour/background do not depend on one Otsu result.
+    g=cv2.cvtColor(cell,cv2.COLOR_BGR2GRAY)
+    variants=[]
+    for mode in range(4):
+        z=g.copy()
+        if mode==1:
+            z=cv2.equalizeHist(z)
+        elif mode==2:
+            z=cv2.GaussianBlur(z,(5,5),0)
+        elif mode==3:
+            z=cv2.normalize(z,None,0,255,cv2.NORM_MINMAX)
+        # Reuse the same centering pipeline by converting back to BGR.
+        variants.append(cell_feature(cv2.cvtColor(z,cv2.COLOR_GRAY2BGR)))
+    return variants
+
 def classify(cells,X,y):
-    out=[]; margins=[]
+    out=[]; margins=[]; agreements=[]
     for c in cells:
-        f=cell_feature(c)
-        # normalized mean squared distance to visual glyph templates
-        ds=np.mean((X-f)**2,axis=1)
-        order=np.argsort(ds)
-        best=order[0]
-        pred=y[best]
-        # compare best digit against best different digit
-        alt=next((i for i in order[1:] if y[i]!=pred),order[1])
-        margin=float(ds[alt]-ds[best])
-        out.append(str(pred)); margins.append(margin)
-    print("VISUAL RESULT:","".join(out))
-    print("VISUAL MIN MARGIN:",round(min(margins),5))
-    return out,min(margins)
+        votes=[]; best_margin=-1
+        for f in adaptive_features(c):
+            ds=np.mean((X-f)**2,axis=1)
+            order=np.argsort(ds)
+            bi=order[0]; pred=str(y[bi])
+            ai=next((i for i in order[1:] if str(y[i])!=pred),order[1])
+            margin=float(ds[ai]-ds[bi])
+            votes.append((pred,margin,float(ds[bi])))
+            best_margin=max(best_margin,margin)
+
+        # weighted vote: stronger separation gets more weight
+        scores={}
+        for pred,margin,dist in votes:
+            scores[pred]=scores.get(pred,0.0)+max(margin,0.00005)/(dist+0.0005)
+        pred=max(scores,key=scores.get)
+        agree=sum(1 for v in votes if v[0]==pred)
+        pred_margins=[v[1] for v in votes if v[0]==pred]
+        out.append(pred)
+        margins.append(max(pred_margins) if pred_margins else best_margin)
+        agreements.append(agree)
+
+    print("ADAPTIVE VISUAL RESULT:","".join(out))
+    print("ADAPTIVE AGREEMENT:",agreements)
+    print("ADAPTIVE MIN MARGIN:",round(min(margins),5))
+    # Save only when each cell has majority agreement across variants.
+    confident = min(agreements) >= 3 and min(margins) >= 0.00012
+    return out, confident
 
 def main():
     db=load_db()
@@ -262,15 +293,19 @@ def main():
         nums=SEED_DIGITS
         print("SEED VERIFIED:",dt,"".join(nums))
     else:
-        nums,margin=classify(cells,X,y)
-        # reject very ambiguous visual matches rather than corrupt DB
-        if margin < 0.002:
-            print("VISUAL MATCH AMBIGUOUS - NO SAVE")
+        nums,confident=classify(cells,X,y)
+        # V8.3 requires majority agreement from multiple visual variants.
+        if not confident:
+            print("ADAPTIVE MATCH AMBIGUOUS - NO SAVE")
             save_db(db); return
+
+    if dt in db:
+        print("DATE ALREADY SAVED - NO OVERWRITE:",dt)
+        save_db(db); return
 
     db[dt]={
         "date":dt,"numbers":list(nums),
-        "source":"MTP-ROW-SPLIT-V8.1-NO-OCR",
+        "source":"MTP-ADAPTIVE-V8.3-NO-OCR",
         "url":url,"auto":True
     }
     print("AUTO SAVED:",dt,"".join(nums))
