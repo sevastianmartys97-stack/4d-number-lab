@@ -1,0 +1,79 @@
+name: Fix Favourite Pattern Hit V2
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install Pattern Hit checker
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path("index.html")
+          s=p.read_text(encoding="utf-8")
+          s=re.sub(r'\s*<script id="FAV-PATTERN-MATCH-V1">.*?</script>\s*','\n',s,flags=re.S)
+          s=re.sub(r'\s*<script id="FAV-PATTERN-HIT-V2">.*?</script>\s*','\n',s,flags=re.S)
+          js="""<script id="FAV-PATTERN-HIT-V2">
+          (() => {
+            function patternHits(){
+              const box=document.getElementById("chartaLines");
+              if(!box)return new Set();
+              return new Set([...box.querySelectorAll(".line-item strong")]
+                .map(e=>(e.textContent||"").trim()).filter(n=>/^\\d{4}$/.test(n)));
+            }
+            function update(){
+              const hits=patternHits();
+              document.querySelectorAll("#favBody tr").forEach(row=>{
+                const input=row.querySelector(".fav-input");
+                if(!input)return;
+                const n=String(input.value||"").trim();
+                if(!/^\\d{4}$/.test(n))return;
+                const cells=row.querySelectorAll("td");
+                if(cells.length<4)return;
+                const cell=cells[3];
+                if(cell.querySelector(".hit"))return;
+                if(hits.has(n)){
+                  cell.innerHTML='<span class="patternhit-v2" style="color:#ffd45a;font-weight:800">⚡ PATTERN HIT</span>';
+                }else if(cell.querySelector(".patternhit-v2")){
+                  cell.innerHTML='<span class="nohit">✕ NO MATCH</span>';
+                }
+              });
+            }
+            let t; const q=()=>{clearTimeout(t);t=setTimeout(update,80)};
+            function start(){
+              q();
+              const a=document.getElementById("chartaLines"),f=document.getElementById("favBody");
+              if(a)new MutationObserver(q).observe(a,{childList:true,subtree:true,characterData:true});
+              if(f)new MutationObserver(q).observe(f,{childList:true,subtree:true});
+              document.addEventListener("input",e=>{if(e.target?.classList.contains("fav-input"))q()},true);
+            }
+            document.readyState==="loading"?document.addEventListener("DOMContentLoaded",start):start();
+          })();
+          </script>"""
+          if "</body>" not in s: raise SystemExit("ERROR: </body> not found")
+          p.write_text(s.replace("</body>",js+"\n</body>",1),encoding="utf-8")
+          print("V1 removed")
+          print("V2 installed: #chartaLines ONLY")
+          print("Full Repeat Family Scan ignored")
+          PY
+      - name: Validate
+        run: |
+          grep -q 'FAV-PATTERN-HIT-V2' index.html
+          grep -q 'document.getElementById("chartaLines")' index.html
+          ! grep -q 'FAV-PATTERN-MATCH-V1' index.html
+          echo "VALID ✓"
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git diff --cached --quiet && exit 0
+          git commit -m "Fix Favourite Pattern Hit checker"
+          git pull --rebase origin main
+          git push origin HEAD:main
