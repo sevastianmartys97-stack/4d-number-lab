@@ -6545,35 +6545,42 @@ document.addEventListener("DOMContentLoaded",function(){
   else start();
 })();
 </script>
-
-<script id="FAV-PATTERN-MATCH-V1">
+\n<script id="FAV-PATTERN-HIT-V2">
 (() => {
-  const nums = el => ((el && el.textContent || "").match(/\b\d{4}\b/g)||[]);
-  function patternBox(){
-    return [...document.querySelectorAll("section,article,div")]
-      .filter(e=>/AUTO CHART(?:A)? PATTERN/i.test(e.textContent||""))
-      .sort((a,b)=>(a.textContent||"").length-(b.textContent||"").length)[0]||null;
+  function patternHits(){
+    const box=document.getElementById("chartaLines");
+    if(!box)return new Set();
+    return new Set([...box.querySelectorAll(".line-item strong")]
+      .map(e=>(e.textContent||"").trim()).filter(n=>/^\d{4}$/.test(n)));
   }
   function update(){
-    const box=patternBox(); if(!box)return;
-    const pats=new Set(nums(box));
-    document.querySelectorAll("div,li,tr").forEach(row=>{
-      if(box.contains(row))return;
-      const t=(row.textContent||"").trim();
-      if(!/NO MATCH|PATTERN MATCH/i.test(t))return;
-      const n=nums(row)[0]; if(!n)return;
-      const status=[...row.querySelectorAll("span,b,strong,small,div")].find(e=>{
-        const x=(e.textContent||"").trim().toUpperCase();
-        return x==="NO MATCH"||x==="PATTERN MATCH"||x==="⚡ PATTERN MATCH";
-      });
-      if(status) status.textContent=pats.has(n)?"⚡ PATTERN MATCH":"NO MATCH";
+    const hits=patternHits();
+    document.querySelectorAll("#favBody tr").forEach(row=>{
+      const input=row.querySelector(".fav-input");
+      if(!input)return;
+      const n=String(input.value||"").trim();
+      if(!/^\d{4}$/.test(n))return;
+      const cells=row.querySelectorAll("td");
+      if(cells.length<4)return;
+      const cell=cells[3];
+      if(cell.querySelector(".hit"))return;
+      if(hits.has(n)){
+        cell.innerHTML='<span class="patternhit-v2" style="color:#ffd45a;font-weight:800">⚡ PATTERN HIT</span>';
+      }else if(cell.querySelector(".patternhit-v2")){
+        cell.innerHTML='<span class="nohit">✕ NO MATCH</span>';
+      }
     });
   }
-  let q; const run=()=>{clearTimeout(q);q=setTimeout(update,80)};
-  document.addEventListener("DOMContentLoaded",()=>{update();setTimeout(update,400)});
-  document.addEventListener("input",run,true);
-  document.addEventListener("change",run,true);
-  new MutationObserver(run).observe(document.documentElement,{childList:true,subtree:true,characterData:true});
+  let t; const q=()=>{clearTimeout(t);t=setTimeout(update,80)};
+  function start(){
+    q();
+    const a=document.getElementById("chartaLines"),f=document.getElementById("favBody");
+    if(a)new MutationObserver(q).observe(a,{childList:true,subtree:true,characterData:true});
+    if(f)new MutationObserver(q).observe(f,{childList:true,subtree:true});
+    document.addEventListener("input",e=>{if(e.target?.classList.contains("fav-input"))q()},true);
+  }
+  document.readyState==="loading"?document.addEventListener("DOMContentLoaded",start):start();
 })();
-</script>\n</body>
+</script>
+</body>
 </html>
