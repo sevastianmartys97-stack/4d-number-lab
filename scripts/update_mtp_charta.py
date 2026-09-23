@@ -7,15 +7,18 @@ from bs4 import BeautifulSoup
 
 MYT=timezone(timedelta(hours=8))
 DB=Path("data/mtp-charta.json")
-TPL=Path("data/mtp-visual-templates.npz")
+TPL=Path("data/mtp-visual-templates-v9.npz")
 BASE="https://cartaplanbee.blogspot.com"
-FEED=BASE+"/feeds/posts/default?alt=json&max-results=10"
+FEED=BASE+"/feeds/posts/default?alt=json&max-results=50"
 UA={"User-Agent":"Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/131 Mobile Safari/537.36"}
 
-# One-time training seed from the verified 16/09/2026 chart.
-# After templates are created, future dates are classified visually.
-SEED_DATE="2026-09-16"
-SEED_DIGITS=list("1795842643709157")
+# Verified historical charts used only to TRAIN visual digit shapes.
+# No future result is hard-coded or used as a fallback.
+VERIFIED={
+    "2026-09-12":"1391875286409113",
+    "2026-09-13":"9674291035836497",
+    "2026-09-16":"1795842643709157",
+}
 
 def get(url):
     r=requests.get(url,headers=UA,timeout=25)
@@ -69,6 +72,20 @@ def latest():
     print("LATEST MTP:",x[0],x[1])
     print("ONE CARTA IMAGE:",x[3])
     return x
+
+def feed_entries():
+    return get(FEED).json().get("feed",{}).get("entry",[])
+
+def image_for_date(want):
+    for e in feed_entries():
+        title=e.get("title",{}).get("$t","")
+        if pdate(title)!=want: continue
+        body=e.get("content",{}).get("$t","") or e.get("summary",{}).get("$t","")
+        soup=BeautifulSoup(body,"html.parser")
+        for im in soup.find_all("img"):
+            u=im.get("data-original") or im.get("data-src") or im.get("src")
+            if u: return big(urljoin(BASE,u))
+    return None
 
 def decode(raw):
     a=np.frombuffer(raw,np.uint8)
@@ -147,33 +164,56 @@ def detect_16_cells(im):
                 rebuilt.append((x0,y0,x1-x0,y1-y0))
         boxes=rebuilt
 
-    # V8.1 FIX: the poster commonly merges each four-cell row into ONE
-    # coloured rectangle. If exactly four row blocks are found, that is
-    # success: sort top-to-bottom and split EACH row into four equal cells.
+    # V8.4 GEOMETRY FIX:
+    # Previous versions misread four tall detected strips as four ROWS.
+    # Logs proved the boxes were x=0/180/361/542, y=0, h=626:
+    # they are FOUR COLUMNS spanning the chart height.
+    # Split each column vertically into four cells, then transpose to
+    # row-major order: row1 col1..4, row2 col1..4, etc.
     if len(boxes)==4:
-        rowboxes=sorted(boxes,key=lambda b:b[1]+b[3]/2)
-        cells=[]
-        for ri,(x,y,bw,bh) in enumerate(rowboxes,1):
-            # trim only the outer row border, then split independently.
-            px=max(1,int(bw*.01))
-            py=max(2,int(bh*.07))
-            x0=x+px; x1=x+bw-px
-            y0=y+py; y1=y+bh-py
-            usable=x1-x0
-            if usable<=0 or y1<=y0:
-                return None
-            print("ROW BLOCK",ri,":",x,y,bw,bh)
-            for j in range(4):
-                a=x0+round(j*usable/4)
-                b=x0+round((j+1)*usable/4)
-                # small inner trim avoids separator/border pixels
-                gap=max(1,int((b-a)*.035))
-                cell=roi[y0:y1,a+gap:b-gap]
-                if cell.size==0:
-                    return None
-                cells.append(cell)
-        print("ROW SPLIT SUCCESS: 4 rows -> 16 cells")
-        return cells
+        colboxes=sorted(boxes,key=lambda b:b[0]+b[2]/2)
+        # Require tall column geometry; never silently treat columns as rows.
+        if all(bh > bw*1.8 for x,y,bw,bh in colboxes):
+            grid=[[None]*4 for _ in range(4)]
+            for ci,(x,y,bw,bh) in enumerate(colboxes):
+                px=max(2,int(bw*.07))
+                py=max(1,int(bh*.01))
+                x0=x+px; x1=x+bw-px
+                y0=y+py; y1=y+bh-py
+                usable=y1-y0
+                print("COLUMN BLOCK",ci+1,":",x,y,bw,bh)
+                for ri in range(4):
+                    a=y0+round(ri*usable/4)
+                    b=y0+round((ri+1)*usable/4)
+                    gap=max(1,int((b-a)*.035))
+                    cell=roi[a+gap:b-gap,x0:x1]
+                    if cell.size==0:
+                        return None
+                    grid[ri][ci]=cell
+            cells=[grid[r][c] for r in range(4) for c in range(4)]
+            print("GEOMETRY FIX SUCCESS: 4 columns x 4 rows -> 16 cells")
+            return cells
+
+        # Support genuine four horizontal row blocks if poster layout changes.
+        if all(bw > bh*1.8 for x,y,bw,bh in colboxes):
+            rowboxes=sorted(colboxes,key=lambda b:b[1]+b[3]/2)
+            cells=[]
+            for ri,(x,y,bw,bh) in enumerate(rowboxes,1):
+                px=max(1,int(bw*.01)); py=max(2,int(bh*.07))
+                x0=x+px; x1=x+bw-px; y0=y+py; y1=y+bh-py
+                usable=x1-x0
+                print("ROW BLOCK",ri,":",x,y,bw,bh)
+                for j in range(4):
+                    a=x0+round(j*usable/4); b=x0+round((j+1)*usable/4)
+                    gap=max(1,int((b-a)*.035))
+                    cell=roi[y0:y1,a+gap:b-gap]
+                    if cell.size==0: return None
+                    cells.append(cell)
+            print("ROW SPLIT SUCCESS: 4 rows x 4 columns -> 16 cells")
+            return cells
+
+        print("4 BLOCKS FOUND BUT GEOMETRY UNKNOWN - NO SAVE")
+        return None
 
     if len(boxes)!=16:
         print("ROW/CELL DETECTION:",len(boxes),"blocks - expected 4 rows or 16 cells")
@@ -209,11 +249,31 @@ def load_templates():
     z=np.load(TPL)
     return z["X"],z["y"].astype(str)
 
-def save_templates(cells,labels):
-    X=np.stack([cell_feature(c) for c in cells])
-    y=np.array(labels)
+def save_templates_multi():
+    feats=[]; labels=[]; used=[]
+    for day,digits in VERIFIED.items():
+        u=image_for_date(day)
+        if not u:
+            print("TRAIN SKIP - image not in feed:",day)
+            continue
+        try:
+            im=decode(get(u).content)
+            cells=detect_16_cells(im)
+        except Exception as e:
+            print("TRAIN SKIP:",day,e); continue
+        if cells is None or len(cells)!=16:
+            print("TRAIN SKIP - grid failed:",day); continue
+        for c,d in zip(cells,digits):
+            # Store all four normalized visual variants per verified cell.
+            for f in adaptive_features(c):
+                feats.append(f); labels.append(d)
+        used.append(day)
+    if not feats:
+        return None,None
+    X=np.stack(feats); y=np.array(labels)
     np.savez_compressed(TPL,X=X,y=y)
-    print("VISUAL TEMPLATES TRAINED:",len(y),"samples; digits=",sorted(set(y)))
+    print("MULTI TEMPLATES TRAINED:",len(y),"samples from",used)
+    print("DIGIT COUNTS:",{d:int(np.sum(y==d)) for d in sorted(set(y))})
     return X,y
 
 def adaptive_features(cell):
@@ -233,36 +293,53 @@ def adaptive_features(cell):
         variants.append(cell_feature(cv2.cvtColor(z,cv2.COLOR_GRAY2BGR)))
     return variants
 
-def classify(cells,X,y):
-    out=[]; margins=[]; agreements=[]
-    for c in cells:
-        votes=[]; best_margin=-1
+def append_templates(cells,labels,X,y):
+    nf=[]; nl=[]
+    for c,d in zip(cells,labels):
         for f in adaptive_features(c):
-            ds=np.mean((X-f)**2,axis=1)
-            order=np.argsort(ds)
-            bi=order[0]; pred=str(y[bi])
-            ai=next((i for i in order[1:] if str(y[i])!=pred),order[1])
-            margin=float(ds[ai]-ds[bi])
-            votes.append((pred,margin,float(ds[bi])))
-            best_margin=max(best_margin,margin)
+            nf.append(f); nl.append(str(d))
+    NX=np.stack(nf); Ny=np.array(nl)
+    if X is not None:
+        NX=np.concatenate([X,NX],axis=0)
+        Ny=np.concatenate([y,Ny],axis=0)
+    np.savez_compressed(TPL,X=NX,y=Ny)
+    print("SELF LEARNED:",len(labels),"cells; total templates:",len(Ny))
+    return NX,Ny
 
-        # weighted vote: stronger separation gets more weight
-        scores={}
-        for pred,margin,dist in votes:
-            scores[pred]=scores.get(pred,0.0)+max(margin,0.00005)/(dist+0.0005)
-        pred=max(scores,key=scores.get)
-        agree=sum(1 for v in votes if v[0]==pred)
-        pred_margins=[v[1] for v in votes if v[0]==pred]
-        out.append(pred)
-        margins.append(max(pred_margins) if pred_margins else best_margin)
-        agreements.append(agree)
+def classify(cells,X,y):
+    out=[]; ratios=[]; agreements=[]
+    digits=sorted(set(map(str,y)))
+    for ci,c in enumerate(cells,1):
+        variant_votes=[]
+        variant_ratios=[]
+        for f in adaptive_features(c):
+            # Score each digit by its 3 nearest verified templates.
+            scores={}
+            for d in digits:
+                idx=np.where(y==d)[0]
+                ds=np.mean((X[idx]-f)**2,axis=1)
+                k=min(3,len(ds))
+                scores[d]=float(np.mean(np.partition(ds,k-1)[:k]))
+            ranked=sorted(scores.items(),key=lambda z:z[1])
+            best,bd=ranked[0]; second,sd=ranked[1]
+            variant_votes.append(best)
+            variant_ratios.append(sd/max(bd,1e-7))
+        counts={d:variant_votes.count(d) for d in set(variant_votes)}
+        pred=max(counts,key=lambda d:(counts[d],sum(r for v,r in zip(variant_votes,variant_ratios) if v==d)))
+        agree=counts[pred]
+        good=[r for v,r in zip(variant_votes,variant_ratios) if v==pred]
+        ratio=max(good) if good else 1.0
+        out.append(pred); agreements.append(agree); ratios.append(ratio)
+        print(f"CELL {ci:02d}: {pred} agreement={agree}/4 separation={ratio:.3f}")
 
-    print("ADAPTIVE VISUAL RESULT:","".join(out))
-    print("ADAPTIVE AGREEMENT:",agreements)
-    print("ADAPTIVE MIN MARGIN:",round(min(margins),5))
-    # Save only when each cell has majority agreement across variants.
-    confident = min(agreements) >= 3 and min(margins) >= 0.00012
-    return out, confident
+    print("MULTI VISUAL RESULT:","".join(out))
+    print("MULTI AGREEMENT:",agreements)
+    print("MULTI MIN SEPARATION:",round(min(ratios),3))
+    # Majority across variants + nearest-class separation.
+    cell_ok=[(a>=3 and r>=1.015) or (a>=2 and r>=1.18) for a,r in zip(agreements,ratios)]
+    confident=all(cell_ok)
+    print("CELL VALID:",cell_ok)
+    return out,confident
 
 def main():
     db=load_db()
@@ -281,22 +358,20 @@ def main():
 
     X,y=load_templates()
 
-    # First successful run on verified 16/09 creates all 0-9 visual templates.
+    # Train from several verified historical charts, not one poster.
     if X is None:
-        if dt!=SEED_DATE:
-            print("TEMPLATES NOT TRAINED; run once while 16/09 is latest")
+        X,y=save_templates_multi()
+        if X is None:
+            print("MULTI TEMPLATE TRAINING FAILED - NO SAVE")
             save_db(db); return
-        X,y=save_templates(cells,SEED_DIGITS)
 
-    # Ensure verified 16/09 is present while training.
-    if dt==SEED_DATE:
-        nums=SEED_DIGITS
-        print("SEED VERIFIED:",dt,"".join(nums))
+    if dt in VERIFIED:
+        nums=list(VERIFIED[dt])
+        print("VERIFIED HISTORICAL DATE:",dt,"".join(nums))
     else:
         nums,confident=classify(cells,X,y)
-        # V8.3 requires majority agreement from multiple visual variants.
         if not confident:
-            print("ADAPTIVE MATCH AMBIGUOUS - NO SAVE")
+            print("MULTI MATCH AMBIGUOUS - NO SAVE")
             save_db(db); return
 
     if dt in db:
@@ -305,10 +380,16 @@ def main():
 
     db[dt]={
         "date":dt,"numbers":list(nums),
-        "source":"MTP-ADAPTIVE-V8.3-NO-OCR",
+        "source":"MTP-DAILY-SELF-LEARNING-V9",
         "url":url,"auto":True
     }
     print("AUTO SAVED:",dt,"".join(nums))
+    # Once a date passes the confidence gate, learn that day's actual
+    # visual style so tomorrow is compared with recent posters too.
+    try:
+        X,y=append_templates(cells,nums,X,y)
+    except Exception as e:
+        print("SELF LEARN SKIP:",e)
     save_db(db)
 
 if __name__=="__main__": main()
