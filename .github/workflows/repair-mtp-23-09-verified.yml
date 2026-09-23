@@ -1,0 +1,52 @@
+name: Repair MTP 23-09 Verified
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Repair and lock 23-09
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          p=Path("data/mtp-charta.json")
+          d=json.loads(p.read_text(encoding="utf-8"))
+          good=list("7294697271658035")
+          entries=d.get("entries",[])
+          hit=False
+          for e in entries:
+              if e.get("date")=="2026-09-23":
+                  print("OLD:","".join(map(str,e.get("numbers",[]))))
+                  e.update({"numbers":good,"source":"MTP-VERIFIED-LOCK","verified":True,"locked":True,"auto":False})
+                  hit=True
+          if not hit:
+              entries.append({"date":"2026-09-23","numbers":good,"source":"MTP-VERIFIED-LOCK","verified":True,"locked":True,"auto":False})
+          d["entries"]=sorted(entries,key=lambda x:x.get("date",""),reverse=True)
+          p.write_text(json.dumps(d,ensure_ascii=False,indent=2),encoding="utf-8")
+          print("NEW: 7294 / 6972 / 7165 / 8035")
+          PY
+      - name: Validate
+        run: |
+          python3 - <<'PY'
+          import json
+          d=json.load(open("data/mtp-charta.json"))
+          e=next(x for x in d["entries"] if x["date"]=="2026-09-23")
+          assert "".join(map(str,e["numbers"]))=="7294697271658035"
+          assert e["verified"] and e["locked"]
+          print("VERIFIED 23/09 LOCK ✓")
+          PY
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/mtp-charta.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Repair verified MTP 23-09"
+          git pull --rebase origin main
+          git push origin HEAD:main
