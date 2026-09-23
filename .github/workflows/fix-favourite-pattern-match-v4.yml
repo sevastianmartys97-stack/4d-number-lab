@@ -1,0 +1,105 @@
+name: Fix Favourite Pattern Match V4
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Fix Favourite against real Auto Chart Pattern
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path("index.html")
+          s=p.read_text(encoding="utf-8")
+
+          # Remove incorrect digit-count fallback V3 if it was installed.
+          s=re.sub(
+            r'\n\s*// FAV-CHARTA-DIGIT-HIT-V3.*?\n\s*return\{hit:false,best:null,type:null,pattern:exactPattern,patternMatch:null\};',
+            '\n  return{hit:false,best:null,type:null,pattern:exactPattern,patternMatch:null};',
+            s, count=1, flags=re.S
+          )
+
+          marker="FAV-AUTO-PATTERN-V4"
+          if marker in s:
+            print("V4 already installed")
+            raise SystemExit(0)
+
+          # Insert a real Auto Chart Pattern lookup before direct-path analysis.
+          anchor='''  const exactPattern=analyzeChartaPattern(number);'''
+          patch='''  // FAV-AUTO-PATTERN-V4
+  // Match Favourite against the SAME generated numbers shown in Auto Chart Pattern.
+  // Exact favourite first, then any unique permutation.
+  const autoPatternExact=chartLines.find(x=>x.number===number);
+  if(autoPatternExact){
+    const ap=analyzeChartaPattern(number);
+    return{
+      hit:true,
+      best:number,
+      type:"EXACT • "+autoPatternExact.type,
+      pattern:ap,
+      patternMatch:"EXACT"
+    };
+  }
+
+  for(const p of getPermutations(number)){
+    if(p===number) continue;
+    const m=chartLines.find(x=>x.number===p);
+    if(m){
+      const ap=analyzeChartaPattern(p);
+      return{
+        hit:true,
+        best:p,
+        type:"PUSINGAN • "+m.type,
+        pattern:ap,
+        patternMatch:"PUSINGAN"
+      };
+    }
+  }
+
+  const exactPattern=analyzeChartaPattern(number);'''
+
+          # Existing checkCharta already has chartLines exact/permutation logic in some builds.
+          # Only insert if the V4 marker is absent; duplicate checks are harmless but avoid if
+          # the exact canonical block is already present immediately before exactPattern.
+          idx=s.find(anchor)
+          if idx < 0:
+            raise SystemExit("ERROR: checkCharta exactPattern anchor not found")
+          before=s[max(0,idx-1800):idx]
+          if 'const exact=chartLines.find(x=>x.number===number);' in before and 'for(const p of getPermutations(number))' in before:
+            # Canonical logic exists already: mark it and leave semantics unchanged.
+            s=s[:idx]+'  // FAV-AUTO-PATTERN-V4\n'+s[idx:]
+            print("Canonical chartLines matching already exists; V4 verified/marked it.")
+          else:
+            s=s.replace(anchor,patch,1)
+            print("V4 chartLines matcher installed.")
+
+          p.write_text(s,encoding="utf-8")
+          PY
+      - name: Validate
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path("index.html").read_text(encoding="utf-8")
+          assert "FAV-AUTO-PATTERN-V4" in s
+          assert 'chartLines.find(x=>x.number===number)' in s
+          assert 'getPermutations(number)' in s
+          assert "FAV-CHARTA-DIGIT-HIT-V3" not in s
+          print("VALID ✓")
+          print("Favourite -> Auto Chart Pattern exact/pusingan")
+          print("V3 digit-only fallback removed")
+          PY
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git diff --cached --quiet && exit 0
+          git commit -m "Fix Favourite against Auto Chart Pattern"
+          git pull --rebase origin main
+          git push origin HEAD:main
