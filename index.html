@@ -6546,5 +6546,34 @@ document.addEventListener("DOMContentLoaded",function(){
 })();
 </script>
 
-</body>
+<script id="FAV-PATTERN-MATCH-V1">
+(() => {
+  const nums = el => ((el && el.textContent || "").match(/\b\d{4}\b/g)||[]);
+  function patternBox(){
+    return [...document.querySelectorAll("section,article,div")]
+      .filter(e=>/AUTO CHART(?:A)? PATTERN/i.test(e.textContent||""))
+      .sort((a,b)=>(a.textContent||"").length-(b.textContent||"").length)[0]||null;
+  }
+  function update(){
+    const box=patternBox(); if(!box)return;
+    const pats=new Set(nums(box));
+    document.querySelectorAll("div,li,tr").forEach(row=>{
+      if(box.contains(row))return;
+      const t=(row.textContent||"").trim();
+      if(!/NO MATCH|PATTERN MATCH/i.test(t))return;
+      const n=nums(row)[0]; if(!n)return;
+      const status=[...row.querySelectorAll("span,b,strong,small,div")].find(e=>{
+        const x=(e.textContent||"").trim().toUpperCase();
+        return x==="NO MATCH"||x==="PATTERN MATCH"||x==="⚡ PATTERN MATCH";
+      });
+      if(status) status.textContent=pats.has(n)?"⚡ PATTERN MATCH":"NO MATCH";
+    });
+  }
+  let q; const run=()=>{clearTimeout(q);q=setTimeout(update,80)};
+  document.addEventListener("DOMContentLoaded",()=>{update();setTimeout(update,400)});
+  document.addEventListener("input",run,true);
+  document.addEventListener("change",run,true);
+  new MutationObserver(run).observe(document.documentElement,{childList:true,subtree:true,characterData:true});
+})();
+</script>\n</body>
 </html>
