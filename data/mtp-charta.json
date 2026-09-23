@@ -22,9 +22,11 @@
         "3",
         "5"
       ],
-      "source": "MTP-CLEAN-LEARNING-V10-VERIFIED",
+      "source": "MTP-VERIFIED-LOCK",
       "url": "https://cartaplanbee.blogspot.com/2026/09/mtp-23092026-carta-dan-4d-hit-ramalan.html",
-      "auto": true
+      "auto": false,
+      "verified": true,
+      "locked": true
     },
     {
       "date": "2026-09-20",
