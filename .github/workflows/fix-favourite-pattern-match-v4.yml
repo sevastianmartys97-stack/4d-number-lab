@@ -1,4 +1,4 @@
-name: Fix Favourite Pattern Match V4
+name: Fix Favourite Pattern Match V4 FINAL
 on:
   workflow_dispatch:
 permissions:
