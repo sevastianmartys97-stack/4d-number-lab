@@ -1,0 +1,70 @@
+name: Repair MTP 26-09
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Add MTP 26-09
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          p = Path("data/mtp-charta.json")
+
+          with open(p, "r", encoding="utf-8") as f:
+              d = json.load(f)
+
+          entries = d.setdefault("entries", [])
+
+          date = "2026-09-26"
+          nums = list("1087763914599281")
+
+          old = next(
+              (x for x in entries if x.get("date") == date),
+              None
+          )
+
+          data = {
+              "date": date,
+              "numbers": nums,
+              "source": "MTP-VERIFIED",
+              "verified": True,
+              "auto": False
+          }
+
+          if old:
+              old.update(data)
+          else:
+              entries.append(data)
+
+          d["entries"] = sorted(
+              entries,
+              key=lambda x: x.get("date", ""),
+              reverse=True
+          )
+
+          with open(p, "w", encoding="utf-8") as f:
+              json.dump(d, f, ensure_ascii=False, indent=2)
+
+          print("MTP 26/09 ADDED")
+          print("1087 / 7639 / 1459 / 9281")
+          PY
+
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add data/mtp-charta.json
+          git commit -m "Add MTP 26-09" || exit 0
+          git push
