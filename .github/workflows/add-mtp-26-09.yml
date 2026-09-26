@@ -1,0 +1,74 @@
+name: Add MTP 26-09
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Add chart 26-09
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          p = Path("data/mtp-charta.json")
+          d = json.loads(p.read_text(encoding="utf-8"))
+
+          date = "2026-09-26"
+          nums = list("1087763914599281")
+
+          entries = d.setdefault("entries", [])
+
+          # Buang 26/09 lama jika ada supaya tak duplicate
+          entries = [
+              e for e in entries
+              if e.get("date") != date
+          ]
+
+          entries.append({
+              "date": date,
+              "numbers": nums,
+              "source": "MTP-VERIFIED",
+              "verified": True,
+              "auto": False
+          })
+
+          d["entries"] = sorted(
+              entries,
+              key=lambda e: e.get("date", ""),
+              reverse=True
+          )
+
+          p.write_text(
+              json.dumps(d, ensure_ascii=False, indent=2),
+              encoding="utf-8"
+          )
+
+          print("SUCCESS")
+          print("26/09/2026")
+          print("1087 / 7639 / 1459 / 9281")
+          PY
+
+      - name: Push database only
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add data/mtp-charta.json
+
+          if git diff --cached --quiet; then
+            echo "26/09 already correct"
+            exit 0
+          fi
+
+          git commit -m "Add verified MTP 26-09"
+          git push
