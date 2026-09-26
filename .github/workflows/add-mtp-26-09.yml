@@ -1,4 +1,4 @@
-name: Auto MTP Smart Image V11
+name: Auto MTP Smart Image V11 FIX
 
 "on":
   workflow_dispatch: {}
@@ -16,81 +16,81 @@ jobs:
   auto-mtp:
     runs-on: ubuntu-latest
     timeout-minutes: 6
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Install visual dependencies
-        run: |
-          python3 -m pip install --upgrade pip
-          pip install requests beautifulsoup4 opencv-python-headless numpy
+      - name: Install dependencies
+        run: pip install requests beautifulsoup4 opencv-python-headless numpy
 
-      - name: Install V10 clean-learning scanner
+      - name: Check V10 scanner exists
         run: |
-          mkdir -p scripts data
-          cat > scripts/update_mtp_charta.py <<'PY'
-          from pathlib import Path
-          import re, json, html as htmlmod
-          from datetime import datetime, timezone, timedelta
+          test -f scripts/update_mtp_charta.py
+          echo "Base scanner found"
+
+      - name: Create V11 smart-image wrapper
+        run: |
+          cat > /tmp/run_v11.py <<'PY'
+          import importlib.util
           from urllib.parse import urljoin
-          import requests, cv2, numpy as np
           from bs4 import BeautifulSoup
 
-          MYT=timezone(timedelta(hours=8))
-          DB=Path("data/mtp-charta.json")
-          TPL=Path("data/mtp-visual-templates-v10.npz")
-          BASE="https://cartaplanbee.blogspot.com"
-          FEED=BASE+"/feeds/posts/default?alt=json&max-results=50"
-          UA={"User-Agent":"Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/131 Mobile Safari/537.36"}
+          spec = importlib.util.spec_from_file_location("mtp", "scripts/update_mtp_charta.py")
+          m = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(m)
 
-          # Verified historical charts used only to TRAIN visual digit shapes.
-          # No future result is hard-coded or used as a fallback.
-          VERIFIED={
-              "2026-09-12":"1391875286409113",
-              "2026-09-13":"9674291035836497",
-              "2026-09-16":"1795842643709157",
-              "2026-09-23":"7294697271658035",
-          }
+          def latest_smart():
+              feed = m.get(m.FEED).json()
+              posts = []
 
-          def get(url):
-              r=requests.get(url,headers=UA,timeout=25)
-              r.raise_for_status()
-              return r
+              for e in feed.get("feed", {}).get("entry", []):
+                  title = e.get("title", {}).get("$t", "")
+                  dt = m.pdate(title)
+                  if not dt or "CARTA" not in title.upper():
+                      continue
 
-          def pdate(s):
-              m=re.search(r"MTP\s+(\d{1,2})[./-](\d{1,2})[./-](\d{4})",s,re.I)
-              if not m:return None
-              d,mn,y=m.groups()
-              return f"{y}-{int(mn):02d}-{int(d):02d}"
+                  url = next(
+                      (x.get("href", "") for x in e.get("link", [])
+                       if x.get("rel") == "alternate"),
+                      ""
+                  )
 
-          def big(u):
-              u=htmlmod.unescape(u)
-              u=re.sub(r"/s\d+(-c)?/","/s1600/",u)
-              return u
+                  body = (
+                      e.get("content", {}).get("$t", "")
+                      or e.get("summary", {}).get("$t", "")
+                  )
+                  soup = BeautifulSoup(body, "html.parser")
 
-          def load_db():
-              if not DB.exists(): return {}
-              try:d=json.loads(DB.read_text(encoding="utf-8"))
-              except:return {}
-              return {e["date"]:e for e in d.get("entries",[]) if e.get("date")}
+                  imgs = []
+                  for im in soup.find_all("img"):
+                      u = im.get("data-original") or im.get("data-src") or im.get("src")
+                      if u:
+                          u = m.big(urljoin(url or m.BASE, u))
+                          if u not in imgs:
+                              imgs.append(u)
 
-          def save_db(d):
-              es=sorted(d.values(),key=lambda x:x["date"],reverse=True)
-              DB.parent.mkdir(exist_ok=True)
-              DB.write_text(json.dumps({
-                "source":"APLANBEE MTP ONLY",
-                "updated_at":datetime.now(MYT).isoformat(timespec="seconds"),
-                "entries":es
-              },ensure_ascii=False,indent=2),encoding="utf-8")
-              if es: print("LATEST SAVED:",es[0]["date"],"".join(map(str,es[0]["numbers"])))
+                  if imgs:
+                      posts.append((dt, title, url, imgs))
 
-          def latest():
-              f=get(FEED).json()
-              ps=[]
-              for e in f.get("feed",{}).get("entry",[]):
-                  title=e.get("title",{}).get("$t","")
-                  dt=pdate(title)
-                  if not dt or "CARTA" not in title.upper(): continue
-                  url=next((x.get("href","") for x in e.get("link",[]) if x.get("rel")=="alternate"),"")
+              if not posts:
+                  raise RuntimeError("No MTP carta found")
+
+              dt, title, url, imgs = sorted(
+                  posts, key=lambda x: x[0], reverse=True
+              )[0]
+
+              print("LATEST MTP:", dt, title)
+              print("CANDIDATE IMAGES:", len(imgs))
+
+              for i, imgurl in enumerate(imgs, 1):
+                  try:
+                      print(f"TRY IMAGE {i}/{len(imgs)}:", imgurl)
+                      im = m.decode(m.get(imgurl).content)
+                      cells = m.detect_16_cells(im)
+
+                      if cells is not None and len(cells) == 16:
+                          print("CARTA IMAGE SELECTED:", imgurl)
+                          return dt, title, url, imgurl
