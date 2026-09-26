@@ -1,0 +1,115 @@
+                  good=[r for v,r in zip(variant_votes,variant_ratios) if v==pred]
+                  ratio=max(good) if good else 1.0
+                  out.append(pred); agreements.append(agree); ratios.append(ratio)
+                  print(f"CELL {ci:02d}: {pred} agreement={agree}/4 separation={ratio:.3f}")
+
+              print("MULTI VISUAL RESULT:","".join(out))
+              print("MULTI AGREEMENT:",agreements)
+              print("MULTI MIN SEPARATION:",round(min(ratios),3))
+              # Majority across variants + nearest-class separation.
+              cell_ok=[(a>=3 and r>=1.015) or (a>=2 and r>=1.18) for a,r in zip(agreements,ratios)]
+              confident=all(cell_ok)
+              print("CELL VALID:",cell_ok)
+              return out,confident
+
+          def main():
+              db=load_db()
+              try:dt,title,url,imgurls=latest()
+              except Exception as e:
+                  print("DISCOVERY FAILED:",e); save_db(db); return
+
+              cells=None
+              imgurl=None
+              for i,candidate in enumerate(imgurls,1):
+                  try:
+                      print(f"TRY IMAGE {i}/{len(imgurls)}:",candidate)
+                      im=decode(get(candidate).content)
+                      trial=detect_16_cells(im)
+                      if trial is not None and len(trial)==16:
+                          cells=trial
+                          imgurl=candidate
+                          print("CARTA IMAGE SELECTED:",candidate)
+                          break
+                      print("IMAGE REJECTED - no valid 4x4 grid")
+                  except Exception as e:
+                      print("IMAGE REJECTED:",e)
+
+              if cells is None:
+                  print("NO VALID CARTA IMAGE - clean DB kept"); save_db(db); return
+
+              X,y=load_templates()
+
+              # Train from several verified historical charts, not one poster.
+              if X is None:
+                  X,y=save_templates_multi()
+                  if X is None:
+                      print("MULTI TEMPLATE TRAINING FAILED - NO SAVE")
+                      save_db(db); return
+
+              if dt in VERIFIED:
+                  nums=list(VERIFIED[dt])
+                  print("VERIFIED HISTORICAL DATE:",dt,"".join(nums))
+              else:
+                  nums,confident=classify(cells,X,y)
+                  if not confident:
+                      print("MULTI MATCH AMBIGUOUS - NO SAVE")
+                      save_db(db); return
+
+              if dt in db:
+                  if dt in VERIFIED:
+                      old="".join(map(str,db[dt].get("numbers",[]))); good="".join(nums)
+                      if old!=good:
+                          print("REPAIR VERIFIED DATE:",dt,old,"->",good)
+                          db[dt]={"date":dt,"numbers":list(nums),"source":"MTP-SMART-IMAGE-V11-VERIFIED","url":url,"auto":True}
+                          save_db(db)
+                      else:
+                          print("VERIFIED DATE ALREADY CORRECT:",dt); save_db(db)
+                      return
+                  print("DATE ALREADY SAVED - NO OVERWRITE:",dt)
+                  save_db(db); return
+
+              db[dt]={
+                  "date":dt,"numbers":list(nums),
+                  "source":"MTP-SMART-IMAGE-V11",
+                  "url":url,"auto":True
+              }
+              print("AUTO SAVED:",dt,"".join(nums))
+              print("CLEAN MODE: prediction NOT added to training templates")
+              save_db(db)
+
+          if __name__=="__main__": main()
+          PY
+
+      - name: Run V11 smart-image scanner
+        run: python3 scripts/update_mtp_charta.py
+
+      - name: Validate database
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path("data/mtp-charta.json")
+          assert p.exists()
+          d=json.loads(p.read_text())
+          es=d.get("entries",[])
+          assert es and all(len(e.get("numbers",[]))==16 for e in es)
+          print("LATEST SAVED:",es[0]["date"],"".join(map(str,es[0]["numbers"])))
+          PY
+
+      - name: Commit safely
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/update_mtp_charta.py data/mtp-charta.json data/mtp-visual-templates-v10.npz 2>/dev/null || true
+          if git diff --cached --quiet; then echo "No changes"; exit 0; fi
+          git commit -m "Install Auto MTP Smart Image V11"
+          for n in 1 2 3; do
+            git fetch origin main
+            if git rebase origin/main && git push origin HEAD:main; then
+              echo "Push successful"
+              exit 0
+            fi
+            git rebase --abort 2>/dev/null || true
+            sleep 3
+          done
+          exit 1
