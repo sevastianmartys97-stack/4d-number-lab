@@ -1,0 +1,67 @@
+name: Repair MTP 26-09 Verified
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Repair verified 26-09
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          p=Path("data/mtp-charta.json")
+          d=json.loads(p.read_text(encoding="utf-8")) if p.exists() else {"source":"APLANBEE MTP ONLY","entries":[]}
+          good=list("1087763914599281")
+          entries=d.setdefault("entries",[])
+          e=next((x for x in entries if x.get("date")=="2026-09-26"),None)
+          data={"date":"2026-09-26","numbers":good,"source":"MTP-VERIFIED-LOCK","verified":True,"locked":True,"auto":False}
+          if e: e.update(data)
+          else: entries.append(data)
+          d["entries"]=sorted(entries,key=lambda x:x.get("date",""),reverse=True)
+          p.parent.mkdir(parents=True,exist_ok=True)
+          p.write_text(json.dumps(d,ensure_ascii=False,indent=2),encoding="utf-8")
+          print("NEW: 1087 / 7639 / 1459 / 9281")
+          PY
+      - name: Add 26-09 to V10 verified training
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path(".github/workflows/auto-mtp-clean-learning-v10.yml")
+          if not p.exists():
+              print("V10 file not found - DB repair remains valid")
+              raise SystemExit(0)
+          s=p.read_text(encoding="utf-8")
+          new='              "2026-09-26":"1087763914599281",\n'
+          if '"2026-09-26":"1087763914599281"' not in s:
+              old='              "2026-09-23":"7294697271658035",\n'
+              if old in s:
+                  s=s.replace(old,old+new,1)
+                  p.write_text(s,encoding="utf-8")
+                  print("V10 VERIFIED updated")
+              else:
+                  print("V10 anchor not found - skipped")
+          PY
+      - name: Validate
+        run: |
+          python3 - <<'PY'
+          import json
+          d=json.load(open("data/mtp-charta.json",encoding="utf-8"))
+          e=next(x for x in d["entries"] if x["date"]=="2026-09-26")
+          assert "".join(map(str,e["numbers"]))=="1087763914599281"
+          print("VERIFIED 26/09 OK")
+          PY
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/mtp-charta.json .github/workflows/auto-mtp-clean-learning-v10.yml 2>/dev/null || true
+          git diff --cached --quiet && exit 0
+          git commit -m "Repair verified MTP 26-09"
+          git pull --rebase origin main
+          git push origin HEAD:main
