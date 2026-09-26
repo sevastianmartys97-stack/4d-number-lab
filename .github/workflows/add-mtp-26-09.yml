@@ -1,74 +1,96 @@
-name: Add MTP 26-09
+name: Auto MTP Smart Image V11
 
-on:
-  workflow_dispatch:
+"on":
+  workflow_dispatch: {}
+  schedule:
+    - cron: "*/15 2-11 * * *"
 
 permissions:
   contents: write
 
-jobs:
-  update:
-    runs-on: ubuntu-latest
+concurrency:
+  group: auto-mtp-smart-image-v11
+  cancel-in-progress: true
 
+jobs:
+  auto-mtp:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Add chart 26-09
+      - name: Install visual dependencies
         run: |
-          python3 - <<'PY'
-          import json
+          python3 -m pip install --upgrade pip
+          pip install requests beautifulsoup4 opencv-python-headless numpy
+
+      - name: Install V10 clean-learning scanner
+        run: |
+          mkdir -p scripts data
+          cat > scripts/update_mtp_charta.py <<'PY'
           from pathlib import Path
+          import re, json, html as htmlmod
+          from datetime import datetime, timezone, timedelta
+          from urllib.parse import urljoin
+          import requests, cv2, numpy as np
+          from bs4 import BeautifulSoup
 
-          p = Path("data/mtp-charta.json")
-          d = json.loads(p.read_text(encoding="utf-8"))
+          MYT=timezone(timedelta(hours=8))
+          DB=Path("data/mtp-charta.json")
+          TPL=Path("data/mtp-visual-templates-v10.npz")
+          BASE="https://cartaplanbee.blogspot.com"
+          FEED=BASE+"/feeds/posts/default?alt=json&max-results=50"
+          UA={"User-Agent":"Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/131 Mobile Safari/537.36"}
 
-          date = "2026-09-26"
-          nums = list("1087763914599281")
+          # Verified historical charts used only to TRAIN visual digit shapes.
+          # No future result is hard-coded or used as a fallback.
+          VERIFIED={
+              "2026-09-12":"1391875286409113",
+              "2026-09-13":"9674291035836497",
+              "2026-09-16":"1795842643709157",
+              "2026-09-23":"7294697271658035",
+          }
 
-          entries = d.setdefault("entries", [])
+          def get(url):
+              r=requests.get(url,headers=UA,timeout=25)
+              r.raise_for_status()
+              return r
 
-          # Buang 26/09 lama jika ada supaya tak duplicate
-          entries = [
-              e for e in entries
-              if e.get("date") != date
-          ]
+          def pdate(s):
+              m=re.search(r"MTP\s+(\d{1,2})[./-](\d{1,2})[./-](\d{4})",s,re.I)
+              if not m:return None
+              d,mn,y=m.groups()
+              return f"{y}-{int(mn):02d}-{int(d):02d}"
 
-          entries.append({
-              "date": date,
-              "numbers": nums,
-              "source": "MTP-VERIFIED",
-              "verified": True,
-              "auto": False
-          })
+          def big(u):
+              u=htmlmod.unescape(u)
+              u=re.sub(r"/s\d+(-c)?/","/s1600/",u)
+              return u
 
-          d["entries"] = sorted(
-              entries,
-              key=lambda e: e.get("date", ""),
-              reverse=True
-          )
+          def load_db():
+              if not DB.exists(): return {}
+              try:d=json.loads(DB.read_text(encoding="utf-8"))
+              except:return {}
+              return {e["date"]:e for e in d.get("entries",[]) if e.get("date")}
 
-          p.write_text(
-              json.dumps(d, ensure_ascii=False, indent=2),
-              encoding="utf-8"
-          )
+          def save_db(d):
+              es=sorted(d.values(),key=lambda x:x["date"],reverse=True)
+              DB.parent.mkdir(exist_ok=True)
+              DB.write_text(json.dumps({
+                "source":"APLANBEE MTP ONLY",
+                "updated_at":datetime.now(MYT).isoformat(timespec="seconds"),
+                "entries":es
+              },ensure_ascii=False,indent=2),encoding="utf-8")
+              if es: print("LATEST SAVED:",es[0]["date"],"".join(map(str,es[0]["numbers"])))
 
-          print("SUCCESS")
-          print("26/09/2026")
-          print("1087 / 7639 / 1459 / 9281")
-          PY
-
-      - name: Push database only
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          git add data/mtp-charta.json
-
-          if git diff --cached --quiet; then
-            echo "26/09 already correct"
-            exit 0
-          fi
-
-          git commit -m "Add verified MTP 26-09"
-          git push
+          def latest():
+              f=get(FEED).json()
+              ps=[]
+              for e in f.get("feed",{}).get("entry",[]):
+                  title=e.get("title",{}).get("$t","")
+                  dt=pdate(title)
+                  if not dt or "CARTA" not in title.upper(): continue
+                  url=next((x.get("href","") for x in e.get("link",[]) if x.get("rel")=="alternate"),"")
