@@ -148,9 +148,14 @@ jobs:
 
           if git diff --cached --quiet; then
             echo "No database changes"
+            git restore scripts/update_mtp_charta.py
             exit 0
           fi
 
           git commit -m "Auto MTP V11 update"
-          git pull --rebase origin main
+
+          git restore scripts/update_mtp_charta.py 2>/dev/null || true
+
+          git fetch origin main
+          git rebase origin/main
           git push origin HEAD:main
