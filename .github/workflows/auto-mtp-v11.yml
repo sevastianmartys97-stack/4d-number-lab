@@ -1,115 +1,156 @@
-                  good=[r for v,r in zip(variant_votes,variant_ratios) if v==pred]
-                  ratio=max(good) if good else 1.0
-                  out.append(pred); agreements.append(agree); ratios.append(ratio)
-                  print(f"CELL {ci:02d}: {pred} agreement={agree}/4 separation={ratio:.3f}")
+name: Auto MTP Smart Image V11
 
-              print("MULTI VISUAL RESULT:","".join(out))
-              print("MULTI AGREEMENT:",agreements)
-              print("MULTI MIN SEPARATION:",round(min(ratios),3))
-              # Majority across variants + nearest-class separation.
-              cell_ok=[(a>=3 and r>=1.015) or (a>=2 and r>=1.18) for a,r in zip(agreements,ratios)]
-              confident=all(cell_ok)
-              print("CELL VALID:",cell_ok)
-              return out,confident
+"on":
+  workflow_dispatch: {}
+  schedule:
+    - cron: "*/15 2-11 * * *"
 
-          def main():
-              db=load_db()
-              try:dt,title,url,imgurls=latest()
+permissions:
+  contents: write
+
+concurrency:
+  group: auto-mtp-smart-image-v11
+  cancel-in-progress: true
+
+jobs:
+  auto-mtp:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          pip install requests beautifulsoup4 opencv-python-headless numpy
+
+      - name: Check scanner
+        run: |
+          test -f scripts/update_mtp_charta.py
+          echo "V10 base scanner found"
+
+      - name: Patch scanner to try all images
+        run: |
+          python3 -c '
+          from pathlib import Path
+
+          p=Path("scripts/update_mtp_charta.py")
+          s=p.read_text(encoding="utf-8")
+
+          old="""if imgs: ps.append((dt,title,url,imgs[0]))"""
+
+          new="""if imgs: ps.append((dt,title,url,imgs))"""
+
+          if old in s:
+              s=s.replace(old,new,1)
+
+          old2="""print("ONE CARTA IMAGE:",x[3])
+              return x"""
+
+          new2="""print("CANDIDATE IMAGES:",len(x[3]))
+              return x"""
+
+          if old2 in s:
+              s=s.replace(old2,new2,1)
+
+          old3="""try:dt,title,url,imgurl=latest()
+              except Exception as e:
+                  print("DISCOVERY FAILED:",e); save_db(db); return
+
+              try:
+                  im=decode(get(imgurl).content)
+                  cells=detect_16_cells(im)
+              except Exception as e:
+                  print("VISUAL FETCH/GRID FAILED:",e); cells=None
+
+              if cells is None:
+                  print("NO SAVE - clean DB kept"); save_db(db); return"""
+
+          new3="""try:dt,title,url,imgurls=latest()
               except Exception as e:
                   print("DISCOVERY FAILED:",e); save_db(db); return
 
               cells=None
               imgurl=None
+
+              if isinstance(imgurls,str):
+                  imgurls=[imgurls]
+
               for i,candidate in enumerate(imgurls,1):
                   try:
-                      print(f"TRY IMAGE {i}/{len(imgurls)}:",candidate)
+                      print("TRY IMAGE",str(i)+"/"+str(len(imgurls))+":",candidate)
                       im=decode(get(candidate).content)
                       trial=detect_16_cells(im)
+
                       if trial is not None and len(trial)==16:
                           cells=trial
                           imgurl=candidate
                           print("CARTA IMAGE SELECTED:",candidate)
                           break
-                      print("IMAGE REJECTED - no valid 4x4 grid")
+
+                      print("IMAGE REJECTED - NO VALID 4X4 GRID")
+
                   except Exception as e:
                       print("IMAGE REJECTED:",e)
 
               if cells is None:
-                  print("NO VALID CARTA IMAGE - clean DB kept"); save_db(db); return
+                  print("NO VALID CARTA IMAGE - CLEAN DB KEPT")
+                  save_db(db)
+                  return"""
 
-              X,y=load_templates()
+          if old3 in s:
+              s=s.replace(old3,new3,1)
+          else:
+              raise SystemExit("MAIN PATCH TARGET NOT FOUND")
 
-              # Train from several verified historical charts, not one poster.
-              if X is None:
-                  X,y=save_templates_multi()
-                  if X is None:
-                      print("MULTI TEMPLATE TRAINING FAILED - NO SAVE")
-                      save_db(db); return
+          p.write_text(s,encoding="utf-8")
+          print("V11 PATCH INSTALLED")
+          '
 
-              if dt in VERIFIED:
-                  nums=list(VERIFIED[dt])
-                  print("VERIFIED HISTORICAL DATE:",dt,"".join(nums))
-              else:
-                  nums,confident=classify(cells,X,y)
-                  if not confident:
-                      print("MULTI MATCH AMBIGUOUS - NO SAVE")
-                      save_db(db); return
+      - name: Check Python syntax
+        run: |
+          python3 -m py_compile scripts/update_mtp_charta.py
+          echo "PYTHON SYNTAX OK"
 
-              if dt in db:
-                  if dt in VERIFIED:
-                      old="".join(map(str,db[dt].get("numbers",[]))); good="".join(nums)
-                      if old!=good:
-                          print("REPAIR VERIFIED DATE:",dt,old,"->",good)
-                          db[dt]={"date":dt,"numbers":list(nums),"source":"MTP-SMART-IMAGE-V11-VERIFIED","url":url,"auto":True}
-                          save_db(db)
-                      else:
-                          print("VERIFIED DATE ALREADY CORRECT:",dt); save_db(db)
-                      return
-                  print("DATE ALREADY SAVED - NO OVERWRITE:",dt)
-                  save_db(db); return
-
-              db[dt]={
-                  "date":dt,"numbers":list(nums),
-                  "source":"MTP-SMART-IMAGE-V11",
-                  "url":url,"auto":True
-              }
-              print("AUTO SAVED:",dt,"".join(nums))
-              print("CLEAN MODE: prediction NOT added to training templates")
-              save_db(db)
-
-          if __name__=="__main__": main()
-          PY
-
-      - name: Run V11 smart-image scanner
-        run: python3 scripts/update_mtp_charta.py
+      - name: Run V11 scanner
+        run: |
+          python3 scripts/update_mtp_charta.py
 
       - name: Validate database
         run: |
-          python3 - <<'PY'
+          python3 -c '
           import json
           from pathlib import Path
-          p=Path("data/mtp-charta.json")
-          assert p.exists()
-          d=json.loads(p.read_text())
-          es=d.get("entries",[])
-          assert es and all(len(e.get("numbers",[]))==16 for e in es)
-          print("LATEST SAVED:",es[0]["date"],"".join(map(str,es[0]["numbers"])))
-          PY
 
-      - name: Commit safely
+          p=Path("data/mtp-charta.json")
+          assert p.exists(),"Database missing"
+
+          d=json.loads(p.read_text(encoding="utf-8"))
+          e=d.get("entries",[])
+
+          assert e,"No entries"
+          assert all(len(x.get("numbers",[]))==16 for x in e),"Invalid MTP data"
+
+          print("LATEST:",e[0]["date"],"".join(map(str,e[0]["numbers"])))
+          print("DATABASE VALID")
+          '
+
+      - name: Commit update
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add scripts/update_mtp_charta.py data/mtp-charta.json data/mtp-visual-templates-v10.npz 2>/dev/null || true
-          if git diff --cached --quiet; then echo "No changes"; exit 0; fi
-          git commit -m "Install Auto MTP Smart Image V11"
-          for n in 1 2 3; do
-            git fetch origin main
-            if git rebase origin/main && git push origin HEAD:main; then
-              echo "Push successful"
-              exit 0
-            fi
-            git rebase --abort 2>/dev/null || true
-            sleep 3
-          done
-          exit 1
+
+          git add data/mtp-charta.json
+
+          if git diff --cached --quiet; then
+            echo "No database changes"
+            exit 0
+          fi
+
+          git commit -m "Auto MTP V11 update"
+          git pull --rebase origin main
+          git push origin HEAD:main
