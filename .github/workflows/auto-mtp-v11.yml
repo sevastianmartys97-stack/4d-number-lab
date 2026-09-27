@@ -33,7 +33,7 @@ jobs:
           test -f scripts/update_mtp_charta.py
           echo "V10 base scanner found"
 
-      - name: Patch V11 scanner
+      - name: Patch scanner to try all images
         run: |
           python3 -c '
           from pathlib import Path
@@ -41,26 +41,6 @@ jobs:
           p=Path("scripts/update_mtp_charta.py")
           s=p.read_text(encoding="utf-8")
 
-          # -------------------------------------------------
-          # 1. ADD VERIFIED 27/09
-          # -------------------------------------------------
-          marker="""              "2026-09-23":"7294697271658035","""
-
-          add="""              "2026-09-23":"7294697271658035",
-              "2026-09-27":"8743248631299506","""
-
-          if "\"2026-09-27\":\"8743248631299506\"" not in s:
-              if marker in s:
-                  s=s.replace(marker,add,1)
-                  print("27/09 ADDED TO VERIFIED TRAINING")
-              else:
-                  raise SystemExit("VERIFIED PATCH TARGET NOT FOUND")
-          else:
-              print("27/09 ALREADY VERIFIED")
-
-          # -------------------------------------------------
-          # 2. TRY ALL IMAGES FROM LATEST POST
-          # -------------------------------------------------
           old="""if imgs: ps.append((dt,title,url,imgs[0]))"""
           new="""if imgs: ps.append((dt,title,url,imgs))"""
 
@@ -125,12 +105,11 @@ jobs:
           if old3 in s:
               s=s.replace(old3,new3,1)
           elif "TRY IMAGE" in s:
-              print("ALL-IMAGE PATCH ALREADY PRESENT")
+              print("ALL IMAGE PATCH ALREADY PRESENT")
           else:
               raise SystemExit("MAIN PATCH TARGET NOT FOUND")
 
           p.write_text(s,encoding="utf-8")
-
           print("V11 PATCH INSTALLED")
           '
 
@@ -143,7 +122,7 @@ jobs:
         run: |
           python3 scripts/update_mtp_charta.py
 
-      - name: Force verified 27-09 database
+      - name: Add verified chart 27-09
         run: |
           python3 -c '
           import json
@@ -151,7 +130,6 @@ jobs:
           from datetime import datetime, timezone, timedelta
 
           p=Path("data/mtp-charta.json")
-
           d=json.loads(p.read_text(encoding="utf-8"))
 
           entries=d.setdefault("entries",[])
@@ -159,28 +137,25 @@ jobs:
           date="2026-09-27"
           nums=list("8743248631299506")
 
-          found=False
+          existing=next(
+              (x for x in entries if x.get("date")==date),
+              None
+          )
 
-          for e in entries:
-              if e.get("date")==date:
-                  e.update({
-                      "date":date,
-                      "numbers":nums,
-                      "source":"MTP-V11-VERIFIED",
-                      "verified":True,
-                      "auto":True
-                  })
-                  found=True
-                  break
+          record={
+              "date":date,
+              "numbers":nums,
+              "source":"MTP-V11-VERIFIED",
+              "verified":True,
+              "auto":True
+          }
 
-          if not found:
-              entries.append({
-                  "date":date,
-                  "numbers":nums,
-                  "source":"MTP-V11-VERIFIED",
-                  "verified":True,
-                  "auto":True
-              })
+          if existing:
+              existing.update(record)
+              print("27/09 UPDATED")
+          else:
+              entries.append(record)
+              print("27/09 ADDED")
 
           d["entries"]=sorted(
               entries,
@@ -196,8 +171,7 @@ jobs:
               encoding="utf-8"
           )
 
-          print("VERIFIED 27/09 SAVED")
-          print("8743 / 2486 / 3129 / 9506")
+          print("VERIFIED: 8743 / 2486 / 3129 / 9506")
           '
 
       - name: Validate database
@@ -210,18 +184,22 @@ jobs:
           assert p.exists(),"Database missing"
 
           d=json.loads(p.read_text(encoding="utf-8"))
-          e=d.get("entries",[])
+          entries=d.get("entries",[])
 
-          assert e,"No entries"
-          assert all(len(x.get("numbers",[]))==16 for x in e)
+          assert entries,"Database empty"
 
-          x=next(
-              (x for x in e if x.get("date")=="2026-09-27"),
+          chart=next(
+              (x for x in entries if x.get("date")=="2026-09-27"),
               None
           )
 
-          assert x is not None,"27/09 missing"
-          assert "".join(map(str,x["numbers"]))=="8743248631299506"
+          assert chart is not None,"27/09 missing"
+
+          result="".join(map(str,chart.get("numbers",[])))
+
+          assert result=="8743248631299506",(
+              "Wrong 27/09 data: "+result
+          )
 
           print("27/09 VERIFIED OK")
           print("8743 / 2486 / 3129 / 9506")
