@@ -42,7 +42,6 @@ jobs:
           s=p.read_text(encoding="utf-8")
 
           old="""if imgs: ps.append((dt,title,url,imgs[0]))"""
-
           new="""if imgs: ps.append((dt,title,url,imgs))"""
 
           if old in s:
@@ -148,7 +147,7 @@ jobs:
 
           if git diff --cached --quiet; then
             echo "No database changes"
-            git restore scripts/update_mtp_charta.py
+            git restore scripts/update_mtp_charta.py 2>/dev/null || true
             exit 0
           fi
 
