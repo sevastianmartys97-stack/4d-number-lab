@@ -1,10 +1,10 @@
 {
   "market": "Magnum 4D",
-  "lastUpdated": "2026-10-03",
+  "lastUpdated": "2026-10-04",
   "historyCoverage": {
-    "drawCount": 923,
+    "drawCount": 924,
     "oldestDate": "2021-01-02",
-    "newestDate": "2026-10-03"
+    "newestDate": "2026-10-04"
   },
   "historyRange": {
     "from": "2021-01-01",
@@ -12,6 +12,35 @@
   },
   "historySource": "deadboy18/malaysia-4d public historical CSV + existing recent records",
   "draws": [
+    {
+      "draw": "",
+      "date": "2026-10-04",
+      "first": "1614",
+      "second": "6301",
+      "third": "2001",
+      "special": [
+        "2306",
+        "3144",
+        "3487",
+        "3043",
+        "9166",
+        "9852",
+        "7558",
+        "8739"
+      ],
+      "consolation": [
+        "1167",
+        "5104",
+        "2399",
+        "2832",
+        "5211",
+        "5096",
+        "3547",
+        "0860",
+        "0069",
+        "7720"
+      ]
+    },
     {
       "draw": "",
       "date": "2026-10-03",
