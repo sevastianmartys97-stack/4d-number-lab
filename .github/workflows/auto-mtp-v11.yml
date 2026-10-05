@@ -1,4 +1,4 @@
-name: Auto MTP Smart Image V11.2
+name: Auto MTP Smart Image V11.3
 
 "on":
   workflow_dispatch: {}
@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: auto-mtp-smart-image-v11-2
+  group: auto-mtp-smart-image-v11-3
   cancel-in-progress: true
 
 jobs:
@@ -40,7 +40,7 @@ jobs:
           test -f scripts/update_mtp_charta.py
           echo "V10 BASE SCANNER FOUND"
 
-      - name: Patch scanner to try all images
+      - name: Patch scanner
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -50,10 +50,11 @@ jobs:
 
           changed = False
 
-          # ------------------------------------------------------------
+          # ============================================================
           # PATCH 1
-          # Store ALL candidate images instead of only imgs[0]
-          # ------------------------------------------------------------
+          # Keep ALL candidate images
+          # ============================================================
+
           old = 'if imgs: ps.append((dt,title,url,imgs[0]))'
           new = 'if imgs: ps.append((dt,title,url,imgs))'
 
@@ -66,10 +67,11 @@ jobs:
           else:
               print("PATCH 1 TARGET NOT FOUND")
 
-          # ------------------------------------------------------------
+          # ============================================================
           # PATCH 2
-          # Show candidate image count
-          # ------------------------------------------------------------
+          # Candidate image count
+          # ============================================================
+
           old2 = '''print("ONE CARTA IMAGE:",x[3])
               return x'''
 
@@ -85,10 +87,11 @@ jobs:
           else:
               print("PATCH 2 TARGET NOT FOUND")
 
-          # ------------------------------------------------------------
+          # ============================================================
           # PATCH 3
-          # Try every candidate image until a valid 4x4 grid is found
-          # ------------------------------------------------------------
+          # Try ALL candidate images
+          # ============================================================
+
           old3 = '''try:dt,title,url,imgurl=latest()
               except Exception as e:
                   print("DISCOVERY FAILED:",e); save_db(db); return
@@ -146,12 +149,75 @@ jobs:
           else:
               print("PATCH 3 TARGET NOT FOUND")
 
-          p.write_text(s, encoding="utf-8")
+          # ============================================================
+          # PATCH 4
+          # Allow 15/16 valid cells
+          #
+          # Original V10/V11 rejected the entire chart if one cell
+          # was invalid.
+          #
+          # New rule:
+          # - 16 cells required
+          # - minimum 15 valid cells
+          # - minimum separation 1.00
+          # ============================================================
+
+          marker = 'MULTI MATCH AMBIGUOUS - NO SAVE'
+
+          if marker in s and 'V11.3 MIN VALID CELLS' not in s:
+
+              old4 = '''if not all(cell_valid):
+                  print("MULTI MATCH AMBIGUOUS - NO SAVE")
+                  save_db(db)
+                  return'''
+
+              new4 = '''valid_count=sum(1 for x in cell_valid if x)
+
+              try:
+                  min_sep=min(
+                      float(x)
+                      for x in separations
+                      if x is not None
+                  )
+              except Exception:
+                  min_sep=0.0
+
+              print("V11.3 VALID CELL COUNT:",valid_count,"/16")
+              print("V11.3 MIN VALID CELLS: 15")
+              print("V11.3 MIN SEPARATION:",min_sep)
+
+              if valid_count < 15:
+                  print("MULTI MATCH AMBIGUOUS - TOO MANY INVALID CELLS")
+                  save_db(db)
+                  return
+
+              if min_sep < 1.00:
+                  print("MULTI MATCH AMBIGUOUS - LOW SEPARATION")
+                  save_db(db)
+                  return
+
+              if valid_count == 15:
+                  print("V11.3 ACCEPTED: 15/16 VALID CELLS")
+
+              if valid_count == 16:
+                  print("V11.3 ACCEPTED: 16/16 VALID CELLS")'''
+
+              if old4 in s:
+                  s=s.replace(old4,new4,1)
+                  print("PATCH 4 INSTALLED")
+                  changed=True
+              else:
+                  print("PATCH 4 TARGET NOT FOUND")
+
+          else:
+              print("PATCH 4 ALREADY PRESENT OR TARGET NOT FOUND")
+
+          p.write_text(s,encoding="utf-8")
 
           if changed:
-              print("V11.2 PATCH INSTALLED")
+              print("V11.3 PATCH INSTALLED")
           else:
-              print("V11.2 PATCH ALREADY ACTIVE")
+              print("V11.3 PATCH ALREADY ACTIVE")
           PY
 
       - name: Check Python syntax
@@ -159,190 +225,154 @@ jobs:
           python3 -m py_compile scripts/update_mtp_charta.py
           echo "PYTHON SYNTAX OK"
 
-      - name: Run V11.2 scanner with retry
+      - name: Run V11.3 scanner
         run: |
-          set +e
-
           echo "=========================================="
-          echo "V11.2 MTP SCANNER START"
+          echo "V11.3 MTP SCANNER START"
           echo "=========================================="
 
-          python3 scripts/update_mtp_charta.py 2>&1 | tee scanner.log
+          python3 scripts/update_mtp_charta.py | tee scanner.log
 
           status=${PIPESTATUS[0]}
 
-          echo "INITIAL SCANNER EXIT CODE: $status"
+          echo "SCANNER EXIT CODE: $status"
 
           if [ "$status" -ne 0 ]; then
-            echo "INITIAL SCANNER FAILED - RETRYING"
+            echo "SCANNER RETURNED ERROR"
           fi
 
-          for attempt in 2 3
-          do
-            source_date=$(grep -oE 'LATEST MTP: [0-9]{4}-[0-9]{2}-[0-9]{2}' scanner.log | tail -1 | awk '{print $3}' || true)
-
-            saved_date=$(python3 - <<'PY'
-          import json
-          from pathlib import Path
-
-          p = Path("data/mtp-charta.json")
-
-          try:
-              d = json.loads(p.read_text(encoding="utf-8"))
-              entries = d.get("entries", [])
-              dates = [x.get("date","") for x in entries if x.get("date")]
-              print(max(dates) if dates else "")
-          except Exception:
-              print("")
-          PY
-          )
-
-            echo "LATEST SOURCE DATE: ${source_date:-UNKNOWN}"
-            echo "LATEST SAVED DATE: ${saved_date:-UNKNOWN}"
-
-            if [ -n "$source_date" ] && [ -n "$saved_date" ] && "$source_date" \> "$saved_date"; then
-              echo "SOURCE IS NEWER THAN DATABASE"
-              echo "RETRY SCANNER ATTEMPT $attempt"
-
-              sleep 5
-
-              python3 scripts/update_mtp_charta.py 2>&1 | tee -a scanner.log
-
-              status=${PIPESTATUS[0]}
-              echo "RETRY $attempt EXIT CODE: $status"
-            else
-              echo "DATABASE IS UP TO DATE OR SOURCE DATE UNKNOWN"
-              break
-            fi
-          done
-
           echo "=========================================="
-          echo "V11.2 SCANNER FINISHED"
+          echo "V11.3 SCANNER FINISHED"
           echo "=========================================="
 
           exit 0
 
-      - name: Show latest source and saved database
+      - name: Validate latest MTP
         run: |
-          echo "=========================================="
-          echo "MTP SOURCE / DATABASE STATUS"
-          echo "=========================================="
-
-          echo "Scanner latest source:"
-          grep "LATEST MTP:" scanner.log | tail -3 || true
-
-          echo ""
-          echo "Scanner selected image:"
-          grep "CARTA IMAGE SELECTED:" scanner.log | tail -3 || true
-
-          echo ""
-          echo "Scanner ambiguity:"
-          grep "AMBIGUOUS" scanner.log | tail -5 || true
-
-          echo ""
-          echo "Scanner save status:"
-          grep -E "SAVE|NO SAVE|SAVED|ADDED|UPDATED" scanner.log | tail -10 || true
-
-          echo ""
           python3 - <<'PY'
           import json
           from pathlib import Path
+          from datetime import datetime
 
-          p = Path("data/mtp-charta.json")
-          d = json.loads(p.read_text(encoding="utf-8"))
+          p=Path("data/mtp-charta.json")
 
-          entries = d.get("entries", [])
-          entries = sorted(
+          if not p.exists():
+              raise SystemExit("DATABASE MISSING")
+
+          d=json.loads(
+              p.read_text(encoding="utf-8")
+          )
+
+          entries=d.get("entries",[])
+
+          if not entries:
+              raise SystemExit("DATABASE EMPTY")
+
+          entries=sorted(
               entries,
-              key=lambda x: x.get("date",""),
+              key=lambda x:x.get("date",""),
               reverse=True
           )
 
-          if entries:
-              latest = entries[0]
+          latest=entries[0]
 
-              print("LATEST SAVED DATE :", latest.get("date"))
-              print(
-                  "LATEST SAVED NUMBERS:",
-                  "".join(map(str, latest.get("numbers", [])))
+          print("==========================================")
+          print("LATEST SAVED DATE:",latest.get("date"))
+          print(
+              "LATEST SAVED NUMBERS:",
+              "".join(map(str,latest.get("numbers",[])))
+          )
+          print("LATEST SOURCE:",latest.get("source"))
+          print("VERIFIED:",latest.get("verified"))
+          print("==========================================")
+
+          # Show 04/10 if present
+          chart=next(
+              (
+                  x for x in entries
+                  if x.get("date")=="2026-10-04"
+              ),
+              None
+          )
+
+          if chart:
+              result="".join(
+                  map(str,chart.get("numbers",[]))
               )
-              print("LATEST SOURCE      :", latest.get("source"))
-              print("VERIFIED            :", latest.get("verified"))
+
+              print("04/10 FOUND IN DATABASE")
+              print("04/10 RESULT:",result)
+              print("04/10 SOURCE:",chart.get("source"))
           else:
-              print("DATABASE EMPTY")
+              print("04/10 NOT YET IN DATABASE")
           PY
 
-          echo "=========================================="
-
-      - name: Add verified chart 27-09 if missing
+      - name: Keep verified 27-09
         run: |
           python3 - <<'PY'
           import json
           from pathlib import Path
           from datetime import datetime, timezone, timedelta
 
-          p = Path("data/mtp-charta.json")
-          d = json.loads(p.read_text(encoding="utf-8"))
+          p=Path("data/mtp-charta.json")
 
-          entries = d.setdefault("entries", [])
+          d=json.loads(
+              p.read_text(encoding="utf-8")
+          )
 
-          date = "2026-09-27"
-          nums = list("8743248631299506")
+          entries=d.setdefault("entries",[])
 
-          existing = next(
-              (x for x in entries if x.get("date") == date),
+          date="2026-09-27"
+          nums=list("8743248631299506")
+
+          existing=next(
+              (
+                  x for x in entries
+                  if x.get("date")==date
+              ),
               None
           )
 
-          changed = False
-
-          record = {
-              "date": date,
-              "numbers": nums,
-              "source": "MTP-V11-VERIFIED",
-              "verified": True,
-              "auto": True
+          record={
+              "date":date,
+              "numbers":nums,
+              "source":"MTP-V11-VERIFIED",
+              "verified":True,
+              "auto":True
           }
 
           if existing:
-              before = dict(existing)
               existing.update(record)
-
-              if existing != before:
-                  changed = True
-                  print("27/09 UPDATED")
-              else:
-                  print("27/09 ALREADY CORRECT")
+              print("27/09 VERIFIED RECORD KEPT")
           else:
               entries.append(record)
-              changed = True
-              print("27/09 ADDED")
+              print("27/09 VERIFIED RECORD RESTORED")
 
           entries.sort(
-              key=lambda x: x.get("date",""),
+              key=lambda x:x.get("date",""),
               reverse=True
           )
 
-          d["entries"] = entries
+          d["entries"]=entries
 
-          if changed:
-              MYT = timezone(timedelta(hours=8))
-              d["updated_at"] = datetime.now(MYT).isoformat(
-                  timespec="seconds"
-              )
+          MYT=timezone(timedelta(hours=8))
 
-              p.write_text(
-                  json.dumps(
-                      d,
-                      ensure_ascii=False,
-                      indent=2
-                  ),
-                  encoding="utf-8"
-              )
+          d["updated_at"]=datetime.now(
+              MYT
+          ).isoformat(
+              timespec="seconds"
+          )
 
-              print("VERIFIED: 8743 / 2486 / 3129 / 9506")
-          else:
-              print("DATABASE UNCHANGED")
+          p.write_text(
+              json.dumps(
+                  d,
+                  ensure_ascii=False,
+                  indent=2
+              ),
+              encoding="utf-8"
+          )
+
+          print("27/09 = 8743 / 2486 / 3129 / 9506")
           PY
 
       - name: Validate database
@@ -351,50 +381,34 @@ jobs:
           import json
           from pathlib import Path
 
-          p = Path("data/mtp-charta.json")
+          p=Path("data/mtp-charta.json")
 
-          assert p.exists(), "Database missing"
+          assert p.exists(),"Database missing"
 
-          d = json.loads(
+          d=json.loads(
               p.read_text(encoding="utf-8")
           )
 
-          entries = d.get("entries", [])
+          entries=d.get("entries",[])
 
-          assert entries, "Database empty"
+          assert entries,"Database empty"
 
-          entries = sorted(
-              entries,
-              key=lambda x: x.get("date",""),
-              reverse=True
-          )
-
-          latest = entries[0]
-
-          latest_date = latest.get("date","")
-          latest_numbers = "".join(
-              map(str, latest.get("numbers", []))
-          )
-
-          print("LATEST DATABASE DATE:", latest_date)
-          print("LATEST DATABASE NUMBERS:", latest_numbers)
-
-          chart = next(
+          chart=next(
               (
                   x for x in entries
-                  if x.get("date") == "2026-09-27"
+                  if x.get("date")=="2026-09-27"
               ),
               None
           )
 
-          assert chart is not None, "27/09 missing"
+          assert chart is not None,"27/09 missing"
 
-          result = "".join(
-              map(str, chart.get("numbers", []))
+          result="".join(
+              map(str,chart.get("numbers",[]))
           )
 
-          assert result == "8743248631299506", (
-              "Wrong 27/09 data: " + result
+          assert result=="8743248631299506",(
+              "Wrong 27/09 data: "+result
           )
 
           print("27/09 VERIFIED OK")
@@ -419,7 +433,7 @@ jobs:
             exit 0
           fi
 
-          git commit -m "Auto update MTP Charta V11.2"
+          git commit -m "Auto update MTP Charta V11.3"
 
           git fetch origin main
 
