@@ -1,21 +1,21 @@
-name: Auto MTP Smart Image V11
+name: Auto MTP Smart Image V11.2
 
 "on":
   workflow_dispatch: {}
   schedule:
-    - cron: "*/15 2-11 * * *"
+    - cron: "*/15 * * * *"
 
 permissions:
   contents: write
 
 concurrency:
-  group: auto-mtp-smart-image-v11
+  group: auto-mtp-smart-image-v11-2
   cancel-in-progress: true
 
 jobs:
   auto-mtp:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 12
 
     steps:
       - name: Checkout
@@ -28,35 +28,68 @@ jobs:
           python3 -m pip install --upgrade pip
           pip install requests beautifulsoup4 opencv-python-headless numpy
 
+      - name: Sync repository
+        run: |
+          git config pull.rebase true
+          git fetch origin main
+          git reset --hard origin/main
+          echo "REPOSITORY SYNCED"
+
       - name: Check scanner
         run: |
           test -f scripts/update_mtp_charta.py
-          echo "V10 base scanner found"
+          echo "V10 BASE SCANNER FOUND"
 
       - name: Patch scanner to try all images
         run: |
-          python3 -c '
+          python3 - <<'PY'
           from pathlib import Path
 
-          p=Path("scripts/update_mtp_charta.py")
-          s=p.read_text(encoding="utf-8")
+          p = Path("scripts/update_mtp_charta.py")
+          s = p.read_text(encoding="utf-8")
 
-          old="""if imgs: ps.append((dt,title,url,imgs[0]))"""
-          new="""if imgs: ps.append((dt,title,url,imgs))"""
+          changed = False
+
+          # ------------------------------------------------------------
+          # PATCH 1
+          # Store ALL candidate images instead of only imgs[0]
+          # ------------------------------------------------------------
+          old = 'if imgs: ps.append((dt,title,url,imgs[0]))'
+          new = 'if imgs: ps.append((dt,title,url,imgs))'
 
           if old in s:
-              s=s.replace(old,new,1)
+              s = s.replace(old, new, 1)
+              print("PATCH 1 INSTALLED")
+              changed = True
+          elif 'if imgs: ps.append((dt,title,url,imgs))' in s:
+              print("PATCH 1 ALREADY PRESENT")
+          else:
+              print("PATCH 1 TARGET NOT FOUND")
 
-          old2="""print("ONE CARTA IMAGE:",x[3])
-              return x"""
+          # ------------------------------------------------------------
+          # PATCH 2
+          # Show candidate image count
+          # ------------------------------------------------------------
+          old2 = '''print("ONE CARTA IMAGE:",x[3])
+              return x'''
 
-          new2="""print("CANDIDATE IMAGES:",len(x[3]))
-              return x"""
+          new2 = '''print("CANDIDATE IMAGES:",len(x[3]))
+              return x'''
 
           if old2 in s:
-              s=s.replace(old2,new2,1)
+              s = s.replace(old2, new2, 1)
+              print("PATCH 2 INSTALLED")
+              changed = True
+          elif 'print("CANDIDATE IMAGES:",len(x[3]))' in s:
+              print("PATCH 2 ALREADY PRESENT")
+          else:
+              print("PATCH 2 TARGET NOT FOUND")
 
-          old3="""try:dt,title,url,imgurl=latest()
+          # ------------------------------------------------------------
+          # PATCH 3
+          # Try every candidate image until a valid 4x4 grid is found
+          # ------------------------------------------------------------
+          old3 = '''try:dt,title,url,imgurl=latest()
               except Exception as e:
                   print("DISCOVERY FAILED:",e); save_db(db); return
 
@@ -67,9 +100,9 @@ jobs:
                   print("VISUAL FETCH/GRID FAILED:",e); cells=None
 
               if cells is None:
-                  print("NO SAVE - clean DB kept"); save_db(db); return"""
+                  print("NO SAVE - clean DB kept"); save_db(db); return'''
 
-          new3="""try:dt,title,url,imgurls=latest()
+          new3 = '''try:dt,title,url,imgurls=latest()
               except Exception as e:
                   print("DISCOVERY FAILED:",e); save_db(db); return
 
@@ -78,6 +111,8 @@ jobs:
 
               if isinstance(imgurls,str):
                   imgurls=[imgurls]
+
+              print("CANDIDATE IMAGE COUNT:",len(imgurls))
 
               for i,candidate in enumerate(imgurls,1):
                   try:
@@ -100,111 +135,277 @@ jobs:
               if cells is None:
                   print("NO VALID CARTA IMAGE - CLEAN DB KEPT")
                   save_db(db)
-                  return"""
+                  return'''
 
           if old3 in s:
-              s=s.replace(old3,new3,1)
-          elif "TRY IMAGE" in s:
-              print("ALL IMAGE PATCH ALREADY PRESENT")
+              s = s.replace(old3, new3, 1)
+              print("PATCH 3 INSTALLED")
+              changed = True
+          elif 'TRY IMAGE' in s and 'CANDIDATE IMAGE COUNT' in s:
+              print("PATCH 3 ALREADY PRESENT")
           else:
-              raise SystemExit("MAIN PATCH TARGET NOT FOUND")
+              print("PATCH 3 TARGET NOT FOUND")
 
-          p.write_text(s,encoding="utf-8")
-          print("V11 PATCH INSTALLED")
-          '
+          p.write_text(s, encoding="utf-8")
+
+          if changed:
+              print("V11.2 PATCH INSTALLED")
+          else:
+              print("V11.2 PATCH ALREADY ACTIVE")
+          PY
 
       - name: Check Python syntax
         run: |
           python3 -m py_compile scripts/update_mtp_charta.py
           echo "PYTHON SYNTAX OK"
 
-      - name: Run V11 scanner
+      - name: Run V11.2 scanner with retry
         run: |
-          python3 scripts/update_mtp_charta.py
+          set +e
 
-      - name: Add verified chart 27-09
+          echo "=========================================="
+          echo "V11.2 MTP SCANNER START"
+          echo "=========================================="
+
+          python3 scripts/update_mtp_charta.py 2>&1 | tee scanner.log
+
+          status=${PIPESTATUS[0]}
+
+          echo "INITIAL SCANNER EXIT CODE: $status"
+
+          if [ "$status" -ne 0 ]; then
+            echo "INITIAL SCANNER FAILED - RETRYING"
+          fi
+
+          for attempt in 2 3
+          do
+            source_date=$(grep -oE 'LATEST MTP: [0-9]{4}-[0-9]{2}-[0-9]{2}' scanner.log | tail -1 | awk '{print $3}' || true)
+
+            saved_date=$(python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          p = Path("data/mtp-charta.json")
+
+          try:
+              d = json.loads(p.read_text(encoding="utf-8"))
+              entries = d.get("entries", [])
+              dates = [x.get("date","") for x in entries if x.get("date")]
+              print(max(dates) if dates else "")
+          except Exception:
+              print("")
+          PY
+          )
+
+            echo "LATEST SOURCE DATE: ${source_date:-UNKNOWN}"
+            echo "LATEST SAVED DATE: ${saved_date:-UNKNOWN}"
+
+            if [ -n "$source_date" ] && [ -n "$saved_date" ] && "$source_date" \> "$saved_date"; then
+              echo "SOURCE IS NEWER THAN DATABASE"
+              echo "RETRY SCANNER ATTEMPT $attempt"
+
+              sleep 5
+
+              python3 scripts/update_mtp_charta.py 2>&1 | tee -a scanner.log
+
+              status=${PIPESTATUS[0]}
+              echo "RETRY $attempt EXIT CODE: $status"
+            else
+              echo "DATABASE IS UP TO DATE OR SOURCE DATE UNKNOWN"
+              break
+            fi
+          done
+
+          echo "=========================================="
+          echo "V11.2 SCANNER FINISHED"
+          echo "=========================================="
+
+          exit 0
+
+      - name: Show latest source and saved database
         run: |
-          python3 -c '
+          echo "=========================================="
+          echo "MTP SOURCE / DATABASE STATUS"
+          echo "=========================================="
+
+          echo "Scanner latest source:"
+          grep "LATEST MTP:" scanner.log | tail -3 || true
+
+          echo ""
+          echo "Scanner selected image:"
+          grep "CARTA IMAGE SELECTED:" scanner.log | tail -3 || true
+
+          echo ""
+          echo "Scanner ambiguity:"
+          grep "AMBIGUOUS" scanner.log | tail -5 || true
+
+          echo ""
+          echo "Scanner save status:"
+          grep -E "SAVE|NO SAVE|SAVED|ADDED|UPDATED" scanner.log | tail -10 || true
+
+          echo ""
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          p = Path("data/mtp-charta.json")
+          d = json.loads(p.read_text(encoding="utf-8"))
+
+          entries = d.get("entries", [])
+          entries = sorted(
+              entries,
+              key=lambda x: x.get("date",""),
+              reverse=True
+          )
+
+          if entries:
+              latest = entries[0]
+
+              print("LATEST SAVED DATE :", latest.get("date"))
+              print(
+                  "LATEST SAVED NUMBERS:",
+                  "".join(map(str, latest.get("numbers", [])))
+              )
+              print("LATEST SOURCE      :", latest.get("source"))
+              print("VERIFIED            :", latest.get("verified"))
+          else:
+              print("DATABASE EMPTY")
+          PY
+
+          echo "=========================================="
+
+      - name: Add verified chart 27-09 if missing
+        run: |
+          python3 - <<'PY'
           import json
           from pathlib import Path
           from datetime import datetime, timezone, timedelta
 
-          p=Path("data/mtp-charta.json")
-          d=json.loads(p.read_text(encoding="utf-8"))
+          p = Path("data/mtp-charta.json")
+          d = json.loads(p.read_text(encoding="utf-8"))
 
-          entries=d.setdefault("entries",[])
+          entries = d.setdefault("entries", [])
 
-          date="2026-09-27"
-          nums=list("8743248631299506")
+          date = "2026-09-27"
+          nums = list("8743248631299506")
 
-          existing=next(
-              (x for x in entries if x.get("date")==date),
+          existing = next(
+              (x for x in entries if x.get("date") == date),
               None
           )
 
-          record={
-              "date":date,
-              "numbers":nums,
-              "source":"MTP-V11-VERIFIED",
-              "verified":True,
-              "auto":True
+          changed = False
+
+          record = {
+              "date": date,
+              "numbers": nums,
+              "source": "MTP-V11-VERIFIED",
+              "verified": True,
+              "auto": True
           }
 
           if existing:
+              before = dict(existing)
               existing.update(record)
-              print("27/09 UPDATED")
+
+              if existing != before:
+                  changed = True
+                  print("27/09 UPDATED")
+              else:
+                  print("27/09 ALREADY CORRECT")
           else:
               entries.append(record)
+              changed = True
               print("27/09 ADDED")
 
-          d["entries"]=sorted(
-              entries,
-              key=lambda x:x.get("date",""),
+          entries.sort(
+              key=lambda x: x.get("date",""),
               reverse=True
           )
 
-          MYT=timezone(timedelta(hours=8))
-          d["updated_at"]=datetime.now(MYT).isoformat(timespec="seconds")
+          d["entries"] = entries
 
-          p.write_text(
-              json.dumps(d,ensure_ascii=False,indent=2),
-              encoding="utf-8"
-          )
+          if changed:
+              MYT = timezone(timedelta(hours=8))
+              d["updated_at"] = datetime.now(MYT).isoformat(
+                  timespec="seconds"
+              )
 
-          print("VERIFIED: 8743 / 2486 / 3129 / 9506")
-          '
+              p.write_text(
+                  json.dumps(
+                      d,
+                      ensure_ascii=False,
+                      indent=2
+                  ),
+                  encoding="utf-8"
+              )
+
+              print("VERIFIED: 8743 / 2486 / 3129 / 9506")
+          else:
+              print("DATABASE UNCHANGED")
+          PY
 
       - name: Validate database
         run: |
-          python3 -c '
+          python3 - <<'PY'
           import json
           from pathlib import Path
 
-          p=Path("data/mtp-charta.json")
-          assert p.exists(),"Database missing"
+          p = Path("data/mtp-charta.json")
 
-          d=json.loads(p.read_text(encoding="utf-8"))
-          entries=d.get("entries",[])
+          assert p.exists(), "Database missing"
 
-          assert entries,"Database empty"
+          d = json.loads(
+              p.read_text(encoding="utf-8")
+          )
 
-          chart=next(
-              (x for x in entries if x.get("date")=="2026-09-27"),
+          entries = d.get("entries", [])
+
+          assert entries, "Database empty"
+
+          entries = sorted(
+              entries,
+              key=lambda x: x.get("date",""),
+              reverse=True
+          )
+
+          latest = entries[0]
+
+          latest_date = latest.get("date","")
+          latest_numbers = "".join(
+              map(str, latest.get("numbers", []))
+          )
+
+          print("LATEST DATABASE DATE:", latest_date)
+          print("LATEST DATABASE NUMBERS:", latest_numbers)
+
+          chart = next(
+              (
+                  x for x in entries
+                  if x.get("date") == "2026-09-27"
+              ),
               None
           )
 
-          assert chart is not None,"27/09 missing"
+          assert chart is not None, "27/09 missing"
 
-          result="".join(map(str,chart.get("numbers",[])))
+          result = "".join(
+              map(str, chart.get("numbers", []))
+          )
 
-          assert result=="8743248631299506",(
-              "Wrong 27/09 data: "+result
+          assert result == "8743248631299506", (
+              "Wrong 27/09 data: " + result
           )
 
           print("27/09 VERIFIED OK")
           print("8743 / 2486 / 3129 / 9506")
           print("DATABASE VALID")
-          '
+          PY
+
+      - name: Restore scanner patch
+        run: |
+          git restore scripts/update_mtp_charta.py 2>/dev/null || true
+          echo "SCANNER PATCH RESTORED"
 
       - name: Commit update
         run: |
@@ -214,15 +415,16 @@ jobs:
           git add data/mtp-charta.json
 
           if git diff --cached --quiet; then
-            echo "Database already correct"
-            git restore scripts/update_mtp_charta.py 2>/dev/null || true
+            echo "NO DATABASE CHANGES"
             exit 0
           fi
 
-          git commit -m "Add verified MTP 27-09"
-
-          git restore scripts/update_mtp_charta.py 2>/dev/null || true
+          git commit -m "Auto update MTP Charta V11.2"
 
           git fetch origin main
+
           git rebase origin/main
+
           git push origin HEAD:main
+
+          echo "MTP DATABASE PUSHED SUCCESSFULLY"
