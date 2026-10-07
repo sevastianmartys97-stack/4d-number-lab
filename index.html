@@ -1703,6 +1703,89 @@ body.v46-ui .pattern-panel{
 #v51GeneratorPage .t3-foot{text-align:center;color:#607d90;font-size:6px;line-height:1.5;padding:2px 6px}
 </style>
 
+
+<style id="MTP-DIRECT-IMAGE-CSS">
+/* MTP-DIRECT-IMAGE-V1 */
+
+.mtp-direct-image-card{
+  margin-top:10px;
+  padding:10px;
+  border:1px solid #234b63;
+  border-radius:14px;
+  background:#061521;
+}
+
+.mtp-direct-image-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:8px;
+  margin-bottom:8px;
+}
+
+.mtp-direct-image-title{
+  color:#dceaf3;
+  font-size:12px;
+  font-weight:800;
+}
+
+.mtp-direct-image-badge{
+  color:#78e79a;
+  border:1px solid #28633d;
+  background:#09271a;
+  border-radius:99px;
+  padding:4px 7px;
+  font-size:8px;
+  font-weight:800;
+}
+
+.mtp-direct-image-date{
+  color:#ffc62e;
+  font-size:10px;
+  font-weight:800;
+  margin-bottom:7px;
+}
+
+.mtp-direct-image-wrap{
+  width:100%;
+  border-radius:11px;
+  overflow:hidden;
+  background:#02080d;
+  border:1px solid #1c3c50;
+}
+
+.mtp-direct-image{
+  display:block;
+  width:100%;
+  height:auto;
+  max-height:520px;
+  object-fit:contain;
+  margin:0 auto;
+}
+
+.mtp-direct-image-note{
+  margin-top:7px;
+  color:#7892a3;
+  font-size:8px;
+  line-height:1.35;
+  text-align:center;
+}
+
+.mtp-direct-image-loading{
+  padding:18px 8px;
+  text-align:center;
+  color:#7892a3;
+  font-size:9px;
+}
+
+.mtp-direct-image-error{
+  padding:14px 8px;
+  text-align:center;
+  color:#ff9a9a;
+  font-size:9px;
+}
+</style>
+
 </head>
 
 <body>
@@ -6611,5 +6694,375 @@ document.addEventListener("DOMContentLoaded",function(){
   document.readyState==="loading"?document.addEventListener("DOMContentLoaded",start):start();
 })();
 </script>
+
+<script id="MTP-DIRECT-IMAGE-V1">
+/* MTP-DIRECT-IMAGE-V1 */
+
+(function(){
+
+  const DB_URL="data/mtp-charta.json";
+
+  const FALLBACK_0410=
+    "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjhK7cEY269PNcQS3EM_z-MaRtKIDccA65G3CioFTjLMBf9EQJOWIsypgOtZ06_jgPZ-ml6KLzWcZMuKVww2Av8IAqGBvaOYvoiQfwyaZR57AoZ5tgyqqfAQZLDWunmemJt_5g6Ef3DywLOJZa6DkTBbFL_9xYL6T8yMeQkXkh9rGBk0Tt90XacWw0L1oAm/s1600/IMG_1791089634649.jpg";
+
+  function nice(date){
+
+    const m=String(date||"").match(
+      /^(\\d{4})-(\\d{2})-(\\d{2})$/
+    );
+
+    return m
+      ? `${m[3]}/${m[2]}/${m[1]}`
+      : date;
+  }
+
+  function getSelectedDate(){
+
+    const s=
+      document.getElementById(
+        "mtpDateSelect"
+      );
+
+    if(s && s.value){
+      return s.value;
+    }
+
+    return "";
+  }
+
+  function makeCard(){
+
+    if(
+      document.getElementById(
+        "mtpDirectImageCard"
+      )
+    ){
+      return document.getElementById(
+        "mtpDirectImageCard"
+      );
+    }
+
+    const card=
+      document.createElement("div");
+
+    card.id=
+      "mtpDirectImageCard";
+
+    card.className=
+      "mtp-direct-image-card";
+
+    card.innerHTML=`
+
+      <div class="mtp-direct-image-head">
+
+        <div class="mtp-direct-image-title">
+          🖼️ MTP CHARTA • GAMBAR SEBENAR
+        </div>
+
+        <div class="mtp-direct-image-badge">
+          LIVE ✓
+        </div>
+
+      </div>
+
+      <div
+        id="mtpDirectImageDate"
+        class="mtp-direct-image-date">
+        MTP
+      </div>
+
+      <div
+        id="mtpDirectImageBody"
+        class="mtp-direct-image-wrap">
+
+        <div
+          class="mtp-direct-image-loading">
+          Memuatkan gambar carta...
+        </div>
+
+      </div>
+
+      <div
+        class="mtp-direct-image-note">
+        Sumber gambar terus daripada CARTAPLANBEE MTP.
+        Gambar ini menjadi rujukan carta sebenar.
+      </div>
+    `;
+
+    const select=
+      document.getElementById(
+        "mtpDateSelect"
+      );
+
+    if(select){
+
+      const parent=
+        select.parentElement;
+
+      if(parent){
+
+        parent.after(card);
+
+      }else{
+
+        document.body.prepend(card);
+
+      }
+
+    }else{
+
+      document.body.prepend(card);
+
+    }
+
+    return card;
+  }
+
+  async function loadImage(){
+
+    const card=makeCard();
+
+    const date=
+      getSelectedDate();
+
+    const dateEl=
+      document.getElementById(
+        "mtpDirectImageDate"
+      );
+
+    const body=
+      document.getElementById(
+        "mtpDirectImageBody"
+      );
+
+    if(!body)return;
+
+    body.innerHTML=
+      `<div class="mtp-direct-image-loading">
+        Memuatkan gambar carta...
+      </div>`;
+
+    try{
+
+      const r=
+        await fetch(
+          DB_URL+
+          "?v="+
+          Date.now(),
+          {
+            cache:"no-store"
+          }
+        );
+
+      if(!r.ok){
+        throw new Error(
+          "HTTP "+r.status
+        );
+      }
+
+      const data=
+        await r.json();
+
+      const entries=
+        Array.isArray(data.entries)
+        ? data.entries
+        : [];
+
+      let selected=
+        entries.find(
+          e =>
+            e &&
+            e.date===date &&
+            e.image_url
+        );
+
+      // Fallback for verified 04/10
+      if(
+        !selected &&
+        date==="2026-10-04"
+      ){
+
+        selected={
+          date:"2026-10-04",
+          image_url:FALLBACK_0410
+        };
+
+      }
+
+      // If selected date has no image,
+      // show newest image available.
+      if(!selected){
+
+        const sorted=
+          entries
+          .filter(
+            e =>
+              e &&
+              e.image_url
+          )
+          .sort(
+            (a,b)=>
+              String(b.date)
+              .localeCompare(
+                String(a.date)
+              )
+          );
+
+        selected=
+          sorted[0] || null;
+
+      }
+
+      if(!selected){
+
+        body.innerHTML=
+          `<div class="mtp-direct-image-error">
+            Gambar MTP belum tersedia.
+          </div>`;
+
+        if(dateEl){
+          dateEl.textContent=
+            "MTP";
+        }
+
+        return;
+
+      }
+
+      if(dateEl){
+
+        dateEl.textContent=
+          nice(selected.date)+
+          " • MTP";
+
+      }
+
+      const img=
+        document.createElement(
+          "img"
+        );
+
+      img.className=
+        "mtp-direct-image";
+
+      img.alt=
+        "MTP Charta "+
+        nice(selected.date);
+
+      img.loading="eager";
+
+      img.referrerPolicy=
+        "no-referrer";
+
+      img.src=
+        selected.image_url;
+
+      img.onload=function(){
+
+        body.innerHTML="";
+        body.appendChild(img);
+
+      };
+
+      img.onerror=function(){
+
+        body.innerHTML=
+          `<div class="mtp-direct-image-error">
+            Gambar carta tidak dapat dimuat.
+          </div>`;
+
+      };
+
+    }catch(err){
+
+      console.warn(
+        "MTP DIRECT IMAGE",
+        err
+      );
+
+      body.innerHTML=
+        `<div class="mtp-direct-image-error">
+          Gagal memuatkan gambar MTP.
+        </div>`;
+
+    }
+
+  }
+
+  function install(){
+
+    makeCard();
+
+    loadImage();
+
+    const select=
+      document.getElementById(
+        "mtpDateSelect"
+      );
+
+    if(select){
+
+      select.addEventListener(
+        "change",
+        function(){
+
+          setTimeout(
+            loadImage,
+            50
+          );
+
+        }
+      );
+
+    }
+
+  }
+
+  function start(){
+
+    install();
+
+    setInterval(
+      loadImage,
+      5*60*1000
+    );
+
+    document.addEventListener(
+      "visibilitychange",
+      function(){
+
+        if(!document.hidden){
+          loadImage();
+        }
+
+      }
+    );
+
+    window.addEventListener(
+      "focus",
+      loadImage
+    );
+
+  }
+
+  if(
+    document.readyState===
+    "loading"
+  ){
+
+    document.addEventListener(
+      "DOMContentLoaded",
+      start
+    );
+
+  }else{
+
+    start();
+
+  }
+
+})();
+</script>
+
 </body>
 </html>
