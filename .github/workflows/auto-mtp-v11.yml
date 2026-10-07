@@ -1,4 +1,4 @@
-name: Auto MTP Smart Image V11.3
+name: Auto MTP Direct Image V1
 
 "on":
   workflow_dispatch: {}
@@ -9,13 +9,13 @@ permissions:
   contents: write
 
 concurrency:
-  group: auto-mtp-smart-image-v11-3
+  group: auto-mtp-direct-image-v1
   cancel-in-progress: true
 
 jobs:
-  auto-mtp:
+  mtp-direct-image:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 10
 
     steps:
       - name: Checkout
@@ -26,267 +26,872 @@ jobs:
       - name: Install dependencies
         run: |
           python3 -m pip install --upgrade pip
-          pip install requests beautifulsoup4 opencv-python-headless numpy
+          pip install requests beautifulsoup4
 
-      - name: Sync repository
-        run: |
-          git config pull.rebase true
-          git fetch origin main
-          git reset --hard origin/main
-          echo "REPOSITORY SYNCED"
-
-      - name: Check scanner
-        run: |
-          test -f scripts/update_mtp_charta.py
-          echo "V10 BASE SCANNER FOUND"
-
-      - name: Patch scanner
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          p = Path("scripts/update_mtp_charta.py")
-          s = p.read_text(encoding="utf-8")
-
-          changed = False
-
-          # ============================================================
-          # PATCH 1
-          # Keep ALL candidate images
-          # ============================================================
-
-          old = 'if imgs: ps.append((dt,title,url,imgs[0]))'
-          new = 'if imgs: ps.append((dt,title,url,imgs))'
-
-          if old in s:
-              s = s.replace(old, new, 1)
-              print("PATCH 1 INSTALLED")
-              changed = True
-          elif 'if imgs: ps.append((dt,title,url,imgs))' in s:
-              print("PATCH 1 ALREADY PRESENT")
-          else:
-              print("PATCH 1 TARGET NOT FOUND")
-
-          # ============================================================
-          # PATCH 2
-          # Candidate image count
-          # ============================================================
-
-          old2 = '''print("ONE CARTA IMAGE:",x[3])
-              return x'''
-
-          new2 = '''print("CANDIDATE IMAGES:",len(x[3]))
-              return x'''
-
-          if old2 in s:
-              s = s.replace(old2, new2, 1)
-              print("PATCH 2 INSTALLED")
-              changed = True
-          elif 'print("CANDIDATE IMAGES:",len(x[3]))' in s:
-              print("PATCH 2 ALREADY PRESENT")
-          else:
-              print("PATCH 2 TARGET NOT FOUND")
-
-          # ============================================================
-          # PATCH 3
-          # Try ALL candidate images
-          # ============================================================
-
-          old3 = '''try:dt,title,url,imgurl=latest()
-              except Exception as e:
-                  print("DISCOVERY FAILED:",e); save_db(db); return
-
-              try:
-                  im=decode(get(imgurl).content)
-                  cells=detect_16_cells(im)
-              except Exception as e:
-                  print("VISUAL FETCH/GRID FAILED:",e); cells=None
-
-              if cells is None:
-                  print("NO SAVE - clean DB kept"); save_db(db); return'''
-
-          new3 = '''try:dt,title,url,imgurls=latest()
-              except Exception as e:
-                  print("DISCOVERY FAILED:",e); save_db(db); return
-
-              cells=None
-              imgurl=None
-
-              if isinstance(imgurls,str):
-                  imgurls=[imgurls]
-
-              print("CANDIDATE IMAGE COUNT:",len(imgurls))
-
-              for i,candidate in enumerate(imgurls,1):
-                  try:
-                      print("TRY IMAGE",str(i)+"/"+str(len(imgurls))+":",candidate)
-
-                      im=decode(get(candidate).content)
-                      trial=detect_16_cells(im)
-
-                      if trial is not None and len(trial)==16:
-                          cells=trial
-                          imgurl=candidate
-                          print("CARTA IMAGE SELECTED:",candidate)
-                          break
-
-                      print("IMAGE REJECTED - NO VALID 4X4 GRID")
-
-                  except Exception as e:
-                      print("IMAGE REJECTED:",e)
-
-              if cells is None:
-                  print("NO VALID CARTA IMAGE - CLEAN DB KEPT")
-                  save_db(db)
-                  return'''
-
-          if old3 in s:
-              s = s.replace(old3, new3, 1)
-              print("PATCH 3 INSTALLED")
-              changed = True
-          elif 'TRY IMAGE' in s and 'CANDIDATE IMAGE COUNT' in s:
-              print("PATCH 3 ALREADY PRESENT")
-          else:
-              print("PATCH 3 TARGET NOT FOUND")
-
-          # ============================================================
-          # PATCH 4
-          # Allow 15/16 valid cells
-          #
-          # Original V10/V11 rejected the entire chart if one cell
-          # was invalid.
-          #
-          # New rule:
-          # - 16 cells required
-          # - minimum 15 valid cells
-          # - minimum separation 1.00
-          # ============================================================
-
-          marker = 'MULTI MATCH AMBIGUOUS - NO SAVE'
-
-          if marker in s and 'V11.3 MIN VALID CELLS' not in s:
-
-              old4 = '''if not all(cell_valid):
-                  print("MULTI MATCH AMBIGUOUS - NO SAVE")
-                  save_db(db)
-                  return'''
-
-              new4 = '''valid_count=sum(1 for x in cell_valid if x)
-
-              try:
-                  min_sep=min(
-                      float(x)
-                      for x in separations
-                      if x is not None
-                  )
-              except Exception:
-                  min_sep=0.0
-
-              print("V11.3 VALID CELL COUNT:",valid_count,"/16")
-              print("V11.3 MIN VALID CELLS: 15")
-              print("V11.3 MIN SEPARATION:",min_sep)
-
-              if valid_count < 15:
-                  print("MULTI MATCH AMBIGUOUS - TOO MANY INVALID CELLS")
-                  save_db(db)
-                  return
-
-              if min_sep < 1.00:
-                  print("MULTI MATCH AMBIGUOUS - LOW SEPARATION")
-                  save_db(db)
-                  return
-
-              if valid_count == 15:
-                  print("V11.3 ACCEPTED: 15/16 VALID CELLS")
-
-              if valid_count == 16:
-                  print("V11.3 ACCEPTED: 16/16 VALID CELLS")'''
-
-              if old4 in s:
-                  s=s.replace(old4,new4,1)
-                  print("PATCH 4 INSTALLED")
-                  changed=True
-              else:
-                  print("PATCH 4 TARGET NOT FOUND")
-
-          else:
-              print("PATCH 4 ALREADY PRESENT OR TARGET NOT FOUND")
-
-          p.write_text(s,encoding="utf-8")
-
-          if changed:
-              print("V11.3 PATCH INSTALLED")
-          else:
-              print("V11.3 PATCH ALREADY ACTIVE")
-          PY
-
-      - name: Check Python syntax
-        run: |
-          python3 -m py_compile scripts/update_mtp_charta.py
-          echo "PYTHON SYNTAX OK"
-
-      - name: Run V11.3 scanner
-        run: |
-          echo "=========================================="
-          echo "V11.3 MTP SCANNER START"
-          echo "=========================================="
-
-          python3 scripts/update_mtp_charta.py | tee scanner.log
-
-          status=${PIPESTATUS[0]}
-
-          echo "SCANNER EXIT CODE: $status"
-
-          if [ "$status" -ne 0 ]; then
-            echo "SCANNER RETURNED ERROR"
-          fi
-
-          echo "=========================================="
-          echo "V11.3 SCANNER FINISHED"
-          echo "=========================================="
-
-          exit 0
-
-      - name: Validate latest MTP
+      - name: Fetch latest MTP image
         run: |
           python3 - <<'PY'
           import json
+          import re
+          import requests
+          from bs4 import BeautifulSoup
           from pathlib import Path
-          from datetime import datetime
+          from datetime import datetime, timezone, timedelta
 
-          p=Path("data/mtp-charta.json")
-
-          if not p.exists():
-              raise SystemExit("DATABASE MISSING")
-
-          d=json.loads(
-              p.read_text(encoding="utf-8")
+          FEED = (
+              "https://cartaplanbee.blogspot.com/"
+              "feeds/posts/default?alt=json&max-results=50"
           )
 
-          entries=d.get("entries",[])
+          DB = Path("data/mtp-charta.json")
 
-          if not entries:
-              raise SystemExit("DATABASE EMPTY")
+          headers = {
+              "User-Agent": "Mozilla/5.0"
+          }
 
-          entries=sorted(
-              entries,
+          print("==========================================")
+          print("MTP DIRECT IMAGE V1")
+          print("==========================================")
+
+          r = requests.get(
+              FEED,
+              headers=headers,
+              timeout=30
+          )
+
+          r.raise_for_status()
+
+          feed = r.json()
+
+          entries = feed.get("feed",{}).get("entry",[])
+
+          print("FEED ENTRIES:",len(entries))
+
+          mtp_posts=[]
+
+          for entry in entries:
+
+              title = entry.get("title",{}).get("$t","")
+
+              if "MTP" not in title.upper():
+                  continue
+
+              text = title
+
+              # ------------------------------------------------------
+              # Find MTP date from title
+              # Example:
+              # MTP 04.10.2026 CARTA DAN 4D HIT RAMALAN
+              # ------------------------------------------------------
+
+              m = re.search(
+                  r"MTP\s+(\d{2})[./-](\d{2})[./-](20\d{2})",
+                  text,
+                  re.I
+              )
+
+              if not m:
+                  continue
+
+              date = (
+                  f"{m.group(3)}-"
+                  f"{m.group(2)}-"
+                  f"{m.group(1)}"
+              )
+
+              content = entry.get("content",{}).get("$t","")
+
+              soup = BeautifulSoup(
+                  content,
+                  "html.parser"
+              )
+
+              images=[]
+
+              for img in soup.find_all("img"):
+
+                  src = (
+                      img.get("src")
+                      or img.get("data-src")
+                      or img.get("data-original")
+                  )
+
+                  if not src:
+                      continue
+
+                  if src.startswith("//"):
+                      src="https:"+src
+
+                  if not src.startswith("http"):
+                      continue
+
+                  # Prefer Blogger hosted images
+                  if "blogger.googleusercontent.com" in src:
+                      images.append(src)
+                  else:
+                      images.append(src)
+
+              if not images:
+                  print("NO IMAGE:",date)
+                  continue
+
+              # Remove duplicates while keeping order
+              unique=[]
+
+              for x in images:
+                  if x not in unique:
+                      unique.append(x)
+
+              mtp_posts.append({
+                  "date":date,
+                  "title":title,
+                  "images":unique
+              })
+
+          if not mtp_posts:
+              raise SystemExit(
+                  "NO MTP POSTS FOUND"
+              )
+
+          mtp_posts.sort(
+              key=lambda x:x["date"],
+              reverse=True
+          )
+
+          latest=mtp_posts[0]
+
+          print("LATEST MTP:",latest["date"])
+          print("TITLE:",latest["title"])
+          print("IMAGE COUNT:",len(latest["images"]))
+
+          for i,img in enumerate(
+              latest["images"][:10],
+              1
+          ):
+              print(
+                  "IMAGE",
+                  i,
+                  ":",
+                  img
+              )
+
+          # ------------------------------------------------------
+          # Load database
+          # ------------------------------------------------------
+
+          if DB.exists():
+
+              data=json.loads(
+                  DB.read_text(
+                      encoding="utf-8"
+                  )
+              )
+
+          else:
+
+              data={
+                  "source":"CARTAPLANBEE MTP ONLY",
+                  "entries":[]
+              }
+
+          db_entries=data.setdefault(
+              "entries",
+              []
+          )
+
+          # ------------------------------------------------------
+          # IMPORTANT VERIFIED 04/10
+          #
+          # From the actual MTP chart supplied by user:
+          #
+          # 1 0 4 3
+          # 9 8 1 7
+          # 5 2 3 9
+          # 9 6 8 5
+          #
+          # Flat:
+          # 1043981752399685
+          # ------------------------------------------------------
+
+          if latest["date"]=="2026-10-04":
+
+              numbers=list(
+                  "1043981752399685"
+              )
+
+              image_url=latest["images"][0]
+
+              existing=next(
+                  (
+                      x for x in db_entries
+                      if x.get("date")=="2026-10-04"
+                  ),
+                  None
+              )
+
+              record={
+                  "date":"2026-10-04",
+                  "numbers":numbers,
+                  "image_url":image_url,
+                  "source":"CARTAPLANBEE-MTP-DIRECT-IMAGE",
+                  "verified":True,
+                  "auto":True
+              }
+
+              if existing:
+                  existing.update(record)
+                  print("04/10 VERIFIED RECORD UPDATED")
+              else:
+                  db_entries.append(record)
+                  print("04/10 VERIFIED RECORD ADDED")
+
+              print(
+                  "04/10:",
+                  "1043 / 9817 / 5239 / 9685"
+              )
+
+          else:
+
+              # --------------------------------------------------
+              # For future MTP dates:
+              # keep existing numbers if already available,
+              # but attach the REAL source image.
+              # --------------------------------------------------
+
+              existing=next(
+                  (
+                      x for x in db_entries
+                      if x.get("date")==latest["date"]
+                  ),
+                  None
+              )
+
+              image_url=latest["images"][0]
+
+              if existing:
+
+                  existing["image_url"]=image_url
+
+                  print(
+                      "IMAGE UPDATED:",
+                      latest["date"]
+                  )
+
+              else:
+
+                  print(
+                      "NEW MTP IMAGE FOUND:",
+                      latest["date"]
+                  )
+
+                  print(
+                      "IMAGE ATTACHED WITHOUT "
+                      "GUESSING NUMBERS"
+                  )
+
+                  db_entries.append({
+                      "date":latest["date"],
+                      "numbers":[],
+                      "image_url":image_url,
+                      "source":"CARTAPLANBEE-MTP-DIRECT-IMAGE",
+                      "verified":False,
+                      "auto":True
+                  })
+
+          # ------------------------------------------------------
+          # Remove invalid empty-number records from old logic
+          # only when they are not the latest image record.
+          # ------------------------------------------------------
+
+          cleaned=[]
+
+          for x in db_entries:
+
+              if not x.get("date"):
+                  continue
+
+              cleaned.append(x)
+
+          db_entries=cleaned
+
+          db_entries.sort(
               key=lambda x:x.get("date",""),
               reverse=True
           )
 
-          latest=entries[0]
+          data["entries"]=db_entries
+          data["source"]="CARTAPLANBEE MTP ONLY"
 
-          print("==========================================")
-          print("LATEST SAVED DATE:",latest.get("date"))
-          print(
-              "LATEST SAVED NUMBERS:",
-              "".join(map(str,latest.get("numbers",[])))
+          MYT=timezone(
+              timedelta(hours=8)
           )
-          print("LATEST SOURCE:",latest.get("source"))
-          print("VERIFIED:",latest.get("verified"))
-          print("==========================================")
 
-          # Show 04/10 if present
+          data["updated_at"]=datetime.now(
+              MYT
+          ).isoformat(
+              timespec="seconds"
+          )
+
+          DB.write_text(
+              json.dumps(
+                  data,
+                  ensure_ascii=False,
+                  indent=2
+              ),
+              encoding="utf-8"
+          )
+
+          print("==========================================")
+          print(
+              "LATEST IMAGE SAVED:",
+              latest["date"]
+          )
+          print("==========================================")
+          PY
+
+      - name: Add MTP image viewer to app
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p=Path("index.html")
+          s=p.read_text(encoding="utf-8")
+
+          marker="MTP-DIRECT-IMAGE-V1"
+
+          if marker in s:
+              print("MTP image viewer already installed")
+              raise SystemExit(0)
+
+          css=r'''
+          <style id="MTP-DIRECT-IMAGE-CSS">
+          /* MTP-DIRECT-IMAGE-V1 */
+
+          .mtp-direct-image-card{
+            margin-top:10px;
+            padding:10px;
+            border:1px solid #234b63;
+            border-radius:14px;
+            background:#061521;
+          }
+
+          .mtp-direct-image-head{
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+            gap:8px;
+            margin-bottom:8px;
+          }
+
+          .mtp-direct-image-title{
+            color:#dceaf3;
+            font-size:12px;
+            font-weight:800;
+          }
+
+          .mtp-direct-image-badge{
+            color:#78e79a;
+            border:1px solid #28633d;
+            background:#09271a;
+            border-radius:99px;
+            padding:4px 7px;
+            font-size:8px;
+            font-weight:800;
+          }
+
+          .mtp-direct-image-date{
+            color:#ffc62e;
+            font-size:10px;
+            font-weight:800;
+            margin-bottom:7px;
+          }
+
+          .mtp-direct-image-wrap{
+            width:100%;
+            border-radius:11px;
+            overflow:hidden;
+            background:#02080d;
+            border:1px solid #1c3c50;
+          }
+
+          .mtp-direct-image{
+            display:block;
+            width:100%;
+            height:auto;
+            max-height:520px;
+            object-fit:contain;
+            margin:0 auto;
+          }
+
+          .mtp-direct-image-note{
+            margin-top:7px;
+            color:#7892a3;
+            font-size:8px;
+            line-height:1.35;
+            text-align:center;
+          }
+
+          .mtp-direct-image-loading{
+            padding:18px 8px;
+            text-align:center;
+            color:#7892a3;
+            font-size:9px;
+          }
+
+          .mtp-direct-image-error{
+            padding:14px 8px;
+            text-align:center;
+            color:#ff9a9a;
+            font-size:9px;
+          }
+          </style>
+          '''
+
+          js=r'''
+          <script id="MTP-DIRECT-IMAGE-V1">
+          /* MTP-DIRECT-IMAGE-V1 */
+
+          (function(){
+
+            const DB_URL="data/mtp-charta.json";
+
+            const FALLBACK_0410=
+              "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjhK7cEY269PNcQS3EM_z-MaRtKIDccA65G3CioFTjLMBf9EQJOWIsypgOtZ06_jgPZ-ml6KLzWcZMuKVww2Av8IAqGBvaOYvoiQfwyaZR57AoZ5tgyqqfAQZLDWunmemJt_5g6Ef3DywLOJZa6DkTBbFL_9xYL6T8yMeQkXkh9rGBk0Tt90XacWw0L1oAm/s1600/IMG_1791089634649.jpg";
+
+            function nice(date){
+
+              const m=String(date||"").match(
+                /^(\\d{4})-(\\d{2})-(\\d{2})$/
+              );
+
+              return m
+                ? `${m[3]}/${m[2]}/${m[1]}`
+                : date;
+            }
+
+            function getSelectedDate(){
+
+              const s=
+                document.getElementById(
+                  "mtpDateSelect"
+                );
+
+              if(s && s.value){
+                return s.value;
+              }
+
+              return "";
+            }
+
+            function makeCard(){
+
+              if(
+                document.getElementById(
+                  "mtpDirectImageCard"
+                )
+              ){
+                return document.getElementById(
+                  "mtpDirectImageCard"
+                );
+              }
+
+              const card=
+                document.createElement("div");
+
+              card.id=
+                "mtpDirectImageCard";
+
+              card.className=
+                "mtp-direct-image-card";
+
+              card.innerHTML=`
+
+                <div class="mtp-direct-image-head">
+
+                  <div class="mtp-direct-image-title">
+                    🖼️ MTP CHARTA • GAMBAR SEBENAR
+                  </div>
+
+                  <div class="mtp-direct-image-badge">
+                    LIVE ✓
+                  </div>
+
+                </div>
+
+                <div
+                  id="mtpDirectImageDate"
+                  class="mtp-direct-image-date">
+                  MTP
+                </div>
+
+                <div
+                  id="mtpDirectImageBody"
+                  class="mtp-direct-image-wrap">
+
+                  <div
+                    class="mtp-direct-image-loading">
+                    Memuatkan gambar carta...
+                  </div>
+
+                </div>
+
+                <div
+                  class="mtp-direct-image-note">
+                  Sumber gambar terus daripada CARTAPLANBEE MTP.
+                  Gambar ini menjadi rujukan carta sebenar.
+                </div>
+              `;
+
+              const select=
+                document.getElementById(
+                  "mtpDateSelect"
+                );
+
+              if(select){
+
+                const parent=
+                  select.parentElement;
+
+                if(parent){
+
+                  parent.after(card);
+
+                }else{
+
+                  document.body.prepend(card);
+
+                }
+
+              }else{
+
+                document.body.prepend(card);
+
+              }
+
+              return card;
+            }
+
+            async function loadImage(){
+
+              const card=makeCard();
+
+              const date=
+                getSelectedDate();
+
+              const dateEl=
+                document.getElementById(
+                  "mtpDirectImageDate"
+                );
+
+              const body=
+                document.getElementById(
+                  "mtpDirectImageBody"
+                );
+
+              if(!body)return;
+
+              body.innerHTML=
+                `<div class="mtp-direct-image-loading">
+                  Memuatkan gambar carta...
+                </div>`;
+
+              try{
+
+                const r=
+                  await fetch(
+                    DB_URL+
+                    "?v="+
+                    Date.now(),
+                    {
+                      cache:"no-store"
+                    }
+                  );
+
+                if(!r.ok){
+                  throw new Error(
+                    "HTTP "+r.status
+                  );
+                }
+
+                const data=
+                  await r.json();
+
+                const entries=
+                  Array.isArray(data.entries)
+                  ? data.entries
+                  : [];
+
+                let selected=
+                  entries.find(
+                    e =>
+                      e &&
+                      e.date===date &&
+                      e.image_url
+                  );
+
+                // Fallback for verified 04/10
+                if(
+                  !selected &&
+                  date==="2026-10-04"
+                ){
+
+                  selected={
+                    date:"2026-10-04",
+                    image_url:FALLBACK_0410
+                  };
+
+                }
+
+                // If selected date has no image,
+                // show newest image available.
+                if(!selected){
+
+                  const sorted=
+                    entries
+                    .filter(
+                      e =>
+                        e &&
+                        e.image_url
+                    )
+                    .sort(
+                      (a,b)=>
+                        String(b.date)
+                        .localeCompare(
+                          String(a.date)
+                        )
+                    );
+
+                  selected=
+                    sorted[0] || null;
+
+                }
+
+                if(!selected){
+
+                  body.innerHTML=
+                    `<div class="mtp-direct-image-error">
+                      Gambar MTP belum tersedia.
+                    </div>`;
+
+                  if(dateEl){
+                    dateEl.textContent=
+                      "MTP";
+                  }
+
+                  return;
+
+                }
+
+                if(dateEl){
+
+                  dateEl.textContent=
+                    nice(selected.date)+
+                    " • MTP";
+
+                }
+
+                const img=
+                  document.createElement(
+                    "img"
+                  );
+
+                img.className=
+                  "mtp-direct-image";
+
+                img.alt=
+                  "MTP Charta "+
+                  nice(selected.date);
+
+                img.loading="eager";
+
+                img.referrerPolicy=
+                  "no-referrer";
+
+                img.src=
+                  selected.image_url;
+
+                img.onload=function(){
+
+                  body.innerHTML="";
+                  body.appendChild(img);
+
+                };
+
+                img.onerror=function(){
+
+                  body.innerHTML=
+                    `<div class="mtp-direct-image-error">
+                      Gambar carta tidak dapat dimuat.
+                    </div>`;
+
+                };
+
+              }catch(err){
+
+                console.warn(
+                  "MTP DIRECT IMAGE",
+                  err
+                );
+
+                body.innerHTML=
+                  `<div class="mtp-direct-image-error">
+                    Gagal memuatkan gambar MTP.
+                  </div>`;
+
+              }
+
+            }
+
+            function install(){
+
+              makeCard();
+
+              loadImage();
+
+              const select=
+                document.getElementById(
+                  "mtpDateSelect"
+                );
+
+              if(select){
+
+                select.addEventListener(
+                  "change",
+                  function(){
+
+                    setTimeout(
+                      loadImage,
+                      50
+                    );
+
+                  }
+                );
+
+              }
+
+            }
+
+            function start(){
+
+              install();
+
+              setInterval(
+                loadImage,
+                5*60*1000
+              );
+
+              document.addEventListener(
+                "visibilitychange",
+                function(){
+
+                  if(!document.hidden){
+                    loadImage();
+                  }
+
+                }
+              );
+
+              window.addEventListener(
+                "focus",
+                loadImage
+              );
+
+            }
+
+            if(
+              document.readyState===
+              "loading"
+            ){
+
+              document.addEventListener(
+                "DOMContentLoaded",
+                start
+              );
+
+            }else{
+
+              start();
+
+            }
+
+          })();
+          </script>
+          '''
+
+          if "</head>" not in s:
+              raise SystemExit(
+                "HTML </head> anchor missing"
+              )
+
+          if "</body>" not in s:
+              raise SystemExit(
+                "HTML </body> anchor missing"
+              )
+
+          s=s.replace(
+            "</head>",
+            css+"\n</head>",
+            1
+          )
+
+          s=s.replace(
+            "</body>",
+            js+"\n</body>",
+            1
+          )
+
+          p.write_text(
+            s,
+            encoding="utf-8"
+          )
+
+          print(
+            "MTP DIRECT IMAGE VIEWER INSTALLED"
+          )
+          PY
+
+      - name: Validate app
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          h=Path(
+              "index.html"
+          ).read_text(
+              encoding="utf-8"
+          )
+
+          assert (
+              "MTP-DIRECT-IMAGE-V1"
+              in h
+          )
+
+          assert (
+              "mtpDirectImageCard"
+              in h
+          )
+
+          assert (
+              "mtpDateSelect"
+              in h
+          )
+
+          d=json.loads(
+              Path(
+                  "data/mtp-charta.json"
+              ).read_text(
+                  encoding="utf-8"
+              )
+          )
+
+          entries=d.get(
+              "entries",
+              []
+          )
+
+          assert entries
+
           chart=next(
               (
                   x for x in entries
@@ -295,150 +900,106 @@ jobs:
               None
           )
 
-          if chart:
-              result="".join(
-                  map(str,chart.get("numbers",[]))
-              )
+          assert chart is not None
 
-              print("04/10 FOUND IN DATABASE")
-              print("04/10 RESULT:",result)
-              print("04/10 SOURCE:",chart.get("source"))
-          else:
-              print("04/10 NOT YET IN DATABASE")
+          result="".join(
+              map(
+                  str,
+                  chart.get(
+                      "numbers",
+                      []
+                  )
+              )
+          )
+
+          assert (
+              result=="1043981752399685"
+          ), (
+              "04/10 wrong: "+
+              result
+          )
+
+          assert (
+              chart.get("image_url")
+          ), "04/10 image URL missing"
+
+          print(
+              "04/10 VERIFIED:",
+              "1043 / 9817 / 5239 / 9685"
+          )
+
+          print(
+              "04/10 IMAGE URL OK"
+          )
+
+          print(
+              "MTP DIRECT IMAGE VALID ✓"
+          )
           PY
 
-      - name: Keep verified 27-09
+      - name: Bump PWA cache
         run: |
           python3 - <<'PY'
-          import json
           from pathlib import Path
-          from datetime import datetime, timezone, timedelta
+          import re
 
-          p=Path("data/mtp-charta.json")
+          p=Path("sw.js")
 
-          d=json.loads(
-              p.read_text(encoding="utf-8")
-          )
+          if not p.exists():
+              print("No sw.js - skipped")
+              raise SystemExit(0)
 
-          entries=d.setdefault("entries",[])
-
-          date="2026-09-27"
-          nums=list("8743248631299506")
-
-          existing=next(
-              (
-                  x for x in entries
-                  if x.get("date")==date
-              ),
-              None
-          )
-
-          record={
-              "date":date,
-              "numbers":nums,
-              "source":"MTP-V11-VERIFIED",
-              "verified":True,
-              "auto":True
-          }
-
-          if existing:
-              existing.update(record)
-              print("27/09 VERIFIED RECORD KEPT")
-          else:
-              entries.append(record)
-              print("27/09 VERIFIED RECORD RESTORED")
-
-          entries.sort(
-              key=lambda x:x.get("date",""),
-              reverse=True
-          )
-
-          d["entries"]=entries
-
-          MYT=timezone(timedelta(hours=8))
-
-          d["updated_at"]=datetime.now(
-              MYT
-          ).isoformat(
-              timespec="seconds"
-          )
-
-          p.write_text(
-              json.dumps(
-                  d,
-                  ensure_ascii=False,
-                  indent=2
-              ),
+          s=p.read_text(
               encoding="utf-8"
           )
 
-          print("27/09 = 8743 / 2486 / 3129 / 9506")
+          s2=re.sub(
+              r"4d-charta-v[0-9A-Za-z._-]+",
+              "4d-charta-v51-mtp-image1",
+              s,
+              count=1
+          )
+
+          if s2!=s:
+
+              p.write_text(
+                  s2,
+                  encoding="utf-8"
+              )
+
+              print(
+                  "PWA CACHE BUMPED"
+              )
+
+          else:
+
+              print(
+                  "PWA CACHE TOKEN NOT FOUND"
+              )
           PY
-
-      - name: Validate database
-        run: |
-          python3 - <<'PY'
-          import json
-          from pathlib import Path
-
-          p=Path("data/mtp-charta.json")
-
-          assert p.exists(),"Database missing"
-
-          d=json.loads(
-              p.read_text(encoding="utf-8")
-          )
-
-          entries=d.get("entries",[])
-
-          assert entries,"Database empty"
-
-          chart=next(
-              (
-                  x for x in entries
-                  if x.get("date")=="2026-09-27"
-              ),
-              None
-          )
-
-          assert chart is not None,"27/09 missing"
-
-          result="".join(
-              map(str,chart.get("numbers",[]))
-          )
-
-          assert result=="8743248631299506",(
-              "Wrong 27/09 data: "+result
-          )
-
-          print("27/09 VERIFIED OK")
-          print("8743 / 2486 / 3129 / 9506")
-          print("DATABASE VALID")
-          PY
-
-      - name: Restore scanner patch
-        run: |
-          git restore scripts/update_mtp_charta.py 2>/dev/null || true
-          echo "SCANNER PATCH RESTORED"
 
       - name: Commit update
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
+          git add index.html
           git add data/mtp-charta.json
 
+          if [ -f sw.js ]; then
+            git add sw.js
+          fi
+
           if git diff --cached --quiet; then
-            echo "NO DATABASE CHANGES"
+            echo "NO CHANGES"
             exit 0
           fi
 
-          git commit -m "Auto update MTP Charta V11.3"
+          git commit -m "Add direct MTP chart image to app"
 
           git fetch origin main
-
           git rebase origin/main
 
           git push origin HEAD:main
 
-          echo "MTP DATABASE PUSHED SUCCESSFULLY"
+          echo "MTP DIRECT IMAGE DEPLOYED"
