@@ -1,10 +1,10 @@
 {
   "market": "Sports Toto",
-  "lastUpdated": "2026-11-15",
+  "lastUpdated": "2026-11-18",
   "historyCoverage": {
-    "drawCount": 927,
+    "drawCount": 928,
     "oldestDate": "2021-01-02",
-    "newestDate": "2026-11-15"
+    "newestDate": "2026-11-18"
   },
   "historyRange": {
     "from": "2021-01-01",
@@ -12,6 +12,37 @@
   },
   "historySource": "deadboy18/malaysia-4d public historical CSV + existing recent records",
   "draws": [
+    {
+      "draw": "",
+      "date": "2026-11-18",
+      "first": "0213",
+      "second": "4770",
+      "third": "8756",
+      "special": [
+        "1920",
+        "0174",
+        "2629",
+        "4394",
+        "8934",
+        "6485",
+        "4287",
+        "1268",
+        "6786",
+        "7532"
+      ],
+      "consolation": [
+        "5182",
+        "6996",
+        "7931",
+        "6148",
+        "9350",
+        "5960",
+        "5757",
+        "0680",
+        "8088",
+        "5648"
+      ]
+    },
     {
       "draw": "",
       "date": "2026-11-15",
